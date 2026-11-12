@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Local secrets for docker compose; see .env.example.
+.env
+
 # Agents
 .claude/settings.local.json
 .claude/.cc-writes/

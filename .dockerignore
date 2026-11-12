@@ -1,0 +1,11 @@
+.git
+.claude
+bin
+*.md
+docs
+web/node_modules
+web/dist
+web/.prerender-ssr
+cmd/website/dist
+cmd/website/prerendered
+charts
