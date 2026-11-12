@@ -7,3 +7,18 @@
 @import './theme/vtech.css';
 
 @source '../node_modules/@ostendorf-cloud/govue/src';
+
+/*
+ * The theme toggle drives its own circular reveal through the View
+ * Transitions API (ThemeToggle.vue), clipping ::view-transition-new(root)
+ * by hand with the Web Animations API. The browser's own default
+ * cross-fade on the root pseudo-elements would otherwise run at the same
+ * time and compete with that clip-path animation, so both are switched
+ * off here; every other same-document view transition this app might
+ * grow stays unaffected because neither selector matches a named group.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
