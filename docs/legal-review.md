@@ -34,41 +34,42 @@ Confirmed and left unchanged, because nothing was wrong:
   anywhere in `web/src/i18n/locales/` or `web/src/views/`, only in three source comments naming
   the old repository. The first milestone already carried out this swap correctly.
 
+## Resolved by the owner
+
+- **Hosting and the Hetzner backup address.** The owner confirmed that the hosting section's "in
+  unseren eigenen Räumlichkeiten" (our own premises) statement and the Hetzner Online GmbH backup
+  address for Umami and the mail server are correct as they stand. No change needed in either
+  page. This closes the two earlier findings about hosting location and the backup address; the
+  owner owes nothing further here.
+- **English privacy policy and AGB.** Both now carry a full English translation, replacing the
+  earlier stub that only pointed back to the German version. See "Translated pages" below.
+
+## Standing operational requirement, not a question
+
+**The 30-day server log retention and the 14-month Umami retention are promises the privacy
+policy makes to visitors, and nothing in either repository's code enforces them.**
+The owner has confirmed both periods are correct as a matter of policy. That settles what the
+text should say; it does not settle whether the infrastructure actually does it. A privacy
+policy stating a retention period the operator does not actually enforce is a false statement to
+a visitor, not a harmless gap, so this stays in the document as a constraint rather than a
+question:
+
+- The log pipeline (whatever sits in front of or inside the deployed application once it exists)
+  must delete server logs at 30 days at the latest, matching the "Server-Log-Dateien" / "Server
+  log files" section of `PrivacyView.vue` in both languages.
+- The Umami instance must be configured to delete statistics data after 14 months, matching the
+  "Besucherstatistik mit Umami" / "Visitor statistics with Umami" section in both languages.
+- Source: repository search for "retention", "30 Tage" and "logrotate" across this worktree and
+  `old_simon-ostendorf.de` found no log pipeline configuration or Umami `DATA_RETENTION` setting;
+  these periods are an operational property of the cluster the site runs on, not of this
+  repository's code.
+- Whoever configures the deployed logging pipeline and the Umami instance must set both
+  retention periods to match these numbers, and keep them matching if either is ever changed:
+  changing one without the other turns a true statement into a false one.
+
 ## Findings for the owner to decide or supply
 
-1. **Hosting provider and location are not established in this repository.**
-   Why it matters: the privacy policy's hosting section states the site is self-hosted "in
-   unseren eigenen Räumlichkeiten" (our own premises) in Germany, carried over verbatim from
-   `old_simon-ostendorf.de`. This repository's `AGENTS.md` says the Helm chart and the Dockerfile
-   are a later milestone, and no Kubernetes manifest, Helm chart or infrastructure repository
-   reference exists yet for `ostendorf.tech` to check that claim against.
-   Source: `AGENTS.md` ("Scope of this milestone"); no Helm chart or deployment manifest found in
-   this worktree or in `old_simon-ostendorf.de`.
-   Owner must supply: where `ostendorf.tech` will actually run, and whether any hosting or backup
-   provider acts as a processor needing a data processing agreement mentioned in the policy.
-
-2. **The 30-day server log retention and the 14-month Umami retention are asserted, not
-   configured anywhere found.**
-   Why it matters: both figures are specific, checkable claims under Art. 13(2)(a) GDPR
-   (storage period). A grep for "retention", "30 Tage" and "logrotate" across this worktree and
-   `old_simon-ostendorf.de` found no log pipeline configuration or Umami `DATA_RETENTION`
-   setting, only the privacy text itself.
-   Source: repository search, both repositories; no retention configuration found.
-   Owner must supply or confirm: the actual retention configured on the deployed logging
-   pipeline and on the Umami instance, so the text states what the infrastructure actually does
-   once milestone two's deployment exists.
-
-3. **The Hetzner backup location named for Umami's database and for the mail server is carried
-   over from the old site and not verified for the new deployment.**
-   Why it matters: Art. 13(1)(e) GDPR requires naming recipients; a wrong address is a wrong
-   statement, not a missing one.
-   Source: `old_simon-ostendorf.de/cmd/website/templates/privacy.html` (Hetzner Online GmbH,
-   Industriestr. 25, 91710 Gunzenhausen); no equivalent configuration exists yet in this
-   worktree.
-   Owner must confirm: whether milestone two's mail server and Umami backups use the same
-   provider and address, once that infrastructure is built.
-
-4. **VAT ID versus Kleinunternehmerregelung is not a contradiction by itself, but is unverified.**
+1. **VAT ID versus Kleinunternehmerregelung is not a contradiction by itself, but is unverified.**
    Why it matters: the AGB state no VAT is charged under section 19 UStG (Kleinunternehmer),
    while the imprint lists a VAT identification number under section 27a UStG. A business can
    legitimately hold both, but this review cannot confirm current turnover or Kleinunternehmer
@@ -77,7 +78,7 @@ Confirmed and left unchanged, because nothing was wrong:
    Owner must confirm: that the Kleinunternehmer status in the AGB still holds, and that the VAT
    ID is still correct and still needed, so both pages keep agreeing with each other.
 
-5. **No chamber, supervisory authority or professional title appears for the trade, and this
+2. **No chamber, supervisory authority or professional title appears for the trade, and this
    review cannot certify that none applies.**
    Why it matters: section 5 DDG requires naming a supervisory authority, chamber and
    professional title for a regulated profession or a licensed craft (Anlage A Handwerksordnung).
@@ -91,17 +92,7 @@ Confirmed and left unchanged, because nothing was wrong:
    the Handwerksrolle (HWK), to settle whether a chamber or supervisory authority line is
    missing.
 
-6. **The English privacy policy and AGB are stubs, not translations.**
-   Why it matters: `PrivacyView.vue` and `AgbView.vue` show only a notice pointing back to the
-   German version in English; only the imprint carries a full English translation. This review
-   does not supply a full English translation of either page: that is a substantial piece of
-   content this task's scope did not cover, and inventing legal wording in a second language
-   without the owner's sign-off is exactly the kind of judgement call that belongs here instead.
-   Source: `PrivacyView.vue`, `AgbView.vue`, both `v-else` branches.
-   Owner must decide: whether English-speaking clients (international bands, touring crews) need
-   a full English privacy policy and AGB, or whether the German-only versions are acceptable.
-
-7. **The whole site's general rate limiting is not mentioned in the privacy policy text as
+3. **The whole site's general rate limiting is not mentioned in the privacy policy text as
    ported.**
    Why it matters: `internal/webapp` (this worktree) wires govue's rate limiter keyed by client
    address for every page request, not only for the contact form. The privacy policy's existing
@@ -114,7 +105,7 @@ Confirmed and left unchanged, because nothing was wrong:
    to the client address. Low priority, since the existing legitimate-interest basis already
    covers it in substance.
 
-8. **The access log's actual fields are narrower than the "Server-Log-Dateien" list describes,
+4. **The access log's actual fields are narrower than the "Server-Log-Dateien" list describes,
    and the gap sits at the reverse proxy, which this repository does not contain yet.**
    Why it matters: `govue`'s `middleware.AccessLog`, as wired in `internal/webapp/webapp.go`,
    logs method, matched route, status, byte count, duration and the resolved client address; it
@@ -129,7 +120,7 @@ Confirmed and left unchanged, because nothing was wrong:
    milestone two's Helm chart exists, so the "Server-Log-Dateien" section matches what is really
    logged, not only what the Go application itself logs.
 
-9. **A stale address lives in code that has not been ported yet, not in a legal page.**
+5. **A stale address lives in code that has not been ported yet, not in a legal page.**
    Why it matters: not a defect in the current pages, but worth catching before milestone two
    lands. `old_simon-ostendorf.de/internal/contact/validate.go` has a validation message that
    tells a visitor with a non-ASCII email address to write to `info@simon-ostendorf.de` directly.
@@ -137,6 +128,25 @@ Confirmed and left unchanged, because nothing was wrong:
    Umlauten..." error message.
    Owner, or whoever implements the contact form milestone, should use `simon@ostendorf.tech`
    there instead when that code is ported.
+
+## Translated pages
+
+`PrivacyView.vue` and `AgbView.vue` now carry a full English translation of the German privacy
+policy and the German AGB, in the same place the imprint already did this: a binding-notice
+sentence at the top of the English block, reusing the existing `legal.bindingNotice` /
+`legal.viewGerman` catalogue strings, followed by the full translated content under the same
+headings. The German text stays the source of truth; nothing was added, removed or softened in
+translation, and every German statutory reference (GDPR articles, Section 25(1) TDDDG, Section
+19 and Section 27a UStG, DGUV, MVStättVO) keeps its German name and section number, with a short
+English gloss on first use rather than a substituted domestic equivalent.
+
+One place in the AGB left room for two readings, and the more conservative one was used rather
+than picked silently: Section 5's "Der Auftragnehmer ist verpflichtet, anderweitig erzielte
+Einnahmen für den abgesagten Zeitraum anzurechnen" was translated as a duty to credit substitute
+income earned elsewhere against the cancellation fee, the plain reading of "anrechnen", rather
+than as a cap on or a waiver of the fee. If the owner means something stronger (for example, the
+fee reduced to the net loss actually suffered), that changes the German text too, not only the
+translation.
 
 ## Confirmed by reading the code, not assumed
 
