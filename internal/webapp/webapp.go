@@ -11,18 +11,23 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 
+	"github.com/ostendorf-cloud/govue/api"
 	"github.com/ostendorf-cloud/govue/clientip"
 	"github.com/ostendorf-cloud/govue/csrf"
 	"github.com/ostendorf-cloud/govue/health"
 	"github.com/ostendorf-cloud/govue/metrics"
 	"github.com/ostendorf-cloud/govue/middleware"
 	"github.com/ostendorf-cloud/govue/ratelimit"
+	"github.com/ostendorf-cloud/govue/session"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/contact"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/pow"
 )
 
-// maxRateLimitKeys bounds the number of distinct client addresses the rate
+// maxRateLimitKeys bounds the number of distinct client addresses a rate
 // limiter tracks at once, the same bound govue's own example applies; see
 // the ratelimit package for why that bound matters.
 const maxRateLimitKeys = 100_000
@@ -31,11 +36,26 @@ const maxRateLimitKeys = 100_000
 type App struct {
 	logger *slog.Logger
 
+	siteURL *url.URL
+
 	health *health.Registry
 
-	limiter   *ratelimit.Limiter
-	rateLimit *middleware.RateLimit
-	protector *csrf.Protector
+	limiter          *ratelimit.Limiter
+	rateLimit        *middleware.RateLimit
+	challengeRateLim *middleware.RateLimit
+	contactRateLim   *middleware.RateLimit
+	protector        *csrf.Protector
+
+	sessions *session.Manager
+	csrfKey  []byte
+
+	challenges    *pow.Service
+	challengeKeys [][]byte
+
+	mailer         *contact.Sender
+	smtpCreds      contact.Credentials
+	smtpConfigured bool
+	envelope       contact.Envelope
 
 	security  middleware.Security
 	accessLog middleware.AccessLog
@@ -58,6 +78,8 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 		}
 	}
 
+	a.siteURL = cfg.SiteURL
+
 	clientIPs := clientip.NewResolver(cfg.TrustedProxies)
 
 	pages, err := newPageServer(dist, prerendered)
@@ -75,18 +97,61 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	fail(err)
 	a.rateLimit = rateLimit
 
-	// No session exists yet in this milestone, so Expected always reports
-	// that there is nothing to forge: csrf.Check then passes every unsafe
-	// method on that half alone. The origin check, the other half, still
-	// runs on every unsafe method regardless, which is what this is wired
-	// up for ahead of the contact form a later milestone adds: that form
-	// only has to start deriving a real per-session token, never wire the
-	// protector itself.
-	protector, err := csrf.New(func(*http.Request) (string, bool) { return "", false })
+	challengeLimiter := ratelimit.New(cfg.ChallengeRateLimitBurst, cfg.ChallengeRateLimitPer, maxRateLimitKeys)
+	challengeRateLim, err := middleware.NewRateLimit(middleware.RateLimitConfig{Limiter: challengeLimiter, ClientIP: clientIPs})
+	fail(err)
+	a.challengeRateLim = challengeRateLim
+
+	contactLimiter := ratelimit.New(cfg.ContactRateLimitBurst, cfg.ContactRateLimitPer, maxRateLimitKeys)
+	contactRateLim, err := middleware.NewRateLimit(middleware.RateLimitConfig{Limiter: contactLimiter, ClientIP: clientIPs})
+	fail(err)
+	a.contactRateLim = contactRateLim
+
+	a.sessions, err = session.New(session.Config{
+		Store:          session.NewMemoryStore(nil),
+		AllowPlainHTTP: cfg.AllowPlainHTTP,
+	})
+	fail(err)
+	a.csrfKey = cfg.CSRFKey
+
+	// Expected is the one place this application connects the session
+	// layer to csrf, which never imports session itself: it reads the
+	// session the request itself carries and derives that session's
+	// token, the same read the example in govue documents. It reads the
+	// store directly rather than through ensureSession's request context,
+	// because the one unsafe route this checks, POST /api/v1/contact,
+	// never runs ensureSession itself: its session was already minted by
+	// an earlier GET, and the browser sends the cookie back on its own.
+	// "No session" still means nothing to forge, the same answer this
+	// milestone's predecessor always gave.
+	protector, err := csrf.New(func(r *http.Request) (string, bool) {
+		s, ok, err := a.sessions.Read(r.Context(), r)
+		if err != nil || !ok {
+			return "", false
+		}
+		return csrf.Token(a.csrfKey, s.ID), true
+	})
 	fail(err)
 	a.protector = protector
 
+	a.challenges = pow.NewService(challengeMaxNumber, challengeTTL, challengeMinAge)
+	a.challengeKeys = nil
+	if len(cfg.ChallengeKey) > 0 {
+		a.challengeKeys = [][]byte{cfg.ChallengeKey}
+	}
+
+	heloName := cfg.SiteURL.Hostname()
+	a.mailer = contact.NewSender(cfg.SMTPAddr, heloName)
+	a.smtpCreds = contact.Credentials{Username: cfg.SMTPUsername, Password: cfg.SMTPPassword}
+	a.smtpConfigured = cfg.SMTPUsername != "" && cfg.SMTPPassword != ""
+	a.envelope = contact.Envelope{From: cfg.ContactFrom, To: cfg.ContactTo}
+
 	a.security = middleware.DefaultSecurity()
+	if cfg.AllowPlainHTTP {
+		// A browser that reached this service over plain HTTP must never
+		// be told to upgrade every future visit to HTTPS.
+		a.security.HSTS = 0
+	}
 	a.accessLog = middleware.AccessLog{ClientIP: clientIPs}
 
 	if err := errors.Join(problems...); err != nil {
@@ -120,12 +185,30 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP, metricsHandler http.Handle
 	a.health.Handle(mux)
 	mux.Handle("GET /metrics", metricsHandler)
 
+	// route is the plain per-handler chain: the general rate limit, then
+	// the CSRF protector's origin check (the token half only ever refuses
+	// an unsafe method, and nothing here answers one). It is for a bare
+	// resource that needs no session of its own: a static asset,
+	// robots.txt and sitemap.xml.
 	route := func(h http.Handler) http.Handler {
 		return middleware.Chain(h, a.rateLimit.Middleware, a.protector.Middleware)
 	}
+	// routeSession adds ensureSession ahead of the protector, so a GET
+	// that may lead to the contact form's POST has already minted a
+	// session and set its cookie by the time it answers.
+	routeSession := func(h http.Handler) http.Handler {
+		return middleware.Chain(h, a.rateLimit.Middleware, a.ensureSession, a.protector.Middleware)
+	}
 
 	mux.Handle("GET /assets/", route(a.pages.assetHandler()))
-	mux.Handle("/", route(a.pages.pageHandler()))
+	mux.Handle("GET /robots.txt", route(a.robotsHandler()))
+	mux.Handle("GET /sitemap.xml", route(a.sitemapHandler()))
+
+	mux.Handle("GET /api/v1/challenge", middleware.Chain(api.Handle(a.handleChallenge), a.challengeRateLim.Middleware, a.ensureSession, a.protector.Middleware))
+	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.contactRateLim.Middleware, a.protector.Middleware))
+	mux.Handle("/api/", route(api.NotFoundHandler()))
+
+	mux.Handle("/", routeSession(a.pages.pageHandler()))
 
 	return middleware.Chain(mux,
 		middleware.Recover(a.logger),
