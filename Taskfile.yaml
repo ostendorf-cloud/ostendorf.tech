@@ -66,13 +66,11 @@ tasks:
   # The web/ half. Every target below runs inside web/ and depends on web:deps,
   # so one of them on its own is enough in a fresh checkout and in CI.
   web:deps:
-    # Not --frozen-lockfile yet: no pnpm-lock.yaml is committed, see
-    # AGENTS.md. Switch back once one is.
     desc: Install the web/ dependencies
     dir: web
     run: once
     cmds:
-      - pnpm install
+      - pnpm install --frozen-lockfile
 
   web:lint:
     desc: ESLint over the web/ package

@@ -101,12 +101,3 @@ privacy and AGB pages, are implemented. Left out, all tracked as later milestone
   Security, which this account does not have.
 - Every job runs on `blacksmith-2vcpu-ubuntu-2404`, never on a GitHub hosted runner:
   this repository is private, so its minutes are billed.
-- No `web/pnpm-lock.yaml` is committed, and `task web:deps` runs `pnpm install`
-  without `--frozen-lockfile`. Generating the lockfile needs pnpm to actually fetch
-  `@ostendorf-cloud/govue`'s git dependency, which calls `git init` against a fresh
-  temporary directory; the sandbox this milestone was built in denies writing
-  `.git/config` unconditionally, including there, confirmed by reproducing the same
-  failure against an unrelated, brand-new directory outside this repository. Run
-  `pnpm install` once from `web/` in an environment that can reach GitHub over git,
-  commit the resulting `pnpm-lock.yaml`, and switch `web:deps` back to
-  `pnpm install --frozen-lockfile` in the same change.
