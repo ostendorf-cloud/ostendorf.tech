@@ -1,0 +1,151 @@
+{
+  "common": {
+    "siteName": "Simon Ostendorf Event Technology",
+    "skipToContent": "Skip to content",
+    "switchLocale": "Deutsch",
+    "theme": {
+      "light": "Switch to light mode",
+      "dark": "Switch to dark mode",
+      "system": "Follow system setting"
+    }
+  },
+  "nav": {
+    "main": "Main menu",
+    "services": "Services",
+    "bands": "Bands",
+    "about": "About me"
+  },
+  "footer": {
+    "copyright": "Copyright © {year} Simon Ostendorf"
+  },
+  "home": {
+    "meta": {
+      "title": "Event Technology",
+      "description": "Simon Ostendorf, event technology from Aachen, Germany: full service, live sound for bands, sound, lighting and video technology for corporate events, concerts and private parties."
+    },
+    "hero": {
+      "eyebrow": "Simon Ostendorf",
+      "title": "Event Technology",
+      "tagline": ["Full Service", "Live Sound / Bands", "Sound Engineering", "Lighting", "Video"],
+      "ctaContact": "Contact",
+      "ctaServices": "Services"
+    },
+    "services": {
+      "eyebrow": "What I offer",
+      "title": "Services",
+      "lead": "From planning to teardown: technology and support for your event, from a single source.",
+      "panelTechnology": "Technology & Service",
+      "items": [
+        { "title": "Full Service", "text": "Planning, setup, on-site support, teardown" },
+        { "title": "Band support", "text": "Live mix, monitoring, tour support, recordings" },
+        { "title": "Sound engineering", "text": "PA systems, wireless links, mixing consoles" },
+        { "title": "Lighting", "text": "Static and moving light, lighting design" },
+        { "title": "Video", "text": "Recordings, streaming" },
+        { "title": "Rental / dry hire", "text": "Equipment to run yourself" }
+      ],
+      "panelAreas": "Where I work",
+      "areas": [
+        "Bands & live music",
+        "Corporate events & galas",
+        "Open-air events & street festivals",
+        "Conferences & conventions",
+        "Graduation & school events",
+        "Birthdays & private parties",
+        "Weddings & civil ceremonies",
+        "Trade show appearances & product launches",
+        "Cultural events & theatre",
+        "Recordings"
+      ],
+      "more": "… and much more, just get in touch!"
+    },
+    "bands": {
+      "eyebrow": "On stage",
+      "title": "Bands",
+      "lead": "Bands and ensembles I provide technical support for.",
+      "instagramLabel": "View on Instagram"
+    },
+    "about": {
+      "eyebrow": "Who's behind it",
+      "title": "About me",
+      "paragraphs": [
+        "I have been passionate about event technology for more than 10 years, with experience in almost every area of the industry. Whether sound, light, stage or video: I offer full-service support for your event, from a single source.",
+        "I mainly support corporate events, galas, trade shows and conferences, from the first idea through to the final execution. I also support bands professionally at concerts, on tour or for single shows, including technical planning, setup, sound check and live support.",
+        "Planning a company party, a cultural event, or need support for a live production? Just get in touch, and together we will make your event an experience."
+      ],
+      "facts": [
+        { "value": "10+", "label": "years of experience" },
+        { "value": "4", "label": "disciplines: sound, light, stage, video" },
+        { "value": "1", "label": "point of contact from the idea to teardown" }
+      ],
+      "cta": "Request a project"
+    }
+  },
+  "bands": {
+    "rubik": {
+      "name": "Rubik",
+      "paragraphs": [
+        "We cover music our own way. Sometimes unplugged, sometimes flat out. We play (almost) everything you know, from Queen, the Beatles, Sting and Stevie Wonder to more special, less familiar songs by Florence and the Machine or Alicia Keys. If you don't find something you like here, that's on you!",
+        "With our own interpretations and ideas we give the classic cover songs a whole new coat of paint, colourful, different and unexpected. We scramble the finished Rubik's cube again, every time. Come by, dance along, have fun!"
+      ]
+    },
+    "bademeister": {
+      "name": "Die Bademeister",
+      "paragraphs": [
+        "We are a cover band made up of current and former students of FH Aachen. We got our start at the first summer festival of the Electrical Engineering and Information Technology department (2022). Back then the student council was still looking for acts, and since we were all involved with the council in some way already, the idea came up to perform together as a band.",
+        "What was originally meant as a one-off show quickly grew into something more. Playing together was so much fun that we decided to keep rehearsing regularly and play further shows. Among other things we have played the joint Christmas market of the AStA student councils at FH Aachen, as well as various private events that came our way by word of mouth.",
+        "Musically we offer a varied mix of international and German rock and pop songs. Starting with classics like Zombie by the Cranberries, we have steadily expanded our repertoire. These days our set also includes more recent tracks by artists such as Måneskin, Kraftklub and Alligatoah."
+      ]
+    },
+    "fourfold": {
+      "name": "Fourfold",
+      "paragraphs": [
+        "Founded for \"Jugend jazzt\", the young band Fourfold from the Mönchengladbach area has played regular small and medium-sized shows for about 4 years. Whether in converted churches, music cafés or jazz cellars, the band plays wherever handmade funk, soul and fusion music is in demand.",
+        "Thanks to its unusual line-up (vocals/trombone, vocals/trumpet, guitar, drums, bass), the five-piece band creates a colourful mix, from instrumental jazz standards and fusion classics to modern funk and jazz in the style of Nils Landgren, Jamie Cullum or the Heavytones. The band presents its songs, covers and originals, always arranged in house, with a fresh sound and the energy it takes."
+      ]
+    },
+    "singingLittleBigBand": {
+      "name": "Singing Little BigBand of FH Aachen"
+    },
+    "bigBand": {
+      "name": "BigBand of FH Aachen",
+      "paragraphs": [
+        "Since 2007 the Full House Big Band of FH Aachen has performed at internal and public events under the direction of Boris Bansbach."
+      ]
+    },
+    "jazzCombo": {
+      "name": "Jazz Combo of FH Aachen",
+      "paragraphs": [
+        "As the \"little brother\" of the Big Band, the Jazz Combo of FH Aachen performs at internal and public events, also under the direction of Boris Bansbach."
+      ]
+    },
+    "herrenjedeck": {
+      "name": "Herrenjedeck",
+      "paragraphs": [
+        "Herrenjedeck play Cologne's carnival classics in Kölsch, the local dialect, dialect and all, since that is the whole point. Their tagline, \"Kölsche Tön met Jeschmack\" (\"Cologne tunes with taste\"), sums up a band from Jülich playing the best of Kölsch music with real heart, from singalong songs to rocked-up versions of Cologne classics.",
+        "As they put it themselves: \"Herrenjedeck, dat es Hejmat, Jesellichkejt un Stimmung. Dat jilt för et Jedränk jenau esu wie för uns Kapell.\" (\"Herrenjedeck is home, togetherness and atmosphere, true of the drinks just as much as of our band.\") Catch them at Carnival, at festivals, at corporate events and at private parties."
+      ]
+    }
+  },
+  "legal": {
+    "eyebrow": "Legal",
+    "bindingNotice": "This page is only available in German. The German version is the legally binding one.",
+    "viewGerman": "View the German version",
+    "imprint": {
+      "title": "Imprint",
+      "metaDescription": "Imprint of Simon Ostendorf Event Technology."
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "metaDescription": "Privacy policy of Simon Ostendorf Event Technology."
+    },
+    "agb": {
+      "title": "Terms and Conditions",
+      "metaDescription": "Terms and conditions of Simon Ostendorf Event Technology."
+    }
+  },
+  "notFound": {
+    "title": "Page not found",
+    "lead": "This page does not exist.",
+    "backHome": "Back to the home page"
+  }
+}

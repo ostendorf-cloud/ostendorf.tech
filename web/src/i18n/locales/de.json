@@ -1,0 +1,158 @@
+{
+  "common": {
+    "siteName": "Simon Ostendorf Veranstaltungstechnik",
+    "skipToContent": "Zum Inhalt springen",
+    "switchLocale": "English",
+    "theme": {
+      "light": "Zu hellem Modus wechseln",
+      "dark": "Zu dunklem Modus wechseln",
+      "system": "Systemeinstellung übernehmen"
+    }
+  },
+  "nav": {
+    "main": "Hauptmenü",
+    "services": "Leistungen",
+    "bands": "Bands",
+    "about": "Über mich"
+  },
+  "footer": {
+    "copyright": "Copyright © {year} Simon Ostendorf"
+  },
+  "home": {
+    "meta": {
+      "title": "Veranstaltungstechnik",
+      "description": "Simon Ostendorf, Veranstaltungstechnik aus Aachen: Full Service, Live-Sound für Bands, Ton-, Licht- und Videotechnik für Firmenevents, Konzerte und private Feiern."
+    },
+    "hero": {
+      "eyebrow": "Simon Ostendorf",
+      "title": "Veranstaltungstechnik",
+      "tagline": [
+        "Full Service",
+        "Live-Sound / Bands",
+        "Tontechnik",
+        "Lichttechnik",
+        "Videotechnik"
+      ],
+      "ctaContact": "Kontakt",
+      "ctaServices": "Leistungen"
+    },
+    "services": {
+      "eyebrow": "Was ich biete",
+      "title": "Leistungen",
+      "lead": "Von der Planung bis zum Abbau: Technik und Betreuung für Ihre Veranstaltung aus einer Hand.",
+      "panelTechnology": "Technik & Service",
+      "items": [
+        { "title": "Full Service", "text": "Planung, Aufbau, Betreuung, Abbau" },
+        {
+          "title": "Betreuung von Bands",
+          "text": "Live-Mix, Monitoring, Tourbegleitung, Recordings"
+        },
+        { "title": "Tontechnik", "text": "PA-Anlagen, Funkstrecken, Mischpulte" },
+        { "title": "Lichttechnik", "text": "Statisches & bewegtes Licht, Lichtdesign" },
+        { "title": "Videotechnik", "text": "Aufzeichnungen, Streaming" },
+        { "title": "Vermietung / Dry-Hire", "text": "Technik zum Selbstbetrieb" }
+      ],
+      "panelAreas": "Einsatzbereiche",
+      "areas": [
+        "Bands & Live-Musik",
+        "Firmenevents & Galas",
+        "Open-Air Events & Straßenfeste",
+        "Konferenzen & Tagungen",
+        "Abschlussfeiern & Schulveranstaltungen",
+        "Geburtstage & private Feiern",
+        "Hochzeiten & freie Trauungen",
+        "Messeauftritte & Produktpräsentationen",
+        "Kulturelle Veranstaltungen & Theater",
+        "Recordings"
+      ],
+      "more": "… und vieles mehr, sprechen Sie mich gerne an!"
+    },
+    "bands": {
+      "eyebrow": "Auf der Bühne",
+      "title": "Bands",
+      "lead": "Bands und Ensembles, die ich technisch begleite.",
+      "instagramLabel": "Auf Instagram ansehen"
+    },
+    "about": {
+      "eyebrow": "Wer dahinter steht",
+      "title": "Über mich",
+      "paragraphs": [
+        "Seit über 10 Jahren bin ich leidenschaftlich in der Veranstaltungstechnik tätig. Dabei habe ich Erfahrung in nahezu allen Bereichen der Branche. Ob Ton, Licht, Bühne oder Video: Ich biete Ihnen Full-Service-Leistungen für Ihr Event aus einer Hand.",
+        "Hauptsächlich betreue ich Firmenveranstaltungen, Galas, Messen und Konferenzen – von der ersten Idee bis zur finalen Umsetzung. Ebenfalls unterstütze ich Bands professionell bei Konzerten, Touren oder Einzelauftritten – inklusive technischer Planung, Aufbau, Soundcheck und Live-Begleitung.",
+        "Sie planen eine Firmenfeier, ein kulturelles Event oder benötigen Unterstützung für eine Live-Produktion? Sprechen Sie mich gerne an, gemeinsam machen wir Ihre Veranstaltung zu einem Erlebnis."
+      ],
+      "facts": [
+        { "value": "10+", "label": "Jahre Erfahrung" },
+        { "value": "4", "label": "Gewerke: Ton, Licht, Bühne, Video" },
+        { "value": "1", "label": "Ansprechpartner von der Idee bis zum Abbau" }
+      ],
+      "cta": "Projekt anfragen"
+    }
+  },
+  "bands": {
+    "rubik": {
+      "name": "Rubik",
+      "paragraphs": [
+        "Wir covern Musik auf unsere eigene Art. Mal unplugged, mal voll auf die Zwölf. Dabei gibt's (fast) alles, was man kennt von Queen, den Beatles, Sting oder Stevie Wonder bis hin zu eher speziellen und unbekannteren Songs von Florence and the Machine oder Alicia Keys. Wer bei uns nichts gut findet, ist selbst schuld!",
+        "Mit unseren eigenen Interpretationen und Ideen geben wir den klassischen Coversongs einen ganz neuen Anstrich – bunt, anders und unerwartet. Wir mischen den fertigen Zauberwürfel also wieder wild durcheinander. Vorbeikommen, mittanzen, Spaß haben!"
+      ]
+    },
+    "bademeister": {
+      "name": "Die Bademeister",
+      "paragraphs": [
+        "Wir sind eine Coverband, bestehend aus aktuellen und ehemaligen Studierenden der FH Aachen. Unser Ursprung liegt im ersten Sommerfest des Fachbereichs Elektro- und Informationstechnik (2022). Damals suchte die Fachschaft noch nach Programmpunkten und da wir alle in irgendeiner Form bereits in der Fachschaft aktiv waren oder uns für sie engagiert hatten, entstand die Idee, gemeinsam als Band aufzutreten.",
+        "Was ursprünglich als einmaliger Auftritt geplant war, entwickelte sich schnell weiter. Das gemeinsame Musizieren bereitete uns so viel Freude, dass wir beschlossen, regelmäßig weiter zu proben und weitere Auftritte zu spielen. So standen wir unter anderem beim Weihnachtsmarkt der Fachschaften des AStAs der FH Aachen auf der Bühne, sowie bei verschiedenen privaten Veranstaltungen, die über Mundpropaganda zustande kamen.",
+        "Musikalisch bieten wir eine abwechslungsreiche Mischung aus internationalen und deutschen Rock- und Popsongs. Angefangen bei Klassikern wie Zombie von den Cranberries haben wir unser Repertoire stetig erweitert. Mittlerweile gehören auch modernere Titel von Künstlern wie Måneskin, Kraftklub oder Alligatoah zu unserem Programm."
+      ]
+    },
+    "fourfold": {
+      "name": "Fourfold",
+      "paragraphs": [
+        "Gegründet für „Jugend jazzt“ bestreitet die junge Band Fourfold aus dem Raum Mönchengladbach seit ca. 4 Jahren regelmäßig kleinere und mittelgroße Auftritte. Ob in Kulturkirchen, Musikcafés oder Jazzkellern, die Band spielt überall, wo handgemachte Funk-, Soul- und Fusionmusik gefragt ist.",
+        "Durch die besondere Besetzung (voc/pos, voc/trp, git, dr, bs) schafft die fünfköpfige Band einen bunten Mix, von instrumentalen Jazz Standards, über Klassiker aus dem Fusion Bereich, bishin zu moderner Funk- und Jazzmusik a la Nils Landgren, Jamie Cullum oder den Heavytones. Die Band präsentiert ihre Songs, Cover und Eigenes, stets eigens arrangiert, mit frischem Sound und der nötigen Energie!"
+      ]
+    },
+    "singingLittleBigBand": {
+      "name": "Singing Little BigBand der Fachhochschule Aachen"
+    },
+    "bigBand": {
+      "name": "BigBand der Fachhochschule Aachen",
+      "paragraphs": [
+        "Seit 2007 spielt die Full House Big Band der FH Aachen unter der Leitung von Boris Bansbach bei internen und öffentlichen Veranstaltungen."
+      ]
+    },
+    "jazzCombo": {
+      "name": "Jazz Combo der Fachhochschule Aachen",
+      "paragraphs": [
+        "Als „kleiner Bruder“ der Big Band spielt die Jazz Combo der FH Aachen, ebenfalls unter der Leitung von Boris Bansbach, bei internen und öffentlichen Veranstaltungen."
+      ]
+    },
+    "herrenjedeck": {
+      "name": "Herrenjedeck",
+      "paragraphs": [
+        "„Kölsche Tön met Jeschmack.“ Herrenjedeck aus Jülich spielen das Beste aus der kölschen Musik, immer met vell Hätzbloot. Von Liedern zum Schunkeln bis zur Rockversion des kölschen Klassikers.",
+        "„Herrenjedeck, dat es Hejmat, Jesellichkejt un Stimmung. Dat jilt för et Jedränk jenau esu wie för uns Kapell.“ Zu hören an Fasteloovend, auf Festen, bei Firmenfeiern und auf privaten Partys."
+      ]
+    }
+  },
+  "legal": {
+    "eyebrow": "Rechtliches",
+    "imprint": {
+      "title": "Impressum",
+      "metaDescription": "Impressum von Simon Ostendorf Veranstaltungstechnik."
+    },
+    "privacy": {
+      "title": "Datenschutzerklärung",
+      "metaDescription": "Datenschutzerklärung von Simon Ostendorf Veranstaltungstechnik."
+    },
+    "agb": {
+      "title": "Allgemeine Geschäftsbedingungen",
+      "metaDescription": "Allgemeine Geschäftsbedingungen von Simon Ostendorf Veranstaltungstechnik."
+    }
+  },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "lead": "Diese Seite gibt es nicht.",
+    "backHome": "Zur Startseite"
+  }
+}
