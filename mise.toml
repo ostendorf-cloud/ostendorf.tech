@@ -14,6 +14,11 @@ actionlint = "1"
 markdownlint-cli2 = "0.20"
 yamllint = "1"
 gitleaks = "8"
+hadolint = "2"
+# Pinned to the 3.x line, not 4.x: the helm-unittest plugin used to verify
+# charts/ostendorf.tech targets Helm 3's plugin API.
+helm = "3.22.0"
+kubeconform = "0.7.0"
 # poppler provides pdftocairo, used once to convert the wordmark from PDF to SVG; see
 # AGENTS.md for the exact command. svgo then optimises the result.
 poppler = "26.11.0"
