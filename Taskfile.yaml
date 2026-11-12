@@ -1,0 +1,145 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: Install the pinned toolchain
+    cmds:
+      - mise trust
+      - mise install
+
+  lint:fmt:
+    desc: Go format check through golangci-lint
+    cmds:
+      - golangci-lint fmt --diff
+
+  lint:golangci-config:
+    desc: golangci-lint configuration check
+    cmds:
+      - golangci-lint config verify
+
+  lint:vet:
+    desc: Go vet
+    cmds:
+      - go vet ./...
+
+  lint:golangci:
+    desc: golangci-lint run
+    cmds:
+      - golangci-lint run ./...
+
+  lint:markdown:
+    desc: Markdown lint
+    cmds:
+      - markdownlint-cli2 "**/*.md"
+
+  lint:yaml:
+    desc: YAML lint
+    cmds:
+      - yamllint .
+
+  lint:actions:
+    desc: GitHub Actions workflow lint
+    cmds:
+      - actionlint
+
+  lint:secrets:
+    desc: Secret scan over the git history
+    cmds:
+      - gitleaks git --no-banner --redact
+
+  build:
+    desc: Compile the website binary
+    deps: [web:build, prerender]
+    cmds:
+      - go build -o bin/website ./cmd/website
+
+  test:go:
+    desc: Go test
+    deps: [web:build, prerender]
+    cmds:
+      - go test -race -count=1 ./...
+
+  # The web/ half. Every target below runs inside web/ and depends on web:deps,
+  # so one of them on its own is enough in a fresh checkout and in CI.
+  web:deps:
+    # Not --frozen-lockfile yet: no pnpm-lock.yaml is committed, see
+    # AGENTS.md. Switch back once one is.
+    desc: Install the web/ dependencies
+    dir: web
+    run: once
+    cmds:
+      - pnpm install
+
+  web:lint:
+    desc: ESLint over the web/ package
+    dir: web
+    deps: [web:deps]
+    cmds:
+      - pnpm run lint
+
+  web:format:
+    desc: Prettier format check over the web/ package
+    dir: web
+    deps: [web:deps]
+    cmds:
+      - pnpm run format:check
+
+  web:types:
+    desc: TypeScript and template typecheck of the web/ package
+    dir: web
+    deps: [web:deps]
+    cmds:
+      - pnpm run typecheck
+
+  web:test:
+    desc: Vitest suite of the web/ package, including the theme contrast and i18n checks
+    dir: web
+    deps: [web:deps]
+    cmds:
+      - pnpm run test
+
+  web:build:
+    desc: Build the SPA bundle into cmd/website/dist
+    dir: web
+    deps: [web:deps]
+    cmds:
+      - pnpm run build
+
+  web:fmt:
+    desc: Format the web/ package
+    dir: web
+    deps: [web:deps]
+    cmds:
+      - pnpm run format
+
+  prerender:
+    desc: Render every route of every locale to static HTML into cmd/website/prerendered
+    dir: web
+    deps: [web:build]
+    cmds:
+      - pnpm run prerender
+
+  check:
+    desc: Every check, one after another
+    cmds:
+      - task: lint:fmt
+      - task: lint:golangci-config
+      - task: lint:vet
+      - task: lint:golangci
+      - task: lint:markdown
+      - task: lint:yaml
+      - task: lint:actions
+      - task: lint:secrets
+      - task: web:lint
+      - task: web:format
+      - task: web:types
+      - task: web:test
+      - task: web:build
+      - task: prerender
+      - task: build
+      - task: test:go
+
+  fmt:
+    desc: Format Go code
+    cmds:
+      - golangci-lint fmt
