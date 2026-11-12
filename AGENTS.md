@@ -13,15 +13,37 @@ The global baseline already applies here and is not repeated below.
   holding the directive, the same reason old_simon-ostendorf.de gave for its own
   `templates` and `static`.
 - `internal/config` loads and validates the environment once, aggregated into one
-  error.
+  error. Every secret-shaped variable also accepts a `_FILE` twin; see the root
+  `README.md`'s Configuration table. There is no secret manager client anywhere in this
+  repository: `internal/openbao` from old_simon-ostendorf.de is deliberately not ported.
+- `internal/pow` issues and verifies the contact form's proof of work challenge, ported
+  from old_simon-ostendorf.de's `internal/pow` unchanged: the algorithm is a contract
+  with the browser worker that solves it.
+- `internal/contact` validates a contact submission, builds the mail and sends it over
+  SMTP, ported from old_simon-ostendorf.de's `internal/contact` with one change: a field
+  error carries a stable code instead of a German message, so `internal/webapp` can
+  answer in German or English depending on the visitor's own locale.
 - `internal/webapp` builds the HTTP handler from govue's packages: health, metrics,
-  the security and access log middleware, the client IP resolver, the rate limiter and
-  the CSRF protector. `pages.go` is the catch-all document handler: the locale redirect
-  at `/`, trailing slash canonicalisation, and serving the matching prerendered file or
-  a locale's own 404 page.
+  the security and access log middleware, the client IP resolver, the rate limiter, a
+  session manager and the CSRF protector. `pages.go` is the catch-all document handler:
+  the locale redirect at `/`, trailing slash canonicalisation, and serving the matching
+  prerendered file or a locale's own 404 page. `sitemap.go` serves `/robots.txt` and
+  `/sitemap.xml` from `pages.go`'s own `routeFiles`/`locales` route table, so the three
+  can never drift apart. `contact.go` and `session.go` are the contact form's two
+  endpoints and the anonymous, cookie-backed session they share with the CSRF
+  protector. `session.go` keeps that session in govue's in-process `session.MemoryStore`,
+  so the Deployment stays at one replica: a second replica can answer a visitor's GET and
+  their contact form POST on two different pods, each with its own session, and the CSRF
+  check then fails unpredictably. `charts/ostendorf.tech` enforces this at render time.
+  Lifts once `internal/webapp` moves to a shared session store instead of the in-memory
+  one.
 - `web/` is the Vue SPA, consuming govue's Vue package as a pnpm git dependency. `web/src`
-  holds the app; `web/scripts/prerender.ts` is the static site generation step `task
+  holds the app; `web/src/lib/contactChallenge.ts` and `web/src/workers/pow.worker.ts`
+  are the contact form's proof of work client, a Web Worker kept cookie-free and
+  third-party-free; `web/scripts/prerender.ts` is the static site generation step `task
   prerender` runs.
+- `charts/ostendorf.tech/` is the Helm chart, `Dockerfile` the multi-stage container
+  build, `docker-compose.yaml` a local development stack for the one.
 
 ## A build needs the frontend first
 
@@ -69,25 +91,17 @@ when the theme changes.
 
 ## Scope of this milestone
 
-Only the home page's hero, Leistungen, Bands and Über mich sections, plus the imprint,
-privacy and AGB pages, are implemented. Left out, all tracked as later milestones:
+The home page's hero, Leistungen, Bands, Über mich and Kontakt sections, the imprint,
+privacy and AGB pages, crawling (`robots.txt`, `sitemap.xml`), the container image and
+the Helm chart are implemented. Left out, tracked as later milestones:
 
-- The Impressionen (Instagram) section and the Kontakt section with its contact form,
-  both excluded from the home page entirely for this milestone. The header's navigation
-  has no Kontakt entry as a result; the hero and about sections' call to action link to
-  `mailto:simon@ostendorf.tech` instead of a `#contact` anchor that does not exist yet.
-- The footer carries only the legal links and the copyright line, not the social icon
-  row (Instagram, Facebook, WhatsApp, mail) the old site's footer also had: those are
-  tied to the same contact and social surface as the excluded sections above.
-- SMTP sending, the proof-of-work challenge, the OpenBao integration, the Umami
-  hookup, the Helm chart and the Dockerfile are later milestones, per the milestone
-  brief.
-- `csrf.Protector` is wired into the route chain in `internal/webapp`, but its
-  `Expected` closure always reports "no session to protect": this milestone has no
-  session package and no mutating route, so there is nothing yet for a per-session
-  token to protect. The origin check half of the protector still runs on every unsafe
-  method regardless. Wiring the real token derivation is the contact form's job in a
-  later milestone, not a change to this middleware chain.
+- The Impressionen (Instagram) section stays excluded from the home page.
+- The Umami hookup is a later milestone.
+- `internal/pow`'s challenge key supports only one key at a time: `CHALLENGE_KEY`
+  rotation (verifying a solution against a previous key while a new one is already
+  being issued, the way old_simon-ostendorf.de's `ChallengeKeys` slice did) is not
+  wired up. Rotating today means every challenge already issued under the old key
+  stops verifying the moment the new one is set.
 
 ## Deviations
 
@@ -101,3 +115,7 @@ privacy and AGB pages, are implemented. Left out, all tracked as later milestone
   Security, which this account does not have.
 - Every job runs on `blacksmith-2vcpu-ubuntu-2404`, never on a GitHub hosted runner:
   this repository is private, so its minutes are billed.
+- The Helm chart lives at `charts/ostendorf.tech/`, matching the repository's own name,
+  but its `Chart.yaml` `name` and every rendered object name use `ostendorf-tech`
+  instead: a literal dot is invalid in a `Service`'s `metadata.name` (RFC 1035 label),
+  which a chart named `ostendorf.tech` would otherwise produce by default.
