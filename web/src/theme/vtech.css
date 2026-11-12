@@ -1,0 +1,72 @@
+/*
+ * vtech: the brand theme of Simon Ostendorf Veranstaltungstechnik.
+ *
+ * Dark mode carries the brand as it already exists on the old site: a
+ * near-black stage background (#07060f) and the cyan (#1ee3f5) to purple
+ * (#7b3cf5) fader gradient, read off cmd/website/static/style.css of
+ * old_simon-ostendorf.de. The neutral ramp there is already a purple
+ * tinted dark, not a plain grey, which is kept here.
+ *
+ * Light mode is authored fresh rather than inverted: a plain white surface
+ * on a faint violet tinted ground, with a darker, more saturated purple
+ * for text, fills and the focus ring, since the vivid dark-mode cyan has
+ * nowhere near enough contrast against a light ground to read as
+ * anything, let alone as a brand colour.
+ *
+ * Every pair below is checked against WCAG 2.2 AA by govue's own
+ * web/src/styles/contrast.test.ts, run over every committed theme
+ * including this one; see also src/theme/contrast.test.ts in this
+ * package, which runs the identical check against this file alone so
+ * a regression here fails before it ever reaches that upstream suite.
+ */
+
+:root[data-theme='vtech'] {
+  --color-bg: light-dark(#f7f3fb, #07060f);
+  --color-bg-subtle: light-dark(#efe7f7, #0d0b1c);
+  --color-surface: light-dark(#ffffff, #15122a);
+  --color-surface-hover: light-dark(#f1e9f9, #1c1836);
+  --color-overlay: light-dark(rgb(27 16 48 / 0.45), rgb(7 6 15 / 0.68));
+
+  --color-border: light-dark(#e3d8ef, #241f3a);
+  --color-border-strong: light-dark(#8a7fa0, #6b6380);
+
+  --color-text: light-dark(#1b1030, #f2f1fb);
+  --color-text-muted: light-dark(#4a3b5c, #b5b4be);
+  --color-text-faint: light-dark(#5f5270, #8b8a93);
+
+  /* accent carries fills and icons at 3:1; accent-text is the brand
+     gradient's purple end, darkened in light mode for 4.5:1 on white and
+     lightened in dark mode for 4.5:1 on near-black, which is exactly what
+     the old site's own --violet token already did for the same reason. */
+  --color-accent: light-dark(#7b3cf5, #1ee3f5);
+  --color-accent-text: light-dark(#5b2bc4, #a47cff);
+  --color-accent-strong: light-dark(#5b2bc4, #5b2bc4);
+  --color-accent-strong-hover: light-dark(#4a2099, #6a35dd);
+  --color-accent-on: light-dark(#ffffff, #fbf7ff);
+  --color-accent-subtle: light-dark(#ece0fb, #2a1f4a);
+  /* The ring stays the cyan the brand gradient starts from in dark mode,
+     vivid against the near-black stage; light mode needs the darker
+     purple instead, the cyan has nowhere near enough contrast on white. */
+  --color-focus: light-dark(#5b2bc4, #1ee3f5);
+
+  /* Semantic. These four hold the same values govue's own base.css and
+     sample.css ship: they are not brand colours, and reusing values already
+     proven against this exact contract keeps this theme to the pairs that
+     are actually brand specific. */
+  --color-success-text: light-dark(#126821, #70db7e);
+  --color-success-subtle: light-dark(#d6f0d9, #1a3d20);
+  --color-warning-text: light-dark(#6e5e0c, #f0d342);
+  --color-warning-subtle: light-dark(#f5edc7, #373215);
+  --color-danger-text: light-dark(#962f17, #f68379);
+  --color-danger-subtle: light-dark(#f8dbd8, #431d19);
+  --color-danger-strong: light-dark(#962f17, #f68379);
+  --color-danger-strong-hover: light-dark(#75180f, #fbc6c1);
+  --color-danger-on: light-dark(#ffffff, #44201d);
+  --color-info-text: light-dark(#0e6281, #5abff2);
+  --color-info-subtle: light-dark(#d1e9f5, #17393f);
+
+  --shadow-card: 0 1px 2px light-dark(rgb(27 16 48 / 0.07), rgb(0 0 0 / 0.52));
+  --shadow-dialog:
+    0 10px 30px -12px light-dark(rgb(27 16 48 / 0.26), rgb(0 0 0 / 0.78)),
+    0 2px 6px light-dark(rgb(27 16 48 / 0.09), rgb(0 0 0 / 0.52));
+}
