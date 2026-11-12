@@ -72,11 +72,11 @@
         "I mainly support corporate events, galas, trade shows and conferences, from the first idea through to the final execution. I also support bands professionally at concerts, on tour or for single shows, including technical planning, setup, sound check and live support.",
         "Planning a company party, a cultural event, or need support for a live production? Just get in touch, and together we will make your event an experience."
       ],
-      "facts": [
-        { "value": "10+", "label": "years of experience" },
-        { "value": "4", "label": "disciplines: sound, light, stage, video" },
-        { "value": "1", "label": "point of contact from the idea to teardown" }
-      ],
+      "facts": {
+        "years": { "label": "years of experience" },
+        "disciplines": { "label": "disciplines: sound, light, stage, video" },
+        "contact": { "label": "point of contact from the idea to teardown" }
+      },
       "cta": "Request a project"
     }
   },
