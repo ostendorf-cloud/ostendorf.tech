@@ -349,6 +349,30 @@ const germanHref = computed(
         ausgenommen.
       </p>
 
+      <h3 class="text-lg font-semibold">Ratenbegrenzung</h3>
+      <p>
+        Um unsere Website vor Überlastung und Missbrauch zu schützen, begrenzen wir, wie viele
+        Anfragen eine einzelne IP-Adresse innerhalb kurzer Zeit an uns stellen kann. Dazu zählt
+        unser Server für jede Adresse, wie viele Anfragen kurz zuvor eingegangen sind; stellt eine
+        Adresse zu viele Anfragen, werden weitere Anfragen von ihr kurzzeitig abgewiesen.
+      </p>
+      <p>
+        Dieser Zähler existiert ausschließlich im Arbeitsspeicher unseres Servers. Er wird nicht auf
+        Festplatte geschrieben und nicht an Dritte übermittelt. Sobald eine Adresse eine Zeit lang
+        keine weiteren Anfragen mehr stellt, verwirft unser Server den zugehörigen Zähler
+        automatisch; eine darüberhinausgehende Aufbewahrung findet nicht statt.
+      </p>
+      <p>
+        Diese allgemeine Ratenbegrenzung gilt für jeden Aufruf unserer Website und ist unabhängig
+        von der im Abschnitt „Kontaktformular“ beschriebenen Begrenzung für das Kontaktformular;
+        beide werden getrennt gezählt.
+      </p>
+      <p>
+        Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Wir haben ein
+        berechtigtes Interesse daran, unsere Website vor Überlastung und missbräuchlichen Zugriffen
+        zu schützen.
+      </p>
+
       <h3 id="umami" class="text-lg font-semibold">Besucherstatistik mit Umami</h3>
       <p>
         Um zu verstehen, welche Inhalte unserer Website gelesen werden und wie Besucher zu uns
@@ -860,6 +884,28 @@ const germanHref = computed(
         The log files are retained for a limited period only and are automatically deleted after 30
         days at the latest. Log files whose further retention is required for evidentiary purposes
         are excluded from deletion until the incident in question has been finally clarified.
+      </p>
+
+      <h3 class="text-lg font-semibold">Rate limiting</h3>
+      <p>
+        To protect our website against overload and misuse, we limit how many requests a single IP
+        address can make to us within a short period of time. To do this, our server counts, for
+        each address, how many requests it has recently received; where an address makes too many
+        requests, further requests from it are briefly refused.
+      </p>
+      <p>
+        This counter exists only in our server's memory. It is not written to disk and not
+        transmitted to third parties. Once an address has made no further requests for a while, our
+        server automatically discards the associated counter; no further retention takes place.
+      </p>
+      <p>
+        This general rate limiting applies to every request to our website and is independent of the
+        limiting described in the "Contact form" section for the contact form specifically; the two
+        are counted separately.
+      </p>
+      <p>
+        This processing is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate
+        interest in protecting our website against overload and abusive access.
       </p>
 
       <h3 id="umami" class="text-lg font-semibold">Visitor statistics with Umami</h3>
