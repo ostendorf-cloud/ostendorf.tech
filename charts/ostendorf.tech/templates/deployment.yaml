@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ostendorf-tech.fullname" . }}
+  labels:
+    {{- include "ostendorf-tech.labels" . | nindent 4 }}
+spec:
+  {{- if gt (.Values.replicaCount | int) 1 }}
+  {{ fail "replicaCount must stay at 1: internal/webapp/session.go keeps anonymous sessions, and the CSRF token derived from them, in govue's in-process session.MemoryStore. A second replica would answer a visitor's GET on one pod and their contact form POST on another pod with no such session, so the CSRF check fails unpredictably. Raise replicaCount only after moving to a shared session store; see AGENTS.md." }}
+  {{- end }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ostendorf-tech.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ostendorf-tech.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ostendorf-tech.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: LISTEN_ADDR
+              value: {{ .Values.config.listenAddr | quote }}
+            - name: SITE_URL
+              value: {{ .Values.config.siteUrl | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            {{- if .Values.config.trustedProxyCidrs }}
+            - name: TRUSTED_PROXY_CIDRS
+              value: {{ .Values.config.trustedProxyCidrs | quote }}
+            {{- end }}
+            - name: ALLOW_PLAIN_HTTP
+              value: {{ .Values.config.allowPlainHttp | quote }}
+            - name: RATE_LIMIT_BURST
+              value: {{ .Values.config.rateLimitBurst | quote }}
+            - name: RATE_LIMIT_PER
+              value: {{ .Values.config.rateLimitPer | quote }}
+            - name: CHALLENGE_RATE_LIMIT_BURST
+              value: {{ .Values.config.challengeRateLimitBurst | quote }}
+            - name: CHALLENGE_RATE_LIMIT_PER
+              value: {{ .Values.config.challengeRateLimitPer | quote }}
+            - name: CONTACT_RATE_LIMIT_BURST
+              value: {{ .Values.config.contactRateLimitBurst | quote }}
+            - name: CONTACT_RATE_LIMIT_PER
+              value: {{ .Values.config.contactRateLimitPer | quote }}
+            - name: SMTP_ADDR
+              value: {{ .Values.config.smtpAddr | quote }}
+            - name: CONTACT_TO
+              value: {{ .Values.config.contactTo | quote }}
+            - name: CONTACT_FROM
+              value: {{ .Values.config.contactFrom | quote }}
+            - name: CSRF_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ostendorf-tech.existingSecretName" . }}
+                  key: {{ .Values.existingSecret.csrfKeyKey }}
+            {{- if .Values.existingSecret.challengeKeyKey }}
+            - name: CHALLENGE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ostendorf-tech.existingSecretName" . }}
+                  key: {{ .Values.existingSecret.challengeKeyKey }}
+            {{- end }}
+            {{- if .Values.existingSecret.smtpUsernameKey }}
+            - name: SMTP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ostendorf-tech.existingSecretName" . }}
+                  key: {{ .Values.existingSecret.smtpUsernameKey }}
+            {{- end }}
+            {{- if .Values.existingSecret.smtpPasswordKey }}
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ostendorf-tech.existingSecretName" . }}
+                  key: {{ .Values.existingSecret.smtpPasswordKey }}
+            {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

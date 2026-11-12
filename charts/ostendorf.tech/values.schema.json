@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ostendorf-tech",
+  "type": "object",
+  "required": ["image", "service", "existingSecret"],
+  "properties": {
+    "replicaCount": { "type": "integer", "minimum": 0 },
+    "image": {
+      "type": "object",
+      "required": ["repository"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "imagePullSecrets": { "type": "array" },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "name": { "type": "string" }
+      }
+    },
+    "podAnnotations": { "type": "object" },
+    "podLabels": { "type": "object" },
+    "podSecurityContext": { "type": "object" },
+    "securityContext": { "type": "object" },
+    "service": {
+      "type": "object",
+      "required": ["type", "port"],
+      "properties": {
+        "type": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "hosts": { "type": "array" },
+        "tls": { "type": "array" }
+      }
+    },
+    "resources": { "type": "object" },
+    "startupProbe": { "type": "object" },
+    "livenessProbe": { "type": "object" },
+    "readinessProbe": { "type": "object" },
+    "nodeSelector": { "type": "object" },
+    "tolerations": { "type": "array" },
+    "affinity": { "type": "object" },
+    "config": {
+      "type": "object",
+      "properties": {
+        "listenAddr": { "type": "string", "minLength": 1 },
+        "siteUrl": { "type": "string", "minLength": 1 },
+        "logLevel": { "type": "string", "enum": ["debug", "info", "warn", "error"] },
+        "trustedProxyCidrs": { "type": "string" },
+        "allowPlainHttp": { "type": "boolean" },
+        "rateLimitBurst": { "type": "integer", "minimum": 1 },
+        "rateLimitPer": { "type": "string" },
+        "challengeRateLimitBurst": { "type": "integer", "minimum": 1 },
+        "challengeRateLimitPer": { "type": "string" },
+        "contactRateLimitBurst": { "type": "integer", "minimum": 1 },
+        "contactRateLimitPer": { "type": "string" },
+        "smtpAddr": { "type": "string", "minLength": 1 },
+        "contactTo": { "type": "string", "minLength": 1 },
+        "contactFrom": { "type": "string", "minLength": 1 }
+      }
+    },
+    "existingSecret": {
+      "type": "object",
+      "required": ["name", "csrfKeyKey"],
+      "properties": {
+        "name": { "type": "string" },
+        "csrfKeyKey": { "type": "string", "minLength": 1 },
+        "challengeKeyKey": { "type": "string" },
+        "smtpUsernameKey": { "type": "string" },
+        "smtpPasswordKey": { "type": "string" }
+      }
+    }
+  }
+}

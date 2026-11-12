@@ -1,0 +1,105 @@
+# ostendorf-tech
+
+Installs [ostendorf.tech](https://github.com/ostendorf-cloud/ostendorf.tech) on a Kubernetes
+cluster.
+
+## Prerequisites
+
+- Kubernetes 1.27 or newer.
+- A `Secret` already in the target namespace, created by your own secret manager operator,
+  carrying at least the CSRF signing key (see "Secrets" below). This chart never creates that
+  `Secret` itself.
+
+## Installing
+
+```sh
+helm install ostendorf-tech charts/ostendorf.tech \
+  --set existingSecret.name=ostendorf-tech-secrets
+```
+
+The chart has no usable default for `existingSecret.name`: no name could ever point at a
+`Secret` that actually exists on your cluster. Leaving it empty fails `helm install`,
+`helm upgrade` and `helm template` at render time, with a message naming `existingSecret.name`
+and why it is needed, rather than installing a `Deployment` that crash-loops on a missing
+`CSRF_KEY`.
+
+This chart is also published as an OCI artifact, at
+`oci://ghcr.io/ostendorf-cloud/charts/ostendorf-tech`, versioned in lock-step with every release:
+
+```sh
+helm install ostendorf-tech oci://ghcr.io/ostendorf-cloud/charts/ostendorf-tech --version <version> \
+  --set existingSecret.name=ostendorf-tech-secrets
+```
+
+or pull it without installing:
+
+```sh
+helm pull oci://ghcr.io/ostendorf-cloud/charts/ostendorf-tech --version <version>
+```
+
+## Secrets
+
+Every secret-shaped setting is read from one existing `Secret`, named by
+`existingSecret.name`, key by key. This chart never offers a values-driven way to create its
+own `Secret` from plaintext values: the `Secret` itself comes from your own secret manager
+operator (OpenBao, External Secrets, SOPS, or similar), and this chart only ever references it
+by name.
+
+| Env var | `values.yaml` key | Default key in the Secret | Required |
+| --- | --- | --- | --- |
+| `CSRF_KEY` | `existingSecret.csrfKeyKey` | `CSRF_KEY` | Yes |
+| `CHALLENGE_KEY` | `existingSecret.challengeKeyKey` | unset (omitted) | No |
+| `SMTP_USERNAME` | `existingSecret.smtpUsernameKey` | unset (omitted) | No |
+| `SMTP_PASSWORD` | `existingSecret.smtpPasswordKey` | unset (omitted) | No |
+
+`CSRF_KEY` has no fallback: a `Secret` missing it fails the pod at the Kubernetes level
+(`CreateContainerConfigError`), and the server would refuse to start without one anyway.
+`CHALLENGE_KEY`, `SMTP_USERNAME` and `SMTP_PASSWORD` left unset omit the corresponding
+environment variable entirely, rather than referencing a key that may not exist in your
+`Secret`; the contact form answers "unavailable" while any of them is missing, and every other
+page keeps working.
+
+Every key is at least 32 random bytes, hex encoded, for example:
+
+```sh
+openssl rand -hex 32
+```
+
+## Replicas
+
+`replicaCount` stays at 1. `internal/webapp/session.go` keeps the anonymous session the CSRF
+protector relies on in govue's in-process `session.MemoryStore`. A second replica can answer a
+visitor's GET and their contact form POST on two different pods, each with its own session, so
+the CSRF check fails unpredictably. `templates/deployment.yaml` rejects a higher value at render
+time, with a message naming this reason. Raising it is possible only once the webapp moves to a
+shared session store instead of the in-memory one.
+
+## Values
+
+See `values.yaml` for the full, commented list. The ones most deployments touch:
+
+| Key | Description | Default |
+| --- | --- | --- |
+| `image.repository` | Container image | `ghcr.io/ostendorf-cloud/ostendorf.tech` |
+| `image.tag` | Image tag | `.Chart.AppVersion` |
+| `replicaCount` | Pod replicas, must stay at 1 (see "Replicas" above) | `1` |
+| `service.port` | Service and container port | `8080` |
+| `ingress.enabled` | Create an `Ingress` | `false` |
+| `resources` | Pod resource requests/limits | see `values.yaml` |
+| `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
+| `config.smtpAddr` | SMTP submission server | `mail.ostendorf.cloud:587` |
+| `existingSecret.name` | Name of the existing `Secret` | `""` (required) |
+
+## Upgrading
+
+No breaking change has shipped yet; `Chart.yaml`'s `version` tracks that going forward.
+
+## Uninstalling
+
+```sh
+helm uninstall ostendorf-tech
+```
+
+Removes the `Deployment`, `Service`, `ServiceAccount` and `Ingress` (when enabled) this chart
+created. The `Secret` `existingSecret.name` points at is never touched: it was never created by
+this chart, so it is never removed by it either.

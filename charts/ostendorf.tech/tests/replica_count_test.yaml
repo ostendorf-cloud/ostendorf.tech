@@ -1,0 +1,18 @@
+suite: replicaCount above 1
+templates:
+  - templates/deployment.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+  replicaCount: 3
+tests:
+  - it: fails the render with the single-replica session store explanation
+    asserts:
+      - failedTemplate:
+          errorMessage: >-
+            replicaCount must stay at 1: internal/webapp/session.go keeps anonymous
+            sessions, and the CSRF token derived from them, in govue's in-process
+            session.MemoryStore. A second replica would answer a visitor's GET on one pod
+            and their contact form POST on another pod with no such session, so the CSRF
+            check fails unpredictably. Raise replicaCount only after moving to a shared
+            session store; see AGENTS.md.
