@@ -23,3 +23,21 @@ kubeconform = "0.7.0"
 # AGENTS.md for the exact command. svgo then optimises the result.
 poppler = "26.11.0"
 "npm:svgo" = "4.1.0"
+
+# helm-unittest (charts/ostendorf.tech's own verification plugin) is a Helm plugin, not a
+# conventional CLI, and the baseline forbids "helm plugin install <url>" regardless of Helm
+# version, so it is pinned through mise's generic "github:" backend instead, the same
+# version "task test:helm" already targeted (v1.2.1): mise downloads and checksums the one
+# release asset built for the current OS and architecture, and "postinstall" then copies
+# that directory straight into Helm's own plugin folder, never through Helm's own installer,
+# so there is nothing left for Helm to ask to verify. "rename_exe" undoes mise's own default
+# of stripping the OS/arch suffix off a single-binary download, which plugin.yaml needs kept
+# to find the right binary by name.
+[tools."github:helm-unittest/helm-unittest"]
+version = "1.2.1"
+depends = ["helm"]
+postinstall = "rm -rf \"$(helm env HELM_PLUGINS)/helm-unittest\" && mkdir -p \"$(helm env HELM_PLUGINS)\" && cp -r \"$MISE_TOOL_INSTALL_PATH\" \"$(helm env HELM_PLUGINS)/helm-unittest\""
+
+[tools."github:helm-unittest/helm-unittest".platforms]
+linux-x64 = { rename_exe = "untt-linux-amd64" }
+macos-arm64 = { rename_exe = "untt-macos-arm64" }
