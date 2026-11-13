@@ -77,6 +77,59 @@ func TestPrerenderedOutputMatchesRouteTable(t *testing.T) {
 	}
 }
 
+// TestPrerenderedPagesCarryATitle guards what internal/webapp's page view
+// reporting reads. The title Umami records is taken from each prerendered
+// page's own <title>, rather than from a second copy of the i18n
+// catalogue in Go, and the privacy policy names that title as one of the
+// things reported ("aufgerufene Seite (ohne angehängte Parameter) und ihr
+// Titel"). A missing title degrades to an empty one rather than failing a
+// request, which is deliberate but would be invisible: this test is what
+// makes web/scripts/prerender.ts dropping or reshaping the element a
+// failing check instead of a quietly emptier statistic.
+func TestPrerenderedPagesCarryATitle(t *testing.T) {
+	table, err := routes.Load()
+	if err != nil {
+		t.Fatalf("routes.Load() error = %v", err)
+	}
+	sub, err := fs.Sub(prerenderedFS, "prerendered")
+	if err != nil {
+		t.Fatalf("fs.Sub(prerenderedFS, \"prerendered\") error = %v", err)
+	}
+	localeDirs, err := fs.ReadDir(sub, ".")
+	if err != nil {
+		t.Fatalf("fs.ReadDir(prerendered) error = %v", err)
+	}
+
+	for _, entry := range localeDirs {
+		if !entry.IsDir() {
+			continue
+		}
+		locale := entry.Name()
+		for _, r := range table {
+			name := locale + "/" + r.File
+			data, err := fs.ReadFile(sub, name)
+			if err != nil {
+				// Already reported, per route and locale, by
+				// TestPrerenderedOutputMatchesRouteTable.
+				continue
+			}
+			_, rest, ok := strings.Cut(string(data), "<title>")
+			if !ok {
+				t.Errorf("%s has no <title> element for the page view to report", name)
+				continue
+			}
+			title, _, ok := strings.Cut(rest, "</title>")
+			if !ok {
+				t.Errorf("%s has an unclosed <title> element", name)
+				continue
+			}
+			if strings.TrimSpace(title) == "" {
+				t.Errorf("%s has an empty <title>", name)
+			}
+		}
+	}
+}
+
 // foundFiles lists every file actually prerendered under locale,
 // relative to that locale's own directory.
 func foundFiles(t *testing.T, sub fs.FS, locale string) map[string]bool {

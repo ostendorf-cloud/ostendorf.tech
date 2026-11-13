@@ -50,6 +50,11 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// The Instagram feed's sync loop and the Umami reporter, both of which
+	// stop with ctx. Neither runs for a deployment that configured no
+	// token and no Umami, and neither can keep the server from serving.
+	app.Start(ctx)
+
 	return httpserver.Run(ctx, httpserver.Config{
 		Addr:    cfg.ListenAddr,
 		Handler: app.Handler(),

@@ -6,12 +6,14 @@
 package webapp
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/ostendorf-cloud/govue/api"
 	"github.com/ostendorf-cloud/govue/clientip"
@@ -22,8 +24,10 @@ import (
 	"github.com/ostendorf-cloud/govue/ratelimit"
 	"github.com/ostendorf-cloud/govue/session"
 
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/analytics"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/contact"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/instagram"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/pow"
 )
 
@@ -89,6 +93,18 @@ type App struct {
 	accessLog middleware.AccessLog
 
 	pages *pageServer
+
+	// instagramFeed is always present, even when no token is configured:
+	// an empty feed is a valid answer, so no handler has to nil check it.
+	// instagramSyncer is what fills it, and exists only when a token is
+	// configured; Start is what sets it running.
+	instagramFeed     *instagram.Feed
+	instagramSyncer   *instagram.Syncer
+	instagramInterval time.Duration
+
+	// analyticsClient reports page views to Umami server to server. Nil
+	// counts nothing, which is what a deployment with no UMAMI_URL gets.
+	analyticsClient *analytics.Client
 
 	handler http.Handler
 }
@@ -182,6 +198,28 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.smtpConfigured = cfg.SMTPUsername != "" && cfg.SMTPPassword != ""
 	a.envelope = contact.Envelope{From: cfg.ContactFrom, To: cfg.ContactTo}
 
+	// The feed exists either way; only the syncer that fills it depends on
+	// a token being configured.
+	a.instagramFeed = &instagram.Feed{}
+	a.instagramInterval = cfg.InstagramRefreshInterval
+	if cfg.InstagramToken != "" {
+		a.instagramSyncer = &instagram.Syncer{
+			Client:     instagram.NewClient(cfg.InstagramAPIVersion),
+			Token:      cfg.InstagramToken,
+			RefreshAge: cfg.InstagramTokenRefreshAge,
+			Count:      cfg.InstagramPostCount,
+			Feed:       a.instagramFeed,
+			Logger:     logger,
+			Now:        time.Now,
+		}
+	}
+
+	// config.Load already refused a half-configured pair, so one of the
+	// two being set is enough to decide here.
+	if cfg.UmamiURL != "" {
+		a.analyticsClient = analytics.New(cfg.UmamiURL, cfg.UmamiWebsiteID, cfg.SiteURL.Hostname(), nil, logger)
+	}
+
 	a.security = middleware.DefaultSecurity()
 	if cfg.AllowPlainHTTP {
 		// A browser that reached this service over plain HTTP must never
@@ -201,6 +239,38 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 // Health is the readiness registry, so main can drain it before shutdown.
 func (a *App) Health() *health.Registry {
 	return a.health
+}
+
+// Start launches the background work the handler itself never does: the
+// Instagram feed's sync loop and the Umami reporter's send loop. Both stop
+// with ctx. It returns at once, and does nothing at all for a deployment
+// that configured neither, so main always calls it unconditionally.
+//
+// Neither loop is part of readiness. A feed that has not loaded yet, or an
+// Umami that cannot be reached, must never keep this service from serving
+// pages, which is the whole reason they live out here rather than inside a
+// request.
+func (a *App) Start(ctx context.Context) {
+	if a.instagramSyncer != nil {
+		go a.instagramSyncer.Run(ctx, a.instagramInterval)
+	}
+	if a.analyticsClient != nil {
+		go a.analyticsClient.Run(ctx)
+	}
+}
+
+// trackPageView reports one served page to Umami, from this server, never
+// from the browser. analytics.FromRequest decides what must not be counted
+// at all (a prefetch, Do Not Track, Global Privacy Control, a client that
+// is not a public address), and Track never blocks: a full queue drops the
+// view rather than holding the response.
+func (a *App) trackPageView(r *http.Request, title string) {
+	if a.analyticsClient == nil {
+		return
+	}
+	if v, ok := analytics.FromRequest(r, a.clientIPs.Resolve(r), title, a.siteURL.Hostname()); ok {
+		a.analyticsClient.Track(v)
+	}
 }
 
 // Handler is the website's whole HTTP handler.
@@ -246,9 +316,17 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP, metricsHandler http.Handle
 	// rely on. requireSession refuses a request with no session before the
 	// CSRF protector's own check would ever apply to this route.
 	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.requireSession, a.protector.Middleware))
+
+	// The Impressionen section's two reads. Both are plain public GETs:
+	// no session, no CSRF token, nothing written. They answer from the
+	// copy of the feed this server already fetched from Meta, which is
+	// what keeps a visitor's browser away from Meta entirely.
+	mux.Handle("GET /api/v1/instagram", route(api.Handle(a.handleInstagramFeed)))
+	mux.Handle("GET /api/v1/instagram/{id}", route(http.HandlerFunc(a.handleInstagramImage)))
+
 	mux.Handle("/api/", route(api.NotFoundHandler()))
 
-	registerRoutes(mux, a.pages, route)
+	registerRoutes(mux, a.pages, route, a.trackPageView)
 	mux.Handle("/", route(a.pages.pageHandler()))
 
 	return middleware.Chain(mux,

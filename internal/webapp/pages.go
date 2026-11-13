@@ -2,6 +2,7 @@ package webapp
 
 import (
 	"fmt"
+	"html"
 	"io/fs"
 	"net/http"
 	"slices"
@@ -84,13 +85,19 @@ func routePattern(locale, slug string) string {
 
 // registerRoutes registers one http.ServeMux pattern per known locale and
 // route slug on mux, each handler wrapped by wrap (the middleware chain a
-// caller wants applied, routeSession in production). It is the one place
-// that loops over locales and routeSlugs, so a test exercising the real
+// caller wants applied, route in production). It is the one place that
+// loops over locales and routeSlugs, so a test exercising the real
 // registration never has to hand-duplicate a route pattern string.
-func registerRoutes(mux *http.ServeMux, p *pageServer, wrap func(http.Handler) http.Handler) {
+//
+// track is called once per page actually served, with that page's own
+// title, and is how a page view reaches Umami (see (*App).trackPageView).
+// A nil track counts nothing, which is both the default for a deployment
+// with no Umami configured and what a test that cares about serving alone
+// passes.
+func registerRoutes(mux *http.ServeMux, p *pageServer, wrap func(http.Handler) http.Handler, track func(*http.Request, string)) {
 	for _, locale := range locales {
 		for _, slug := range routeSlugs() {
-			mux.Handle(routePattern(locale, slug), wrap(p.routeHandler(locale, slug)))
+			mux.Handle(routePattern(locale, slug), wrap(p.routeHandler(locale, slug, track)))
 		}
 	}
 }
@@ -100,6 +107,13 @@ func registerRoutes(mux *http.ServeMux, p *pageServer, wrap func(http.Handler) h
 type pageServer struct {
 	assets      fs.FS
 	prerendered fs.FS
+	// titles is each prerendered file's own <title>, read once at
+	// startup, keyed the same way serveFile names a file. It exists for
+	// the page view reported to Umami, which the privacy policy says
+	// carries "aufgerufene Seite (ohne angehängte Parameter) und ihr
+	// Titel": this is that title, the exact text the visitor's own tab
+	// shows, rather than a second copy of the i18n catalogue in Go.
+	titles map[string]string
 }
 
 // newPageServer validates that dist carries the assets/ directory the SPA
@@ -110,7 +124,46 @@ func newPageServer(dist, prerendered fs.FS) (*pageServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("webapp: dist has no assets directory: %w", err)
 	}
-	return &pageServer{assets: assets, prerendered: prerendered}, nil
+	return &pageServer{assets: assets, prerendered: prerendered, titles: readTitles(prerendered)}, nil
+}
+
+// readTitles reads every known route's prerendered <title> once. A file
+// that cannot be read, or carries no title, simply has none here: a page
+// view then reports an empty title, which Umami leaves out of the record
+// entirely. Nothing about this may fail startup or a request, because a
+// statistic is never worth a page.
+func readTitles(prerendered fs.FS) map[string]string {
+	titles := make(map[string]string, len(locales)*len(routeFiles))
+	for _, locale := range locales {
+		for _, slug := range routeSlugs() {
+			file := locale + "/" + routeFiles[slug]
+			data, err := fs.ReadFile(prerendered, file)
+			if err != nil {
+				continue
+			}
+			if title := titleOf(data); title != "" {
+				titles[file] = title
+			}
+		}
+	}
+	return titles
+}
+
+// titleOf is the text of the one <title> element web/scripts/prerender.ts
+// writes into every page it generates. It is a plain cut rather than an
+// HTML parse because the input is this repository's own build output, not
+// anything a visitor sends, and prerender.ts escapes the title before
+// writing it, which html.UnescapeString here reverses.
+func titleOf(data []byte) string {
+	_, rest, ok := strings.Cut(string(data), "<title>")
+	if !ok {
+		return ""
+	}
+	title, _, ok := strings.Cut(rest, "</title>")
+	if !ok {
+		return ""
+	}
+	return html.UnescapeString(title)
 }
 
 // assetHandler serves the SPA's built, content hashed files as immutable:
@@ -128,10 +181,19 @@ func (p *pageServer) assetHandler() http.Handler {
 // once at startup under routePattern(locale, slug) so routeFiles[slug]
 // can be captured directly: the pattern itself pins both the locale and
 // the slug literally, so no per-request lookup or validation is needed.
-func (p *pageServer) routeHandler(locale, slug string) http.Handler {
+//
+// track, when set, is called after the page was written, so only a page a
+// visitor actually received is ever counted: no redirect, no 404, no
+// asset and no API call reaches it, the same rule
+// old_simon-ostendorf.de's own page() applied.
+func (p *pageServer) routeHandler(locale, slug string, track func(*http.Request, string)) http.Handler {
 	file := locale + "/" + routeFiles[slug]
+	title := p.titles[file]
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p.serveFile(w, http.StatusOK, file)
+		served := p.serveFile(w, http.StatusOK, file)
+		if served && track != nil {
+			track(r, title)
+		}
 	})
 }
 
@@ -173,19 +235,22 @@ func (p *pageServer) pageHandler() http.Handler {
 // serveFile writes the prerendered file at name, or falls back to the
 // locale's own 404 page when it is missing: a route this handler believes
 // exists but whose file never got prerendered must still answer something
-// rather than crash.
-func (p *pageServer) serveFile(w http.ResponseWriter, status int, name string) {
+// rather than crash. It reports whether the requested file itself was
+// served, so a caller counting page views counts the page and not the
+// fallback.
+func (p *pageServer) serveFile(w http.ResponseWriter, status int, name string) bool {
 	data, err := fs.ReadFile(p.prerendered, name)
 	if err != nil {
 		locale, _, _ := strings.Cut(name, "/")
 		p.serveNotFound(w, locale)
-		return
+		return false
 	}
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", "no-cache")
 	w.WriteHeader(status)
 	_, _ = w.Write(data)
+	return true
 }
 
 // serveNotFound answers 404 with the given locale's own prerendered page,
