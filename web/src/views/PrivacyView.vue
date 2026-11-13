@@ -17,10 +17,11 @@ const germanHref = computed(
   <GovuePage width="reading" :title="t('legal.privacy.title')">
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
       <p class="text-text-muted">
-        Kurz vorab: Diese Website verwendet keine Cookies, keine Tracking- oder Werbedienste und
+        Kurz vorab: Diese Website setzt ein einziges, rein technisches Cookie zum Schutz des
+        Kontaktformulars (siehe Abschnitt „Cookies“), aber keine Tracking- oder Werbedienste, und
         bindet keine Inhalte von Drittanbietern ein. Ihr Browser lädt alle Inhalte ausschließlich
         von unserem eigenen Server. Eine Besucherstatistik erstellen wir selbst auf unseren eigenen
-        Servern, ohne Skript in Ihrem Browser und ohne etwas auf Ihrem Endgerät zu speichern.
+        Servern, ohne Skript in Ihrem Browser und ohne sonst etwas auf Ihrem Endgerät zu speichern.
       </p>
 
       <h2 class="text-xl font-semibold">1. Datenschutz auf einen Blick</h2>
@@ -313,28 +314,57 @@ const germanHref = computed(
 
       <h2 class="text-xl font-semibold">4. Datenerfassung auf dieser Website</h2>
 
-      <h3 class="text-lg font-semibold">Keine Cookies</h3>
+      <h3 class="text-lg font-semibold">Cookies</h3>
       <p>
-        Diese Website verwendet keine Cookies. Wir speichern keine Informationen in Ihrem Endgerät
-        und greifen nicht auf dort gespeicherte Informationen zu; auch Device-Fingerprinting im
-        Browser setzen wir nicht ein. Eine Einwilligung nach § 25 Abs. 1 TDDDG ist deshalb nicht
-        erforderlich, und wir zeigen kein Cookie-Banner an.
+        Diese Website setzt ein einziges Cookie: ein technisches Sitzungs-Cookie, das bei jedem
+        Seitenaufruf gesetzt wird, sofern Ihr Browser noch keines hat. Es enthält ausschließlich
+        eine zufällige, nicht auf Sie persönlich zurückführbare Kennung und dient dazu, unserem
+        Server zu ermöglichen, das Kontaktformular vor Cross-Site-Request-Forgery-Angriffen (CSRF)
+        zu schützen; es wird nicht zu Tracking, Analyse oder Werbung verwendet und nicht an Dritte
+        übermittelt.
+      </p>
+      <p>
+        Das Cookie ist ein Sitzungs-Cookie ohne eigenes Speicherdauer-Attribut: Ihr Browser verwirft
+        es, sobald Sie ihn schließen. Zusätzlich ist es so gesetzt, dass kein Skript auf der Seite
+        es auslesen kann (HttpOnly), dass es nur über eine verschlüsselte Verbindung übertragen wird
+        (Secure) und dass es nicht an eine andere Website mitgesendet wird (SameSite=Lax).
+      </p>
+      <p>
+        Nach unserer Einschätzung ist dieses Cookie technisch notwendig im Sinne von § 25 Abs. 2 Nr.
+        2 TDDDG, weil ohne ein solches Sitzungs-Cookie das Kontaktformular nicht wirksam vor
+        Cross-Site-Request-Forgery geschützt werden kann; eine Einwilligung ist deshalb nicht
+        erforderlich, und wir zeigen kein Cookie-Banner an. Darüber hinaus speichern wir keine
+        weiteren Informationen in Ihrem Endgerät, greifen nicht auf dort gespeicherte Informationen
+        zu und setzen auch kein Device-Fingerprinting im Browser ein.
       </p>
 
       <h3 class="text-lg font-semibold">Server-Log-Dateien</h3>
       <p>
-        Beim Aufruf dieser Website erheben und speichern unser Webserver und der vorgeschaltete
-        Reverse-Proxy automatisch Informationen in so genannten Server-Log-Dateien, die Ihr Browser
-        automatisch an uns übermittelt. Dies sind:
+        Bei jedem Aufruf dieser Website schreibt unser Webserver automatisch eine Protokollzeile.
+        Darin festgehalten werden:
       </p>
       <ul class="list-disc pl-6">
+        <li>Zeitpunkt der Anfrage</li>
         <li>IP-Adresse</li>
-        <li>Datum und Uhrzeit der Serveranfrage</li>
-        <li>Anfragezeile (aufgerufene Seite bzw. Datei, Anfragemethode und Protokollversion)</li>
+        <li>
+          eine zufällige, von unserem Server vergebene Anfrage-Kennung, mit der sich
+          zusammengehörige Protokollzeilen einer einzelnen Anfrage zuordnen lassen
+        </li>
+        <li>Anfragemethode (z. B. GET oder POST)</li>
+        <li>
+          eine grobe, interne Einordnung der Anfrage (z. B. „eine Seite dieser Website“, „eine
+          Asset-Datei“), nicht die vollständige aufgerufene Adresse mit allen enthaltenen
+          Parametern; bei einem gewöhnlichen Seitenaufruf unterscheidet diese Einordnung nicht
+          einmal, welche einzelne Seite aufgerufen wurde – Startseite, Impressum,
+          Datenschutzerklärung, AGB und die Fehlerseite erhalten alle denselben Wert
+        </li>
         <li>HTTP-Statuscode und übertragene Datenmenge</li>
-        <li>Browsertyp und Browserversion sowie verwendetes Betriebssystem (User-Agent)</li>
-        <li>Referrer URL, sofern Ihr Browser sie übermittelt</li>
+        <li>Bearbeitungsdauer der Anfrage</li>
       </ul>
+      <p>
+        Nicht erfasst werden dabei der Browsertyp Ihres Geräts (User-Agent) und eine etwaige
+        Referrer-URL.
+      </p>
       <p>Eine Zusammenführung dieser Daten mit anderen Datenquellen wird nicht vorgenommen.</p>
       <p>
         Die Erfassung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Der
@@ -440,12 +470,15 @@ const germanHref = computed(
       <p>
         Zum Schutz vor Spam löst Ihr Browser beim Ausfüllen des Formulars eine kleine Rechenaufgabe
         (sogenannter Proof of Work). Dazu ruft er bei unserem Server eine zufällige Aufgabe ab und
-        sendet die Lösung zusammen mit dem Formular zurück. Dabei werden keine Cookies gesetzt,
-        keine Informationen in Ihrem Endgerät gespeichert und keine Dienste von Drittanbietern
-        eingebunden. Um Missbrauch zu verhindern, verarbeitet unser Server außerdem Ihre IP-Adresse
-        kurzzeitig im Arbeitsspeicher, um die Zahl der Anfragen je Adresse zu begrenzen; dafür wird
-        sie nicht dauerhaft gespeichert. Rechtsgrundlage hierfür ist unser berechtigtes Interesse am
-        Schutz vor Spam und Missbrauch (Art. 6 Abs. 1 lit. f DSGVO).
+        sendet die Lösung zusammen mit dem Formular zurück. Dabei werden selbst keine weiteren
+        Cookies gesetzt, keine weiteren Informationen in Ihrem Endgerät gespeichert und keine
+        Dienste von Drittanbietern eingebunden; das technische Sitzungs-Cookie, das beim Aufruf
+        jeder Seite dieser Website gesetzt wird (siehe Abschnitt „Cookies“), schützt dabei auch
+        dieses Formular vor Cross-Site-Request-Forgery. Um Missbrauch zu verhindern, verarbeitet
+        unser Server außerdem Ihre IP-Adresse kurzzeitig im Arbeitsspeicher, um die Zahl der
+        Anfragen je Adresse zu begrenzen; dafür wird sie nicht dauerhaft gespeichert.
+        Rechtsgrundlage hierfür ist unser berechtigtes Interesse am Schutz vor Spam und Missbrauch
+        (Art. 6 Abs. 1 lit. f DSGVO).
       </p>
       <p>
         Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern
@@ -571,10 +604,11 @@ const germanHref = computed(
       </p>
 
       <p class="text-text-muted">
-        A brief summary up front: this website does not use cookies, tracking or advertising
-        services, and does not embed third-party content. Your browser loads everything exclusively
-        from our own server. We compile visitor statistics ourselves, on our own servers, without
-        any script running in your browser and without storing anything on your device.
+        A brief summary up front: this website sets a single, purely technical cookie to protect the
+        contact form (see the "Cookies" section), but no tracking or advertising services, and does
+        not embed third-party content. Your browser loads everything exclusively from our own
+        server. We compile visitor statistics ourselves, on our own servers, without any script
+        running in your browser and without storing anything else on your device.
       </p>
 
       <h2 class="text-xl font-semibold">1. Data protection at a glance</h2>
@@ -849,30 +883,55 @@ const germanHref = computed(
 
       <h2 class="text-xl font-semibold">4. Data collection on this website</h2>
 
-      <h3 class="text-lg font-semibold">No cookies</h3>
+      <h3 class="text-lg font-semibold">Cookies</h3>
       <p>
-        This website does not use cookies. We do not store any information on your device and do not
-        access information stored there; we also do not use device fingerprinting in the browser.
-        Consent under Section 25(1) TDDDG is therefore not required, and we do not display a cookie
-        banner.
+        This website sets a single cookie: a technical session cookie, set on every page view where
+        your browser does not already have one. It contains only a random identifier that cannot be
+        traced back to you personally, and exists to let our server protect the contact form against
+        cross-site request forgery (CSRF) attacks; it is not used for tracking, analytics or
+        advertising, and is not transmitted to third parties.
+      </p>
+      <p>
+        The cookie is a session cookie with no storage-duration attribute of its own: your browser
+        discards it once you close it. It is also set so that no script on the page can read it
+        (HttpOnly), so that it is only transmitted over an encrypted connection (Secure), and so
+        that it is not sent along to another website (SameSite=Lax).
+      </p>
+      <p>
+        In our assessment, this cookie is technically necessary within the meaning of Section 25(2)
+        no. 2 TDDDG, because the contact form cannot be effectively protected against cross-site
+        request forgery without a session cookie of this kind; consent is therefore not required,
+        and we do not display a cookie banner. Beyond this, we do not store any further information
+        on your device, do not access information stored there, and do not use device fingerprinting
+        in the browser either.
       </p>
 
       <h3 class="text-lg font-semibold">Server log files</h3>
       <p>
-        When you access this website, our web server and the reverse proxy in front of it
-        automatically collect and store information in so-called server log files, which your
-        browser automatically transmits to us. These are:
+        For every request to this website, our web server automatically writes one log line. It
+        records:
       </p>
       <ul class="list-disc pl-6">
-        <li>IP address</li>
-        <li>Date and time of the server request</li>
+        <li>the time of the request</li>
+        <li>the IP address</li>
         <li>
-          Request line (the page or file requested, the request method and the protocol version)
+          a random request id our server assigns, so that log lines belonging to one request can be
+          matched to each other
         </li>
-        <li>HTTP status code and amount of data transferred</li>
-        <li>Browser type and version, and operating system used (user agent)</li>
-        <li>Referrer URL, where your browser transmits it</li>
+        <li>the request method (for example, GET or POST)</li>
+        <li>
+          a coarse, internal category for the request (for example, "a page of this website", "an
+          asset file"), not the full address requested with all its parameters; for an ordinary page
+          view, this category does not even distinguish which page was viewed – the home page, the
+          imprint, the privacy policy, the AGB and the error page all get the same value
+        </li>
+        <li>the HTTP status code and the amount of data transferred</li>
+        <li>how long the request took to answer</li>
       </ul>
+      <p>
+        Your device's browser type (user agent) and any referrer URL are not recorded as part of
+        this.
+      </p>
       <p>This data is not merged with other data sources.</p>
       <p>
         This data is collected on the basis of Art. 6(1)(f) GDPR. The website operator has a
@@ -973,8 +1032,10 @@ const germanHref = computed(
       <p>
         To protect against spam, your browser solves a small computational task (a so-called proof
         of work) when you fill in the form. To do this, it requests a random task from our server
-        and sends the solution back together with the form. No cookies are set, no information is
-        stored on your device, and no third-party services are used for this purpose. To prevent
+        and sends the solution back together with the form. This itself sets no further cookies,
+        stores no further information on your device, and uses no third-party services for this
+        purpose; the technical session cookie set when you load any page of this website (see the
+        "Cookies" section) also protects this form against cross-site request forgery. To prevent
         misuse, our server also processes your IP address briefly in memory in order to limit the
         number of requests per address; it is not stored permanently for this purpose. The legal
         basis for this is our legitimate interest in protection against spam and misuse (Art.
