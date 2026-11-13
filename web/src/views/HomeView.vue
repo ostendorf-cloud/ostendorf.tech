@@ -3,7 +3,10 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { GovueCard, GovuePage } from '@ostendorf-cloud/govue'
 
+import CountingFacts from '../components/CountingFacts.vue'
 import { bands } from '../data/bands'
+import { experienceYearsFloor } from '../lib/experienceYears'
+import type { Fact } from '../lib/facts'
 
 // Destructuring tm is vue-i18n's own documented usage; unbound-method's
 // warning about it does not apply, tm never reads `this`.
@@ -13,6 +16,19 @@ const { t, tm, rt } = useI18n()
 // Annotated so the v-for below sees a real array type and a numeric
 // index, which tm's own return type does not provably give it.
 const tagline = computed<string[]>(() => tm('home.hero.tagline'))
+
+// The years figure is computed, never hand-edited; the other two facts
+// are fixed counts that still count up alongside it, as one motion. Only
+// the label text comes from the message catalogues.
+const aboutFacts = computed<Fact[]>(() => [
+  {
+    label: t('home.about.facts.years.label'),
+    target: experienceYearsFloor(new Date()),
+    suffix: '+',
+  },
+  { label: t('home.about.facts.disciplines.label'), target: 4 },
+  { label: t('home.about.facts.contact.label'), target: 1 },
+])
 </script>
 
 <template>
@@ -139,12 +155,7 @@ const tagline = computed<string[]>(() => tm('home.hero.tagline'))
           {{ rt(paragraph) }}
         </p>
       </div>
-      <ul class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3" role="list">
-        <li v-for="fact in tm('home.about.facts')" :key="rt(fact.label)" class="flex flex-col">
-          <span class="text-2xl font-semibold text-accent-text">{{ rt(fact.value) }}</span>
-          <span class="text-sm text-text-muted">{{ rt(fact.label) }}</span>
-        </li>
-      </ul>
+      <CountingFacts :facts="aboutFacts" class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3" />
       <p class="mt-6">
         <a
           href="mailto:simon@ostendorf.tech"

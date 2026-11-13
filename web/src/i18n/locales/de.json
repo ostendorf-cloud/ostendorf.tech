@@ -81,11 +81,11 @@
         "Hauptsächlich betreue ich Firmenveranstaltungen, Galas, Messen und Konferenzen – von der ersten Idee bis zur finalen Umsetzung. Ebenfalls unterstütze ich Bands professionell bei Konzerten, Touren oder Einzelauftritten – inklusive technischer Planung, Aufbau, Soundcheck und Live-Begleitung.",
         "Sie planen eine Firmenfeier, ein kulturelles Event oder benötigen Unterstützung für eine Live-Produktion? Sprechen Sie mich gerne an, gemeinsam machen wir Ihre Veranstaltung zu einem Erlebnis."
       ],
-      "facts": [
-        { "value": "10+", "label": "Jahre Erfahrung" },
-        { "value": "4", "label": "Gewerke: Ton, Licht, Bühne, Video" },
-        { "value": "1", "label": "Ansprechpartner von der Idee bis zum Abbau" }
-      ],
+      "facts": {
+        "years": { "label": "Jahre Erfahrung" },
+        "disciplines": { "label": "Gewerke: Ton, Licht, Bühne, Video" },
+        "contact": { "label": "Ansprechpartner von der Idee bis zum Abbau" }
+      },
       "cta": "Projekt anfragen"
     }
   },

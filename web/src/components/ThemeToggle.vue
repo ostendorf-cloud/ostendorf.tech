@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTheme, GovueButton } from '@ostendorf-cloud/govue'
 
+import { prefersReducedMotion } from '../lib/motion'
+
 /**
  * The header's dark/light toggle. useTheme's mode already has three
  * states, light, dark and system, in that cycling order; this button only
@@ -23,10 +25,76 @@ const nextMode = computed(
   () => cycleOrder[(cycleOrder.indexOf(mode.value) + 1) % cycleOrder.length],
 )
 const label = computed(() => t(`common.theme.${nextMode.value}`))
+
+// The circle's curve mirrors base.css's own --ease-out token: the Web
+// Animations API takes a literal easing function, not a CSS var()
+// reference, so the same cubic-bezier is written out here by hand.
+const REVEAL_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
+const REVEAL_DURATION_MS = 300
+
+/** activationPoint is the point the reveal grows from. A MouseEvent whose
+ *  detail is 0 was synthesized by keyboard activation (Enter or Space)
+ *  rather than a real pointer click, and carries no usable coordinates,
+ *  so the button's own centre stands in for it. */
+function activationPoint(event: MouseEvent): { x: number; y: number } {
+  if (event.detail === 0) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+  }
+  return { x: event.clientX, y: event.clientY }
+}
+
+/**
+ * onToggle replaces the instant mode switch with a circle that expands
+ * from the activation point, using the View Transitions API. A browser
+ * without it, and a visitor who asked for reduced motion, both get the
+ * same instant switch cycleMode always did; what the mode actually means
+ * (light, dark, system) is untouched, this only changes how the change is
+ * presented.
+ */
+function onToggle(event: MouseEvent): void {
+  if (typeof document.startViewTransition !== 'function' || prefersReducedMotion()) {
+    cycleMode()
+    return
+  }
+
+  const { x, y } = activationPoint(event)
+  const endRadius = Math.hypot(
+    Math.max(x, window.innerWidth - x),
+    Math.max(y, window.innerHeight - y),
+  )
+
+  const transition = document.startViewTransition(() => {
+    cycleMode()
+  })
+
+  void transition.ready
+    .then(() => {
+      document.documentElement.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`] },
+        {
+          duration: REVEAL_DURATION_MS,
+          easing: REVEAL_EASING,
+          pseudoElement: '::view-transition-new(root)',
+        },
+      )
+    })
+    .catch((reason: unknown) => {
+      // transition.ready rejects when the browser skips the transition, for
+      // example a second click arriving before the first one finished.
+      // cycleMode above already ran, so the mode change itself is not lost,
+      // only its reveal, and that is not worth telling anyone about. A
+      // failure from animate() lands here too and is a real defect, so it
+      // goes to the console rather than disappearing with the expected case.
+      if (!(reason instanceof DOMException && reason.name === 'AbortError')) {
+        console.error('theme reveal failed', reason)
+      }
+    })
+}
 </script>
 
 <template>
-  <GovueButton variant="quiet" :title="label" :aria-label="label" @click="cycleMode">
+  <GovueButton variant="quiet" :title="label" :aria-label="label" @click="onToggle">
     <svg
       v-if="resolvedMode === 'dark'"
       class="size-4 shrink-0"
