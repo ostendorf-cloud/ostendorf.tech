@@ -125,6 +125,13 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("feedclient: sync: %w", err)
 	}
+	if len(posts) > maxPosts {
+		// A buggy or compromised feed service ignoring its own POST_COUNT
+		// ceiling must not drive this process into downloading and holding
+		// images for far more posts than the feed service was ever asked
+		// to serve; see maxPosts's own doc comment (feedclient.go).
+		posts = posts[:maxPosts]
+	}
 
 	out := make([]*CachedPost, 0, len(posts))
 	var failures int

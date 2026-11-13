@@ -46,6 +46,16 @@ const (
 	// independent limit of the same size against a feed service response
 	// that does not honour that ceiling, not the only one.
 	MaxImageBytes = 4 << 20
+	// maxPosts bounds how many posts one sync cycle will ever process,
+	// mirroring internal/feedconfig's own ceiling on POST_COUNT (also 100):
+	// the feed service already caps itself to at most that many, but
+	// maxPostsBytes alone does not stand in for a post count limit, since
+	// a 1 MiB JSON body is roughly ten thousand small post entries, each
+	// able to pull a MaxImageBytes image. A second, independent limit
+	// against a feed service response that does not honour its own
+	// ceiling, the same reasoning MaxImageBytes above already states for
+	// image size.
+	maxPosts = 100
 )
 
 // allowedImageTypes are the formats served back to the browser.

@@ -154,6 +154,34 @@ func TestSyncEmptyStaysEmpty(t *testing.T) {
 	}
 }
 
+// TestSyncCapsPostCount proves the website bounds how many posts one cycle
+// ever processes on its own, independent of what the feed service sends:
+// internal/feedconfig already caps POST_COUNT to 100, but a buggy or
+// compromised feed service ignoring that ceiling must not be able to drive
+// this process into downloading and holding images for far more posts than
+// that, inside a single-replica, Recreate-strategy pod.
+func TestSyncCapsPostCount(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeFeedService()
+	const sent = maxPosts + 50
+	for i := range sent {
+		f.posts = append(f.posts, Post{ID: fmt.Sprintf("%d", i), Alt: "a", Permalink: "https://www.instagram.com/p/A/"})
+	}
+	s := newSyncer(f, io.Discard)
+
+	if err := s.Sync(t.Context()); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	posts := s.Cache.Posts()
+	if len(posts) != maxPosts {
+		t.Fatalf("Posts() = %d, want capped at %d even though the feed service sent %d", len(posts), maxPosts, sent)
+	}
+	if posts[0].ID != "0" || posts[maxPosts-1].ID != fmt.Sprintf("%d", maxPosts-1) {
+		t.Errorf("kept posts = %q..%q, want the first %d in the order the feed service sent them", posts[0].ID, posts[len(posts)-1].ID, maxPosts)
+	}
+}
+
 func TestSyncKeepsLastCacheWhenPostsCallFails(t *testing.T) {
 	t.Parallel()
 
