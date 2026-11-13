@@ -7,9 +7,12 @@ below is marked with the source it relies on; anything not verifiable is named a
 
 Checked: `web/src/views/ImprintView.vue`, `PrivacyView.vue`, `AgbView.vue` and
 `web/src/i18n/locales/{de,en}.json`, against current German law and against this repository's
-code (first milestone, this worktree) plus the second milestone's not-yet-ported code in
-`old_simon-ostendorf.de` (`internal/pow`, `internal/analytics`, `internal/contact`,
-`internal/instagram`, `internal/clientip`, `internal/ratelimit`).
+code. Two generations of that code check: the first milestone, in this worktree; and, once it
+existed, the second milestone's real, pushed implementation on the `feat/go-live` branch of the
+main checkout (`internal/webapp`, `internal/contact`, `internal/pow`, and `govue`'s
+`middleware/accesslog.go` and `session` package), read directly rather than inferred from
+`old_simon-ostendorf.de`. Earlier findings based on the old repository's forward-looking code are
+marked below where `feat/go-live`'s actual code turned out to differ from it.
 
 Fixed directly, not listed here: the dispute resolution statement in the imprint (section 36
 VSBG), applied in German and English.
@@ -162,31 +165,104 @@ privacy policy, not only the contact form's own limiting. Added as a new "Ratenb
   limiting described in the "Kontaktformular" / "Contact form" section; the two do not share a
   bucket or a key space, so being rate limited on one does not count against the other.
 
-## Findings for the owner to decide or supply
+## Fixed: the server log field list, with real data
 
-1. **The access log's actual fields are narrower than the "Server-Log-Dateien" list describes,
-   and the gap sits at the reverse proxy, which this repository does not contain yet.**
-   Why it matters: `govue`'s `middleware.AccessLog`, as wired in `internal/webapp/webapp.go`,
-   logs method, matched route, status, byte count, duration and the resolved client address; it
-   does not log the user agent or the referrer by default, and this application does not turn
-   that on. The ported privacy text's list (IP, date/time, request line, status, bytes, browser
-   and OS, referrer) describes a conventional web or reverse-proxy log, which is plausible for
-   whatever sits in front of this application once deployed, but that component is not part of
-   this repository yet.
-   Source: `internal/webapp/webapp.go`; `govue/middleware/accesslog.go` (`AccessLog.log`, no
-   `UserAgent` field set here, so it defaults to omitted).
-   Owner must confirm: the actual log fields and retention of the edge or ingress component once
-   milestone two's Helm chart exists, so the "Server-Log-Dateien" section matches what is really
-   logged, not only what the Go application itself logs.
+The owner's own sample log line was from the old site and does not describe this one; verified
+against `feat/go-live`'s actual code instead of inferring from `old_simon-ostendorf.de`, the
+fields genuinely differ from what the ported "Server-Log-Dateien" text claimed, and in the more
+privacy-friendly direction, so the old text was understating how little this site logs. Rewrote
+the section in both languages of `PrivacyView.vue` to list exactly, and only, what is logged:
 
-2. **A stale address lives in code that has not been ported yet, not in a legal page.**
-   Why it matters: not a defect in the current pages, but worth catching before milestone two
-   lands. `old_simon-ostendorf.de/internal/contact/validate.go` has a validation message that
-   tells a visitor with a non-ASCII email address to write to `info@simon-ostendorf.de` directly.
-   Source: `old_simon-ostendorf.de/internal/contact/validate.go`, the "E-Mail-Adressen mit
-   Umlauten..." error message.
-   Owner, or whoever implements the contact form milestone, should use `simon@ostendorf.tech`
-   there instead when that code is ported.
+- Read `middleware/accesslog.go` in `govue` and `internal/webapp/webapp.go` on `feat/go-live`
+  directly. `AccessLog.log` writes: the request method, `Route(r)` (the matched net/http mux
+  *pattern*, never the raw path), the HTTP status, the byte count, the duration, and, because
+  `internal/webapp/webapp.go` constructs `middleware.AccessLog{ClientIP: clientIPs}` without
+  setting `UserAgent`, the resolved client address but never the user agent. `RequestID`
+  middleware additionally attaches a per-request id to the same log line.
+- The two points made explicit in both languages, as asked: the full requested address is never
+  stored, only an internal category of the request; for an ordinary page view that category does
+  not even distinguish which page was viewed, because `internal/webapp/webapp.go` registers the
+  entire document handler on the single catch-all mux pattern `"/"` (`pages.go`'s own routing
+  happens inside that one handler, never as further mux patterns) — the home page, the imprint,
+  the privacy policy, the AGB and the 404 page all produce the identical logged value. The
+  browser's user agent is not logged at all.
+- The legal basis and retention sentences were left exactly as they were, since the 30 day
+  retention is already recorded above as a standing operational requirement rather than something
+  this section needed to restate.
+
+This closes the finding.
+
+## Closed: the stale address, checked where it actually lives now
+
+`old_simon-ostendorf.de/internal/contact/validate.go`'s unported code was the one carrying
+`info@simon-ostendorf.de`. That package is now ported on `feat/go-live` as `internal/contact`,
+alongside `internal/webapp/messages.go`, which holds the German and English strings a field
+error or a service outage shows a visitor. Checked both for the old domain and the old address:
+
+- `grep -rn "simon-ostendorf\.de\|info@simon-ostendorf" internal/contact/` on `feat/go-live`
+  matches only a source comment naming the old repository
+  (`internal/contact/validate.go:2`), never a live address.
+- Every visitor-facing message in `internal/webapp/messages.go`, in both languages, including the
+  one about an email address the form cannot process and the one about the form being
+  temporarily unavailable, already says `simon@ostendorf.tech`. `internal/contact/message.go`'s
+  mail body also already says "ostendorf.tech", not the old domain.
+
+The ported package is clean. Nothing needed fixing, and nothing was changed on `feat/go-live`,
+which is outside this worktree.
+
+## Fixed: a cookie the privacy policy denied exists
+
+Reading `feat/go-live`'s real code surfaced a mismatch the ported text could not have caught,
+because it goes the other way round from every other finding in this review: the privacy policy
+said less processing happens than actually does, not more.
+
+- `internal/webapp/session.go`'s `ensureSession` runs on every page request
+  (`routeSession` wraps `mux.Handle("/", ...)` in `webapp.go`'s `buildHandler`), and starts a
+  fresh, cookie-backed session for any visitor who does not already have one
+  (`govue/session/session.go`, `Manager.Start` → `setCookie` → `http.SetCookie`). That is a real
+  browser cookie (`__Host-session`, or the same name without the prefix on a plain HTTP
+  development run, per `govue/session/session.go`'s `DefaultCookieName` and `New`), set for
+  every visitor of every page, not only someone who uses the contact form.
+- What is in it: `govue/session/session.go`'s `cookie()` sets `HttpOnly`, `Secure` (unless
+  plain HTTP is explicitly allowed) and `SameSite=Lax`, with `Path=/` and no `Domain`, and no
+  `Max-Age` unless an application asks for a persistent cookie, which this one does not
+  (`session.Config{Store: ..., AllowPlainHTTP: cfg.AllowPlainHTTP}` in `webapp.go`, `Persistent`
+  left false). The cookie's value is a random 256 bit id; the session itself (`session.Session{}`,
+  empty here: no login exists on this site) lives server-side in an in-process memory store
+  (`session.NewMemoryStore(nil)`). `internal/webapp/contact.go` confirms the session's only use:
+  deriving the contact form's CSRF token (`csrf.Token(a.csrfKey, s.ID)`), nothing else.
+- This directly contradicted the privacy policy's opening sentence and its "Keine Cookies" / "No
+  cookies" section, both carried over from the old site, which claimed this website uses no
+  cookies at all. Fixed in both languages of `PrivacyView.vue`: the opening summary now says the
+  site sets one, purely technical cookie for the contact form; the section (renamed "Cookies" /
+  "Cookies") describes what the cookie contains, that it is session-only, and its `HttpOnly`,
+  `Secure` and `SameSite` attributes; and the "Kontaktformular" / "Contact form" section's
+  existing sentence about the proof-of-work step itself setting no cookie was kept (it is still
+  true, the PoW mechanism itself sets nothing) and given a cross-reference to the session cookie
+  that already exists by the time a visitor reaches the form.
+- What was not invented: whether this cookie actually falls under the "technically necessary"
+  exemption from consent (Section 25(2) no. 2 TDDDG) is a genuinely contested point in German
+  commentary specifically for CSRF cookies, not a settled one. Some sources treat a security
+  cookie with no tracking purpose as covered by the exemption the same way a login or shopping
+  cart session is; others argue a CSRF cookie is a security enhancement rather than something the
+  requested service cannot function without, and would need consent (source:
+  [dr-dsgvo.de](https://dr-dsgvo.de/csrf-cookies-zur-gefahrenabwehr-bedeutung-und-problem-mit-dem-datenschutz/)).
+  The fixed text states the "technically necessary, no banner" position plainly, as "nach unserer
+  Einschätzung" / "in our assessment", which is the mainstream, commonly applied view for a
+  session cookie used solely for security with no tracking purpose, and is also simply the
+  operator's own classification to make; it is not asserted here as a settled point of law.
+
+This is now a finding, not a question answered by itself:
+
+1. **Confirm the "technically necessary, no cookie banner" classification for the session
+   cookie.** Why it matters: the fixed text takes a defensible, mainstream position on a
+   genuinely contested question, in the text on the owner's behalf. Source:
+   [dr-dsgvo.de](https://dr-dsgvo.de/csrf-cookies-zur-gefahrenabwehr-bedeutung-und-problem-mit-dem-datenschutz/)
+   and [cortina-consult.com](https://cortina-consult.com/web-compliance/wissen/tdddg/) on the
+   Section 25(2) TDDDG exemption generally. Owner should have this one specific point confirmed,
+   for instance by whoever already helped with the Kleinunternehmer and chamber questions, before
+   the contact form milestone goes live; if the conclusion changes, both the German and the
+   English "Cookies" section need a cookie banner added, not just different wording.
 
 ## Translated pages
 
@@ -209,21 +285,22 @@ translation.
 
 ## Confirmed by reading the code, not assumed
 
-- The proof-of-work challenge is cookie-free as advertised: `internal/pow/pow.go` keeps state
-  only in an in-memory map on the server (`Service.used`) and in the challenge/salt/signature
-  values the browser already receives and returns with the form; nothing is written to the
-  visitor's browser.
-- Umami analytics run entirely server to server: `internal/analytics/analytics.go` builds the
-  view from the request the server already has and posts it to Umami's `/api/send`; no script
-  reaches the browser and no cookie is set.
-- The Instagram feed is proxied: `internal/instagram/client.go` and `feed.go` fetch posts and
-  images server-side and cache them in memory; a visitor's browser never contacts Meta unless
-  they click through to a permalink, and Instagram's API receives only the server's own address
-  and access token, never visitor data.
-- No `Cookie` or `Set-Cookie` handling exists anywhere in this worktree's `internal/` or `cmd/`
-  packages, matching the privacy policy's cookie-free claim for the current milestone.
+What follows was first checked against `old_simon-ostendorf.de`'s forward-looking implementation,
+then re-checked directly against `feat/go-live`'s real, pushed code once it existed. One of the
+four points changed as a result, the cookie point; the other three held up unchanged:
 
-These four points mean the planned second milestone (contact form, Instagram feed, Umami) is
-consistent with what the privacy policy already says, provided it ports the same architecture
-unchanged. Re-check this once that code actually lands in this repository rather than relying on
-this review of the old repository's implementation.
+- The proof-of-work challenge itself is cookie-free: `internal/pow/pow.go` on `feat/go-live` is
+  the same algorithm as `old_simon-ostendorf.de`'s, unchanged, keeping state only in an in-memory
+  map on the server (`Service.used`) and in the challenge/salt/signature values the browser
+  already receives and returns with the form. This specific mechanism still writes nothing to
+  the visitor's browser; see "Fixed: a cookie the privacy policy denied exists" above for the
+  separate, sitewide session cookie that exists alongside it.
+- The Umami hookup is not yet part of this codebase on either branch (the milestone brief lists
+  it as a later milestone); `internal/analytics/analytics.go` only exists in
+  `old_simon-ostendorf.de`, so the privacy text's Umami section remains forward-looking and
+  unverified against real code, consistent with the standing operational requirement above.
+- The Instagram feed likewise does not exist on `feat/go-live` yet (also a later milestone); the
+  privacy text's Instagram section remains forward-looking, based on `old_simon-ostendorf.de`'s
+  `internal/instagram/client.go` and `feed.go`, and needs re-checking once that code lands.
+- The site is not cookie-free. `feat/go-live` sets one real cookie, on every page view, for the
+  reason and with the attributes described above; the privacy policy no longer claims otherwise.
