@@ -69,6 +69,35 @@ func TestImageRejectsDisallowedHost(t *testing.T) {
 	}
 }
 
+// TestClientRefreshToken exercises RefreshToken's own HTTP behaviour
+// against Meta's refresh endpoint: this is its only direct test now that
+// Syncer no longer runs a refresh of its own (that moved to TokenStore,
+// token.go, which exercises this method only through the Refresher
+// interface's fake). fakeMeta and hostTransport are instagram_test.go's.
+func TestClientRefreshToken(t *testing.T) {
+	t.Parallel()
+
+	meta := newFakeMeta()
+	client := NewClient("v23.0")
+	client.BaseURL = "https://graph.test"
+	client.HTTP = &http.Client{Transport: hostTransport{meta}}
+
+	fresh, err := client.RefreshToken(t.Context(), "tok-1")
+	if err != nil {
+		t.Fatalf("RefreshToken() error = %v", err)
+	}
+	if fresh != "tok-2" {
+		t.Errorf("RefreshToken() = %q, want tok-2", fresh)
+	}
+	if meta.refreshes() != 1 {
+		t.Errorf("refresh calls = %d, want 1", meta.refreshes())
+	}
+
+	if _, err := client.RefreshToken(t.Context(), "not-a-real-token"); err == nil {
+		t.Fatal("RefreshToken() error = nil, want one for a token Meta does not recognise")
+	}
+}
+
 func TestImageFetchesAllowedHost(t *testing.T) {
 	t.Parallel()
 

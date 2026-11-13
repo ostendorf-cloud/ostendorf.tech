@@ -8,8 +8,7 @@ import (
 )
 
 // fakeTokenSource is a hand-written TokenSource: it returns token or err,
-// and counts how often it was asked, so a test can prove Sync called it
-// instead of falling back to the in-memory Token/RefreshAge path.
+// and counts how often it was asked.
 type fakeTokenSource struct {
 	token string
 	err   error
@@ -24,16 +23,12 @@ func (f *fakeTokenSource) Token(context.Context) (string, error) {
 	return f.token, nil
 }
 
-func TestSyncUsesTokenSourceWhenSet(t *testing.T) {
+func TestSyncAsksTheTokenSourceOnce(t *testing.T) {
 	t.Parallel()
 
 	meta := newFakeMeta()
 	meta.media = []Media{{ID: "1", MediaType: "IMAGE", MediaURL: "https://cdn.test/a.jpg", Permalink: "https://www.instagram.com/p/A/"}}
-	s := newSyncer(meta, io.Discard, fixedClock())
-	// Token is deliberately left empty and RefreshAge/refresh logic
-	// untouched: Tokens being set must mean Sync never falls back to any
-	// of that.
-	s.Token = ""
+	s := newSyncer(meta, io.Discard)
 	source := &fakeTokenSource{token: "tok-1"}
 	s.Tokens = source
 
@@ -42,9 +37,6 @@ func TestSyncUsesTokenSourceWhenSet(t *testing.T) {
 	}
 	if source.calls != 1 {
 		t.Errorf("TokenSource.Token called %d times, want 1", source.calls)
-	}
-	if meta.refreshes() != 0 {
-		t.Errorf("refresh calls = %d, want 0: Tokens must bypass the in-memory refresh entirely", meta.refreshes())
 	}
 	if got := meta.token(); got != "tok-1" {
 		t.Errorf("media called with %q, want the TokenSource's tok-1", got)
@@ -59,7 +51,7 @@ func TestSyncReturnsTokenSourceError(t *testing.T) {
 
 	meta := newFakeMeta()
 	meta.media = []Media{{ID: "1", MediaType: "IMAGE", MediaURL: "https://cdn.test/a.jpg", Permalink: "https://www.instagram.com/p/A/"}}
-	s := newSyncer(meta, io.Discard, fixedClock())
+	s := newSyncer(meta, io.Discard)
 	wantErr := errors.New("openbao unreachable")
 	source := &fakeTokenSource{err: wantErr}
 	s.Tokens = source
