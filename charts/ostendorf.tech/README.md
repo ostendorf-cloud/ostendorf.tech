@@ -317,13 +317,18 @@ at.
 
 This chart is verified with:
 
-- `helm lint`
-- `helm template`, for the default values and for the documented ingress-enabled and
-  httpRoute-enabled combinations.
-- `kubeconform`, against the rendered manifests. The default schema set carries no Gateway API
-  schemas, so an httpRoute-enabled render's `HTTPRoute` is validated with a second
-  `-schema-location` added after the default one, pointing at the community
-  [CRDs-catalog](https://github.com/datreeio/CRDs-catalog):
+- `helm lint`, over the default values and the documented ingress-enabled and httpRoute-enabled
+  combinations. `helm lint` never propagates a template's `fail` or `required` call; it logs
+  either at INFO and still exits zero, so it covers a values mistake schema validation would
+  catch, not one of this chart's own render-time guards.
+- `helm template`, for the same combinations as `helm lint` above, and for a must-fail set: one
+  combination per render-time guard in `templates/deployment.yaml`, `templates/deployment-feed.yaml`
+  and `templates/httproute.yaml`, each asserted to fail with that guard's own message rather than
+  merely to render. `helm lint` cannot stand in for this: see the bullet above.
+- `kubeconform`, against the rendered manifests of the must-succeed combinations. The default
+  schema set carries no Gateway API schemas, so an httpRoute-enabled render's `HTTPRoute` is
+  validated with a second `-schema-location` added after the default one, pointing at the
+  community [CRDs-catalog](https://github.com/datreeio/CRDs-catalog):
 
   ```sh
   kubeconform -strict -summary \
@@ -332,8 +337,14 @@ This chart is verified with:
   ```
 
 - [`helm-unittest`](https://github.com/helm-unittest/helm-unittest), run with
-  `helm unittest charts/ostendorf.tech`; see `mise.toml` for how the plugin is pinned.
+  `helm unittest charts/ostendorf.tech`; see `mise.toml` for how the plugin is pinned. Its
+  `failedTemplate` suites cover the same render-time guards as the must-fail set above,
+  independently: both have to agree before a guard counts as checked.
 
-`task lint:helm`, `task validate:kubeconform` and `task test:helm` run each of these, one job
-per check in CI. A live end-to-end install into a real cluster is a separate, tracked follow-up,
-not part of this chart's static verification.
+`scripts/validate-chart.sh` holds the must-succeed and must-fail `--set` combinations in one
+place, shared by `task lint:helm` (`helm lint` over the must-succeed set, then `helm template`
+over the must-fail set) and `task validate:kubeconform` (`helm template` piped into `kubeconform`
+over the must-succeed set), so CI and a local run check the exact same combinations.
+`task test:helm` runs `helm-unittest` separately. Each has its own job in CI. A live end-to-end
+install into a real cluster is a separate, tracked follow-up, not part of this chart's static
+verification.

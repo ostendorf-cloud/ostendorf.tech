@@ -62,70 +62,21 @@ tasks:
       - shellcheck scripts/*.sh
       - shfmt --diff --indent 2 --case-indent scripts/*.sh
 
-  # The --set combinations mirror charts/ostendorf.tech/tests/*_test.yaml's own
-  # "set:" blocks: default, ingress enabled and httpRoute enabled. Each combination's
-  # value list is split across several short vars, and the longer commands folded
-  # over several lines, so no physical line in this file exceeds yamllint's
-  # line-length limit; see charts/ostendorf.tech/README.md's "External routing"
-  # section for the combinations themselves. FEED_SET1 and FEED_SET2 carry the feed
-  # workload's own required values, folded into DEFAULT_SET the same way
-  # existingSecret.name already is, since every combination below renders the whole
-  # chart, feed Deployment included.
+  # scripts/validate-chart.sh holds the --set combinations, the must-succeed set and the
+  # must-fail set alike, so task lint:helm and task validate:kubeconform below check the
+  # exact same succeed combinations and CI shares that one definition with a local run.
+  # See that script's own header comment for why the must-fail set belongs there and not
+  # here: a must-fail case needs helm template's exit code and its guard's exact message,
+  # which a single-line Taskfile cmd cannot assert.
   lint:helm:
-    desc: Helm chart lint
-    vars:
-      FEED_SET1: feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200
-      FEED_SET2: feed.config.openBaoRole=ostendorf-tech-feed
-      DEFAULT_SET: existingSecret.name=ostendorf-tech-secrets,{{.FEED_SET1}},{{.FEED_SET2}}
-      INGRESS_SET1: config.trustedProxyCidrs=10.0.0.0/8,ingress.enabled=true,ingress.className=nginx
-      INGRESS_SET2: ingress.hosts[0].host=ostendorf.tech
-      INGRESS_SET3: ingress.hosts[0].paths[0].path=/,ingress.hosts[0].paths[0].pathType=Prefix
-      HTTPROUTE_SET1: httpRoute.enabled=true,httpRoute.hostnames[0]=ostendorf.tech
-      HTTPROUTE_SET2: httpRoute.parentRefs.name=shared-gateway,httpRoute.parentRefs.namespace=gateway-system
+    desc: Helm chart lint, including a must-fail set proving every render-time guard rejects what it must
     cmds:
-      - helm lint charts/ostendorf.tech --set {{.DEFAULT_SET}}
-      - >-
-        helm lint charts/ostendorf.tech
-        --set {{.DEFAULT_SET}},{{.INGRESS_SET1}},{{.INGRESS_SET2}},{{.INGRESS_SET3}}
-      - >-
-        helm lint charts/ostendorf.tech
-        --set {{.DEFAULT_SET}},{{.HTTPROUTE_SET1}},{{.HTTPROUTE_SET2}}
+      - scripts/validate-chart.sh lint
 
-  # kubeconform's default schema location carries no Gateway API schemas. A second
-  # -schema-location, after the default one, adds the community CRDs-catalog
-  # (https://github.com/datreeio/CRDs-catalog): kubeconform tries each location in
-  # order and falls through to the next on a miss, so every other, non-CRD kind still
-  # resolves against the default location first. GATEWAY_API_SCHEMA is split in two,
-  # like the --set combinations below, so no line here exceeds yamllint's
-  # line-length limit.
   validate:kubeconform:
     desc: Schema validation of the rendered Helm chart
-    vars:
-      FEED_SET1: feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200
-      FEED_SET2: feed.config.openBaoRole=ostendorf-tech-feed
-      DEFAULT_SET: existingSecret.name=ostendorf-tech-secrets,{{.FEED_SET1}},{{.FEED_SET2}}
-      INGRESS_SET1: config.trustedProxyCidrs=10.0.0.0/8,ingress.enabled=true,ingress.className=nginx
-      INGRESS_SET2: ingress.hosts[0].host=ostendorf.tech
-      INGRESS_SET3: ingress.hosts[0].paths[0].path=/,ingress.hosts[0].paths[0].pathType=Prefix
-      HTTPROUTE_SET1: httpRoute.enabled=true,httpRoute.hostnames[0]=ostendorf.tech
-      HTTPROUTE_SET2: httpRoute.parentRefs.name=shared-gateway,httpRoute.parentRefs.namespace=gateway-system
-      GATEWAY_API_SCHEMA_1: 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{"{{"}}.Group{{"}}"}}'
-      GATEWAY_API_SCHEMA_2: '/{{"{{"}}.ResourceKind{{"}}"}}_{{"{{"}}.ResourceAPIVersion{{"}}"}}.json'
     cmds:
-      - >-
-        helm template charts/ostendorf.tech --set {{.DEFAULT_SET}}
-        | kubeconform -strict -summary -schema-location default
-        -schema-location '{{.GATEWAY_API_SCHEMA_1}}{{.GATEWAY_API_SCHEMA_2}}'
-      - >-
-        helm template charts/ostendorf.tech
-        --set {{.DEFAULT_SET}},{{.INGRESS_SET1}},{{.INGRESS_SET2}},{{.INGRESS_SET3}}
-        | kubeconform -strict -summary -schema-location default
-        -schema-location '{{.GATEWAY_API_SCHEMA_1}}{{.GATEWAY_API_SCHEMA_2}}'
-      - >-
-        helm template charts/ostendorf.tech
-        --set {{.DEFAULT_SET}},{{.HTTPROUTE_SET1}},{{.HTTPROUTE_SET2}}
-        | kubeconform -strict -summary -schema-location default
-        -schema-location '{{.GATEWAY_API_SCHEMA_1}}{{.GATEWAY_API_SCHEMA_2}}'
+      - scripts/validate-chart.sh kubeconform
 
   # helm-unittest is a Helm plugin, and helm only finds a plugin inside HELM_PLUGINS.
   # The mise entry's postinstall copies it into helm's own plugin directory, but that
