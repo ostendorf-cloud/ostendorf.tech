@@ -1,0 +1,53 @@
+# Notice
+
+LICENSE covers the software in this repository. This file covers everything in
+and around it that LICENSE does not, because a website is more than its code.
+
+## Third party components
+
+The software depends on components that are not covered by LICENSE and that
+carry their own terms. Nothing in LICENSE restricts them, and nothing here
+grants anything beyond what their own licences grant.
+
+The direct dependencies, and the licence each one carries:
+
+- `github.com/ostendorf-cloud/govue`, the Go module and the Vue package:
+  Apache License 2.0
+- `github.com/prometheus/client_golang`, reached through govue:
+  Apache License 2.0
+- Vue, Vue Router and Vue I18n: MIT License
+- Tailwind CSS: MIT License
+
+Each dependency's full licence text ships with the dependency itself, in the
+Go module cache and in `web/node_modules`, and is not reproduced here. The
+complete set, including transitive dependencies, is whatever `go.mod`,
+`go.sum`, `web/package.json` and `web/pnpm-lock.yaml` resolve to at a given
+commit; those four files are the authoritative list, not this one.
+
+## Brand and imagery
+
+The name Simon Ostendorf Veranstaltungstechnik, the logo, the wordmark and the
+photographs are not software and are not licensed to anyone. They identify a
+specific business. Reusing them would misidentify the source of a service even
+where the surrounding code was reused lawfully.
+
+`web/src/assets/logo-wordmark-light.svg` and `logo-wordmark-dark.svg` are
+generated from vector sources held outside this repository; see AGENTS.md.
+
+## Page texts
+
+The German texts on the site are the copyright of Simon Ostendorf, with two
+exceptions worth naming because they are other people's words:
+
+- The band descriptions in the Bands section were written by, or about, the
+  bands themselves and are reproduced with their agreement. They describe those
+  bands and belong to them, not to this repository.
+- The Kölsch quotations attributed to Herrenjedeck are that band's own wording,
+  quoted as such.
+
+## Legal pages
+
+The imprint, the privacy policy and the general terms are statements about this
+business and its data processing. They are accurate for this business only.
+Copying them into another website would make false statements about that
+website, regardless of copyright.
