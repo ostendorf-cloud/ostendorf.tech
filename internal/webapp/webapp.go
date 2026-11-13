@@ -32,6 +32,33 @@ import (
 // the ratelimit package for why that bound matters.
 const maxRateLimitKeys = 100_000
 
+// maxSessions bounds how many anonymous sessions session.MemoryStore keeps
+// at once, deliberately far below govue's own 10000 default.
+//
+// A session here carries no account: an opaque id and three timestamps,
+// nothing this application ever writes into Session.Data, Groups, Subject,
+// Username, Name or Email. That keeps one entry's cost to roughly the map's
+// per-entry overhead plus the id string stored twice (as the map key and as
+// Session.ID), well under 1KiB even counting Go's own bookkeeping. 2000
+// sessions therefore cost on the order of 1-2MiB, a rounding error against
+// the chart's 128Mi pod limit (charts/ostendorf.tech/values.yaml) even
+// before the sweep in MemoryStore.Save ever runs, and the bound is what
+// stands between that budget and an attacker who keeps minting fresh
+// sessions: without it, a flood of distinct GET /api/v1/challenge requests
+// (the only place a session is minted) would grow the store without limit,
+// capped only by RAM.
+//
+// A session lives up to session.DefaultLifetime, 12 hours, so this is also
+// a ceiling on how many distinct visitors can be mid-visit to the contact
+// form at once within any 12 hour window before MemoryStore.Save starts
+// evicting one arbitrary entry per new arrival to make room. 2000 is a
+// generous multiple of any realistic concurrency for one small business's
+// contact form, legitimate or abusive within the challenge rate limit's own
+// per-address budget (DefaultChallengeRateLimitBurst), so that eviction is
+// not expected to ever trigger in practice; it exists as the hard ceiling,
+// not the working set.
+const maxSessions = 2_000
+
 // App holds every dependency the website's handler needs.
 type App struct {
 	logger *slog.Logger
@@ -114,7 +141,7 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.contactLimiter = ratelimit.New(cfg.ContactRateLimitBurst, cfg.ContactRateLimitPer, maxRateLimitKeys)
 
 	a.sessions, err = session.New(session.Config{
-		Store:          session.NewMemoryStore(nil),
+		Store:          session.NewMemoryStore(nil, maxSessions),
 		AllowPlainHTTP: cfg.AllowPlainHTTP,
 	})
 	fail(err)

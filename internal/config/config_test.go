@@ -168,6 +168,26 @@ func TestLoadSecretRefusesBothVariableAndFile(t *testing.T) {
 	}
 }
 
+// TestLoadSecretFileMustNotBeEmpty is govue v0.3.0's envconf.SecretOrFile
+// contract: a file resolving to an empty value is a problem, not a silent
+// "not configured". A deployment pointing SMTP_PASSWORD_FILE at a secret
+// that failed to populate must not start thinking it simply has no
+// password.
+func TestLoadSecretFileMustNotBeEmpty(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "smtp-password")
+	if err := os.WriteFile(path, []byte("\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(env(withCSRFKey(map[string]string{
+		"SMTP_PASSWORD_FILE": path,
+	})))
+	if err == nil || !strings.Contains(err.Error(), "SMTP_PASSWORD") {
+		t.Fatalf("Load() error = %v, want a problem naming SMTP_PASSWORD", err)
+	}
+}
+
 func TestLoadRequiresCSRFKey(t *testing.T) {
 	_, err := Load(env(nil))
 	if err == nil || !strings.Contains(err.Error(), "CSRF_KEY") {

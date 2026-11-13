@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/ostendorf-cloud/govue/api"
 	"github.com/ostendorf-cloud/govue/csrf"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
@@ -52,6 +53,15 @@ func testConfig(t *testing.T, env map[string]string) config.Config {
 // a 5xx would otherwise collapse to.
 func decodeErrorMessage(t *testing.T, body []byte) string {
 	t.Helper()
+	_, message := decodeError(t, body)
+	return message
+}
+
+// decodeError is decodeErrorMessage plus the code, for a test that also has
+// to prove a 5xx collapsed to govue's generic shape rather than merely
+// checking the status.
+func decodeError(t *testing.T, body []byte) (code, message string) {
+	t.Helper()
 	var envelope struct {
 		Error struct {
 			Code    string `json:"code"`
@@ -61,7 +71,7 @@ func decodeErrorMessage(t *testing.T, body []byte) string {
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		t.Fatalf("decode error envelope: %v", err)
 	}
-	return envelope.Error.Message
+	return envelope.Error.Code, envelope.Error.Message
 }
 
 func testFS() (dist, prerendered fstest.MapFS) {
@@ -216,11 +226,12 @@ func TestAppChallengeUnavailableWithoutKey(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge", nil)
 	rec := httptest.NewRecorder()
 	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusConflict, rec.Body)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusServiceUnavailable, rec.Body)
 	}
-	// The status has to stay below 500, or api.WriteError would collapse
-	// this localized message to the fixed "internal error" placeholder.
+	// 503 would normally make api.WriteError collapse this to the fixed
+	// "internal error" placeholder; handleChallenge marks this message
+	// Exposed, so the localized text has to survive regardless.
 	message := decodeErrorMessage(t, rec.Body.Bytes())
 	if message != contactMessagesDE.unavailable {
 		t.Errorf("message = %q, want the localized unavailable message %q", message, contactMessagesDE.unavailable)
@@ -341,13 +352,13 @@ func TestAppContactUnavailableWithoutCredentials(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusConflict, rec.Body)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusServiceUnavailable, rec.Body)
 	}
 	// A status-only assertion here is exactly why this bug shipped: the
 	// handler answered the right status with the wrong, English-collapsed
-	// body. The message has to be the localized German text, not the fixed
-	// "internal error" placeholder a 5xx would have produced.
+	// body. The message has to be the localized German text, which survives
+	// only because handleContact marks this specific error Exposed.
 	message := decodeErrorMessage(t, rec.Body.Bytes())
 	if message != contactMessagesDE.unavailable {
 		t.Errorf("message = %q, want the localized unavailable message %q", message, contactMessagesDE.unavailable)
@@ -525,7 +536,14 @@ func TestAppContactFullPipelineReachesTheMailer(t *testing.T) {
 	// up to that boundary (session, CSRF, honeypot, validation, proof of
 	// work) without needing a real SMTP server; internal/contact's own
 	// tests already cover the SMTP conversation itself.
-	dialErr := errors.New("dial refused")
+	//
+	// The error text is deliberately shaped like a real net/smtp dial
+	// failure, carrying a hostname and credentials, so the leak assertion
+	// below is checking something a real SMTP error could actually
+	// contain, not a string this test invented for its own sake.
+	const leakedHost = "mail.ostendorf.internal"
+	const leakedCreds = "user=mailer-svc@ostendorf.cloud password=correct-horse-battery-staple"
+	dialErr := errors.New("dial tcp " + leakedHost + ":587: smtp auth failed for " + leakedCreds)
 	app.mailer.Dial = func(context.Context, string, string) (net.Conn, error) {
 		return nil, dialErr
 	}
@@ -545,14 +563,31 @@ func TestAppContactFullPipelineReachesTheMailer(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("status = %d, want %d (the mailer's dial failure), body = %s", rec.Code, http.StatusUnprocessableEntity, rec.Body)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d (the mailer's dial failure), body = %s", rec.Code, http.StatusServiceUnavailable, rec.Body)
 	}
-	// Below 500, so the localized message must survive, not collapse to
-	// api.WriteError's fixed "internal error" placeholder.
-	message := decodeErrorMessage(t, rec.Body.Bytes())
+	// handleContact marks this error Exposed, but builds it fresh from the
+	// localized sendFailed text alone; err itself is never handed to the
+	// client-facing error, only logged above. The localized message
+	// therefore survives, same as the two "not configured" cases.
+	code, message := decodeError(t, rec.Body.Bytes())
+	if code != api.CodeUnavailable {
+		t.Errorf("code = %q, want %q", code, api.CodeUnavailable)
+	}
 	if message != contactMessagesDE.sendFailed {
 		t.Errorf("message = %q, want the localized sendFailed message %q", message, contactMessagesDE.sendFailed)
+	}
+
+	// The real assertion: whatever the mailer's own error said must never
+	// reach the response body. Checking the whole body against the fixed
+	// German text alone would still pass if a future change appended the
+	// cause after it, so this checks for the leak-prone substrings
+	// specifically, not just body equality.
+	full := rec.Body.String()
+	for _, leaked := range []string{leakedHost, leakedCreds, dialErr.Error()} {
+		if strings.Contains(full, leaked) {
+			t.Errorf("response body leaked %q from the mailer's own error, body = %s", leaked, full)
+		}
 	}
 }
 

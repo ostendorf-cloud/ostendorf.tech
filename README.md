@@ -36,11 +36,12 @@ bin/website
 
 The server reads its configuration from the environment; every secret-shaped variable
 also accepts a `_FILE` twin naming a path whose contents are the value, trimmed of a
-trailing newline, and it is an error to set both. There is no secret manager client in
-this binary: an OpenBao agent, External Secrets, a Kubernetes secret mount or a plain
-`.env` file are all interchangeable, as long as one of them lands the value in the
-right place before the process starts. `CSRF_KEY` is the only variable with no usable
-default; every other one does, so `bin/website` otherwise runs with none of them set.
+trailing newline, and it is an error to set both or to point `_FILE` at a file that
+resolves to nothing. There is no secret manager client in this binary: an OpenBao
+agent, External Secrets, a Kubernetes secret mount or a plain `.env` file are all
+interchangeable, as long as one of them lands the value in the right place before the
+process starts. `CSRF_KEY` is the only variable with no usable default; every other one
+does, so `bin/website` otherwise runs with none of them set.
 It serves the site at `/de/...` and `/en/...`, redirects `/` to the visitor's preferred
 locale, answers `/healthz`, `/readyz` and `/metrics`, and serves `/robots.txt` and
 `/sitemap.xml` built from the same route table the prerenderer uses.
