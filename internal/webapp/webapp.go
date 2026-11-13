@@ -208,6 +208,7 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP, metricsHandler http.Handle
 	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.contactRateLim.Middleware, a.protector.Middleware))
 	mux.Handle("/api/", route(api.NotFoundHandler()))
 
+	registerRoutes(mux, a.pages, routeSession)
 	mux.Handle("/", routeSession(a.pages.pageHandler()))
 
 	return middleware.Chain(mux,
