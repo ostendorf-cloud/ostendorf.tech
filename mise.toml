@@ -3,10 +3,12 @@
 [tools]
 go = "1.27.3"
 task = "3"
-# The web/ package. pnpm is the package manager, so npm is never called directly, and the
-# lockfile is written by the major pinned here.
+# The web/ package. pnpm is the package manager, so npm is never called directly.
+# pnpm is pinned to the patch, not the major: the Dockerfile's frontend stage installs
+# one literal version, and the lockfile that stage reads with --frozen-lockfile has to
+# have been written by the same one. A floating major silently drifts the two apart.
 node = "26"
-pnpm = "10"
+pnpm = "10.34.7"
 # Pinned to the patch, not "2": a golangci-lint release is built against one Go patch and
 # cannot read the stdlib export data of a newer one, so the two versions move together.
 golangci-lint = "2.15.0"
@@ -15,6 +17,10 @@ markdownlint-cli2 = "0.20"
 yamllint = "1"
 gitleaks = "8"
 hadolint = "2"
+# scripts/ holds the image smoke test, so the shell gets the same treatment as
+# every other language here: a linter and a formatter, both pinned.
+shellcheck = "0.11"
+shfmt = "3"
 # Pinned to the 3.x line, not 4.x: the helm-unittest plugin used to verify
 # charts/ostendorf.tech targets Helm 3's plugin API.
 helm = "3.22.0"
