@@ -68,8 +68,28 @@ tasks:
     cmds:
       - helm template charts/ostendorf.tech --set {{.SECRET_SET}} | kubeconform -strict -summary
 
+  # helm-unittest is a Helm plugin, and helm only finds a plugin inside HELM_PLUGINS.
+  # The mise entry's postinstall copies it into helm's own plugin directory, but that
+  # hook runs only on a fresh install: a cached tool skips it, which is why CI failed
+  # on one run and passed on the next with an identical chart. This builds a plugin
+  # directory holding exactly one entry, pointing at whatever mise resolved, so the
+  # target no longer depends on the hook having run. mise's install parent cannot be
+  # used directly: it also holds the version aliases, and helm then sees three plugins
+  # all claiming the same name.
+  helm:plugins:
+    desc: Link helm-unittest into a plugin directory helm can read
+    internal: true
+    run: once
+    cmds:
+      - rm -rf .task/helm-plugins
+      - mkdir -p .task/helm-plugins
+      - ln -s "$(mise where 'github:helm-unittest/helm-unittest')" .task/helm-plugins/unittest
+
   test:helm:
     desc: Helm chart unit tests
+    deps: [helm:plugins]
+    env:
+      HELM_PLUGINS: .task/helm-plugins
     cmds:
       - helm unittest charts/ostendorf.tech
 

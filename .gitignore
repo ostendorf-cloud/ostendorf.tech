@@ -35,3 +35,7 @@ web/playwright-report/
 # pnpm puts its store inside the project when the global one is not writable,
 # which is what a sandboxed run does.
 .pnpm-store/
+
+# Task's scratch directory. `task test:helm` builds a helm plugin directory here
+# rather than relying on helm's own, which a cached tool install never populates.
+.task/

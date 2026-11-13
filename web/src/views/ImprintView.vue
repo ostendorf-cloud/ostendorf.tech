@@ -36,17 +36,10 @@ const germanHref = computed(
       <h2 class="text-xl font-semibold">Umsatzsteuer-ID</h2>
       <p>Umsatzsteuer-Identifikationsnummer gemäß §27a Umsatzsteuergesetz: DE362164357</p>
 
-      <h2 class="text-xl font-semibold">Verbraucherstreitbeilegung/Universalschlichtungsstelle</h2>
+      <h2 class="text-xl font-semibold">Verbraucherstreitbeilegung</h2>
       <p>
-        Wir nehmen an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teil.
-        Zuständig ist die Universalschlichtungsstelle des Zentrums für Schlichtung e.V., Straßburger
-        Straße 8, 77694 Kehl am Rhein (<a
-          class="text-accent-text hover:underline"
-          href="https://www.verbraucher-schlichter.de"
-          target="_blank"
-          rel="noopener noreferrer"
-          >https://www.verbraucher-schlichter.de</a
-        >).
+        Wir sind weder verpflichtet noch bereit, an einem Streitbeilegungsverfahren vor einer
+        Verbraucherschlichtungsstelle teilzunehmen.
       </p>
     </div>
 
@@ -77,6 +70,12 @@ const germanHref = computed(
 
       <h2 class="text-xl font-semibold">VAT ID</h2>
       <p>VAT identification number per Section 27a of the German VAT Act: DE362164357</p>
+
+      <h2 class="text-xl font-semibold">Consumer dispute resolution</h2>
+      <p>
+        We are neither obliged nor willing to take part in dispute resolution proceedings before a
+        consumer arbitration board.
+      </p>
     </div>
   </GovuePage>
 </template>

@@ -181,6 +181,169 @@ const germanHref = computed(() => router.resolve({ name: 'agb', params: { locale
           t('legal.viewGerman')
         }}</a>
       </p>
+
+      <h2 class="text-xl font-semibold">Section 1 Scope of application</h2>
+      <p>
+        These General Terms and Conditions apply to all contracts between Simon Ostendorf
+        (hereinafter the "Contractor") and the respective client (hereinafter the "Organiser") for
+        the provision of audio engineering services and the provision of equipment. Deviating terms
+        proposed by the Organiser are only recognised where the Contractor has expressly agreed to
+        them in writing.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 2 Scope of services</h2>
+      <p>The scope of services results from the respective written quotation.</p>
+      <p>
+        Expressly not part of the service are activities as a safety officer for event technology
+        ("SiMA"), rigging, truss construction, stage construction, electrical installation, and all
+        further activities subject to trade-specific regulation or permit requirements under the
+        rules of the DGUV (the German Social Accident Insurance) and the MVStättVO (the Model
+        Ordinance on Assembly Venues). The Contractor is not a licensed specialist for these areas.
+        Responsibility and liability for these areas rests exclusively with the Organiser.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 3 Offer and conclusion of contract</h2>
+      <p>
+        The Contractor's quotations are non-binding and valid for 14 days from the date of issue,
+        unless another period is stated. The contract is concluded by written order confirmation
+        (email is sufficient) or by the commencement of performance. Oral side agreements require
+        written confirmation.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 4 Remuneration and payment terms</h2>
+      <p>
+        The agreed remuneration is due per event day. Invoices are payable within 14 days of
+        invoicing without deduction. For concert series or tours with multiple dates, the Contractor
+        reserves the right to a deposit of 30% before the start of the tour.
+      </p>
+      <p>
+        No value added tax is charged, under the small business exemption
+        ("Kleinunternehmerregelung") of Section 19 of the German VAT Act (Umsatzsteuergesetz, UStG).
+      </p>
+      <p>
+        In the event of late payment, the Contractor is entitled to charge default interest of 5%
+        p.a. above the then-applicable base rate.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 5 Cancellation and cancellation fee</h2>
+      <p>
+        If the Organiser cancels or postpones one or more dates, the following cancellation fees
+        apply, based on the agreed fee, per cancelled date:
+      </p>
+      <ul class="list-disc pl-6">
+        <li>cancellation more than 60 days before the date: 25% of the fee</li>
+        <li>cancellation 30–60 days before the date: 50% of the fee</li>
+        <li>cancellation 14–29 days before the date: 75% of the fee</li>
+        <li>cancellation less than 14 days before the date: 100% of the fee</li>
+      </ul>
+      <p>
+        Costs already incurred (for example, equipment purchases or rentals demonstrably made for
+        the booked production) are to be reimbursed in full, regardless of when the cancellation
+        occurs. The Contractor is obliged to credit any income earned elsewhere for the cancelled
+        period against this.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 6 Working conditions and working time</h2>
+      <p>
+        An event day (day rate) comprises up to 11 hours of working time, including one hour's
+        break. Where this working time is exceeded, an additional day rate of the same amount is
+        charged, unless otherwise agreed.
+      </p>
+      <p>
+        The Contractor is entitled to interrupt or discontinue their work where the working
+        conditions on site endanger their safety or the safety of the equipment, and the Organiser
+        fails to remedy this despite being asked to. In this case, the Organiser has no claim to a
+        refund of payments already made.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 7 Equipment – provision and liability</h2>
+      <p>
+        Equipment brought by the Contractor is provided in proper, functional condition. The
+        Organiser is liable for damage to or loss of the equipment from the time of delivery until
+        it is removed. This applies in particular to damage caused by improper handling by third
+        parties (the audience, local staff), theft, and damage caused by natural events.
+      </p>
+      <p>
+        Damaged or lost equipment will be invoiced at the current replacement price (new price). Any
+        damage must be reported immediately, and at the latest by the time of load-out. The
+        Contractor recommends that the Organiser take out event liability insurance.
+      </p>
+      <p>
+        The Contractor is not liable for damage caused by a defective power supply (fluctuations,
+        overvoltage) on the part of the Organiser or the venue.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 8 Organiser's obligations</h2>
+      <p>The Organiser provides the following, free of charge:</p>
+      <ul class="list-disc pl-6">
+        <li>free and timely access to the venue from the agreed get-in time</li>
+        <li>
+          sufficiently dimensioned stage power (230V/16A Schuko, separate from lighting power) as
+          well as FOH power
+        </li>
+        <li>
+          an FOH position in the audience area (not in the production booth), at least 1 m wide
+        </li>
+        <li>a network connection (Cat 5e or higher) between FOH and the stage, where agreed</li>
+        <li>
+          local technical staff (lighting and house sound engineers, stagehands) in accordance with
+          the stage plot
+        </li>
+        <li>
+          obtaining all official permits, in particular noise-protection permits and exemptions for
+          noise levels
+        </li>
+        <li>
+          commissioning and bearing the cost of any sound-level measurements or noise-protection
+          assessments
+        </li>
+        <li>complying with and monitoring the officially approved emission limits</li>
+      </ul>
+      <p>
+        The Contractor will have regard to level limits on the Organiser's instruction, but bears no
+        responsibility and no liability for regulatory measures resulting from exceeding approved
+        limits.
+      </p>
+      <p>
+        Any GEMA fees (the German music performance-rights organisation) and official permits are
+        borne by the Organiser. For concert series, the venue specifications must be provided to the
+        Contractor no later than 4 weeks before the respective event.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 9 Force majeure</h2>
+      <p>
+        Where the Contractor is unable to provide their service due to force majeure (natural
+        disasters, official orders, power outages, pandemics or similar), they are released from the
+        obligation to perform. Payments already made for the affected period will be refunded on a
+        pro rata basis. Further claims for damages are excluded in this case.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 10 References and image rights</h2>
+      <p>
+        The Contractor is entitled to refer to the service provided for reference and advertising
+        purposes. Unless the Organiser objects in writing, the Contractor may use their own
+        recordings of the working environment (not of the artist or the show itself) for portfolio
+        purposes.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 11 Data protection</h2>
+      <p>
+        In connection with the initiation and performance of contracts, the Contractor collects and
+        stores the Organiser's personal data exclusively for the purpose of performing the contract.
+        The data is not passed on to third parties unless required by law. On request, the data will
+        be deleted once the business relationship has ended, to the extent no statutory retention
+        periods apply.
+      </p>
+
+      <h2 class="text-xl font-semibold">Section 12 Final provisions</h2>
+      <p>
+        The law of the Federal Republic of Germany applies. The place of jurisdiction for all
+        disputes is Aachen, to the extent legally permissible. Should individual provisions of these
+        General Terms and Conditions be or become invalid, the validity of the remaining provisions
+        remains unaffected. The invalid provision is replaced by the legally permissible provision
+        that comes closest to its original purpose.
+      </p>
+      <p>There are no oral side agreements. Amendments and additions require written form.</p>
     </div>
   </GovuePage>
 </template>

@@ -17,10 +17,12 @@ const germanHref = computed(
   <GovuePage width="reading" :title="t('legal.privacy.title')">
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
       <p class="text-text-muted">
-        Kurz vorab: Diese Website verwendet keine Cookies, keine Tracking- oder Werbedienste und
-        bindet keine Inhalte von Drittanbietern ein. Ihr Browser lädt alle Inhalte ausschließlich
-        von unserem eigenen Server. Eine Besucherstatistik erstellen wir selbst auf unseren eigenen
-        Servern, ohne Skript in Ihrem Browser und ohne etwas auf Ihrem Endgerät zu speichern.
+        Kurz vorab: Diese Website setzt ein einziges, rein technisches Cookie zum Schutz des
+        Kontaktformulars (siehe Abschnitt „Cookies“), nutzt aber keine Tracking- oder Werbedienste
+        und bindet keine Inhalte von Drittanbietern ein. Ihr Browser lädt alle Inhalte
+        ausschließlich von unserem eigenen Server. Eine Besucherstatistik erstellen wir selbst auf
+        unseren eigenen Servern, ohne Skript in Ihrem Browser und ohne sonst etwas auf Ihrem
+        Endgerät zu speichern.
       </p>
 
       <h2 class="text-xl font-semibold">1. Datenschutz auf einen Blick</h2>
@@ -313,28 +315,59 @@ const germanHref = computed(
 
       <h2 class="text-xl font-semibold">4. Datenerfassung auf dieser Website</h2>
 
-      <h3 class="text-lg font-semibold">Keine Cookies</h3>
+      <h3 class="text-lg font-semibold">Cookies</h3>
       <p>
-        Diese Website verwendet keine Cookies. Wir speichern keine Informationen in Ihrem Endgerät
-        und greifen nicht auf dort gespeicherte Informationen zu; auch Device-Fingerprinting im
-        Browser setzen wir nicht ein. Eine Einwilligung nach § 25 Abs. 1 TDDDG ist deshalb nicht
-        erforderlich, und wir zeigen kein Cookie-Banner an.
+        Diese Website setzt ein einziges Cookie: ein technisches Sitzungs-Cookie, und zwar erst
+        dann, wenn Sie das Kontaktformular benutzen. Es wird gesetzt, sobald Sie ein Feld des
+        Formulars auswählen, gleich ob mit der Maus oder mit der Tastatur. Wenn Sie die Seiten
+        dieser Website nur lesen und das Kontaktformular nicht benutzen, erhalten Sie kein Cookie.
+        Es enthält ausschließlich eine zufällige, nicht auf Sie persönlich zurückführbare Kennung
+        und dient dazu, unserem Server zu ermöglichen, das Kontaktformular vor
+        Cross-Site-Request-Forgery-Angriffen (CSRF) zu schützen; es wird nicht zu Tracking, Analyse
+        oder Werbung verwendet und nicht an Dritte übermittelt.
+      </p>
+      <p>
+        Das Cookie ist ein Sitzungs-Cookie ohne eigenes Speicherdauer-Attribut: Ihr Browser verwirft
+        es, sobald Sie ihn schließen. Zusätzlich ist es so gesetzt, dass kein Skript auf der Seite
+        es auslesen kann (HttpOnly), dass es nur über eine verschlüsselte Verbindung übertragen wird
+        (Secure) und dass es nicht an eine andere Website mitgesendet wird (SameSite=Lax).
+      </p>
+      <p>
+        Nach unserer Einschätzung ist dieses Cookie technisch notwendig im Sinne von § 25 Abs. 2 Nr.
+        2 TDDDG, weil ohne ein solches Sitzungs-Cookie das Kontaktformular nicht wirksam vor
+        Cross-Site-Request-Forgery geschützt werden kann; eine Einwilligung ist deshalb nicht
+        erforderlich, und wir zeigen kein Cookie-Banner an. Darüber hinaus speichern wir keine
+        weiteren Informationen in Ihrem Endgerät, greifen nicht auf dort gespeicherte Informationen
+        zu und setzen auch kein Device-Fingerprinting im Browser ein.
       </p>
 
       <h3 class="text-lg font-semibold">Server-Log-Dateien</h3>
       <p>
-        Beim Aufruf dieser Website erheben und speichern unser Webserver und der vorgeschaltete
-        Reverse-Proxy automatisch Informationen in so genannten Server-Log-Dateien, die Ihr Browser
-        automatisch an uns übermittelt. Dies sind:
+        Bei jedem Aufruf dieser Website schreibt unser Webserver automatisch eine Protokollzeile.
+        Darin festgehalten werden:
       </p>
       <ul class="list-disc pl-6">
+        <li>Zeitpunkt der Anfrage</li>
         <li>IP-Adresse</li>
-        <li>Datum und Uhrzeit der Serveranfrage</li>
-        <li>Anfragezeile (aufgerufene Seite bzw. Datei, Anfragemethode und Protokollversion)</li>
+        <li>
+          eine zufällige, von unserem Server vergebene Anfrage-Kennung, mit der sich
+          zusammengehörige Protokollzeilen einer einzelnen Anfrage zuordnen lassen
+        </li>
+        <li>Anfragemethode (z. B. GET oder POST)</li>
+        <li>
+          was angefragt wurde, als internes Muster: bei einem Seitenaufruf, welche Seite in welcher
+          Sprache (z. B. „das Impressum auf Deutsch“), bei allen übrigen Anfragen die jeweilige Art
+          der Anfrage (z. B. eine Design- oder Bilddatei, die Sitemap, eine Anfrage des
+          Kontaktformulars). In keinem Fall die vollständige aufgerufene Adresse mit allen
+          enthaltenen Parametern
+        </li>
         <li>HTTP-Statuscode und übertragene Datenmenge</li>
-        <li>Browsertyp und Browserversion sowie verwendetes Betriebssystem (User-Agent)</li>
-        <li>Referrer URL, sofern Ihr Browser sie übermittelt</li>
+        <li>Bearbeitungsdauer der Anfrage</li>
       </ul>
+      <p>
+        Nicht erfasst werden dabei der Browsertyp Ihres Geräts (User-Agent) und eine etwaige
+        Referrer-URL.
+      </p>
       <p>Eine Zusammenführung dieser Daten mit anderen Datenquellen wird nicht vorgenommen.</p>
       <p>
         Die Erfassung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Der
@@ -347,6 +380,32 @@ const germanHref = computed(
         Tagen automatisch gelöscht. Log-Dateien, deren weitere Aufbewahrung zu Beweiszwecken
         erforderlich ist, sind bis zur endgültigen Klärung des jeweiligen Vorfalls von der Löschung
         ausgenommen.
+      </p>
+
+      <h3 class="text-lg font-semibold">Ratenbegrenzung</h3>
+      <p>
+        Um unsere Website vor Überlastung und Missbrauch zu schützen, begrenzen wir, wie viele
+        Anfragen eine einzelne IP-Adresse innerhalb kurzer Zeit an uns stellen kann. Dazu zählt
+        unser Server für jede Adresse, wie viele Anfragen kurz zuvor eingegangen sind; stellt eine
+        Adresse zu viele Anfragen, werden weitere Anfragen von ihr kurzzeitig abgewiesen.
+      </p>
+      <p>
+        Dieser Zähler existiert ausschließlich im Arbeitsspeicher unseres Servers. Er wird nicht auf
+        Festplatte geschrieben und nicht an Dritte übermittelt. Sobald eine Adresse eine Zeit lang
+        keine weiteren Anfragen mehr stellt, verwirft unser Server den zugehörigen Zähler
+        automatisch; eine darüberhinausgehende Aufbewahrung findet nicht statt.
+      </p>
+      <p>
+        Diese allgemeine Ratenbegrenzung gilt für Seitenaufrufe, für die zugehörigen Design- und
+        Bilddateien, für die Dateien, die Suchmaschinen auslesen, und für Anfragen an Adressen, die
+        es auf dieser Website nicht gibt. Für die beiden Schritte des Kontaktformulars gelten
+        stattdessen zwei eigene Begrenzungen, die im Abschnitt „Kontaktformular“ beschrieben sind.
+        Alle drei werden getrennt gezählt.
+      </p>
+      <p>
+        Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Wir haben ein
+        berechtigtes Interesse daran, unsere Website vor Überlastung und missbräuchlichen Zugriffen
+        zu schützen.
       </p>
 
       <h3 id="umami" class="text-lg font-semibold">Besucherstatistik mit Umami</h3>
@@ -416,12 +475,15 @@ const germanHref = computed(
       <p>
         Zum Schutz vor Spam löst Ihr Browser beim Ausfüllen des Formulars eine kleine Rechenaufgabe
         (sogenannter Proof of Work). Dazu ruft er bei unserem Server eine zufällige Aufgabe ab und
-        sendet die Lösung zusammen mit dem Formular zurück. Dabei werden keine Cookies gesetzt,
-        keine Informationen in Ihrem Endgerät gespeichert und keine Dienste von Drittanbietern
-        eingebunden. Um Missbrauch zu verhindern, verarbeitet unser Server außerdem Ihre IP-Adresse
-        kurzzeitig im Arbeitsspeicher, um die Zahl der Anfragen je Adresse zu begrenzen; dafür wird
-        sie nicht dauerhaft gespeichert. Rechtsgrundlage hierfür ist unser berechtigtes Interesse am
-        Schutz vor Spam und Missbrauch (Art. 6 Abs. 1 lit. f DSGVO).
+        sendet die Lösung zusammen mit dem Formular zurück. Dabei werden selbst keine weiteren
+        Cookies gesetzt, keine weiteren Informationen in Ihrem Endgerät gespeichert und keine
+        Dienste von Drittanbietern eingebunden; das technische Sitzungs-Cookie, das beim Aufruf
+        jeder Seite dieser Website gesetzt wird (siehe Abschnitt „Cookies“), schützt dabei auch
+        dieses Formular vor Cross-Site-Request-Forgery. Um Missbrauch zu verhindern, verarbeitet
+        unser Server außerdem Ihre IP-Adresse kurzzeitig im Arbeitsspeicher, um die Zahl der
+        Anfragen je Adresse zu begrenzen; dafür wird sie nicht dauerhaft gespeichert.
+        Rechtsgrundlage hierfür ist unser berechtigtes Interesse am Schutz vor Spam und Missbrauch
+        (Art. 6 Abs. 1 lit. f DSGVO).
       </p>
       <p>
         Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern
@@ -544,6 +606,555 @@ const germanHref = computed(
         <a class="text-accent-text hover:underline" :href="germanHref">{{
           t('legal.viewGerman')
         }}</a>
+      </p>
+
+      <p class="text-text-muted">
+        A brief summary up front: this website sets a single, purely technical cookie to protect the
+        contact form (see the "Cookies" section), but no tracking or advertising services, and does
+        not embed third-party content. Your browser loads everything exclusively from our own
+        server. We compile visitor statistics ourselves, on our own servers, without any script
+        running in your browser and without storing anything else on your device.
+      </p>
+
+      <h2 class="text-xl font-semibold">1. Data protection at a glance</h2>
+
+      <h3 class="text-lg font-semibold">General notes</h3>
+      <p>
+        The following notes give a simple overview of what happens to your personal data when you
+        visit this website. Personal data is any data that can be used to identify you personally.
+        For detailed information on data protection, please see our privacy policy set out below
+        this text.
+      </p>
+
+      <h3 class="text-lg font-semibold">Data collection on this website</h3>
+
+      <h4 class="font-semibold">Who is responsible for data collection on this website?</h4>
+      <p>
+        Data processing on this website is carried out by the website operator. You can find the
+        operator's contact details in the section "Information about the controller" in this privacy
+        policy.
+      </p>
+
+      <h4 class="font-semibold">How do we collect your data?</h4>
+      <p>
+        Your data is collected, firstly, through information you provide to us. This may, for
+        example, be data you enter into a contact form.
+      </p>
+      <p>
+        Other data is collected automatically by our IT systems when you visit the website. This is
+        mainly technical data (for example, your internet browser, operating system or the time of
+        the page request). This data is collected automatically as soon as you access this website.
+      </p>
+
+      <h4 class="font-semibold">What do we use your data for?</h4>
+      <p>
+        Part of the data is collected to ensure the website is provided without errors. We also use
+        page views to compile pseudonymised visitor statistics (see "Visitor statistics with
+        Umami"). To the extent contracts can be concluded or initiated through the website, the data
+        transmitted is also processed for contract offers, orders or other service enquiries.
+      </p>
+
+      <h4 class="font-semibold">What rights do you have regarding your data?</h4>
+      <p>
+        You have the right at any time to obtain information, free of charge, about the origin,
+        recipients and purpose of your stored personal data. You also have the right to demand that
+        this data be corrected or deleted. If you have given consent to data processing, you can
+        withdraw that consent at any time for the future. You also have the right, under certain
+        circumstances, to demand that the processing of your personal data be restricted.
+        Furthermore, you have the right to lodge a complaint with the competent supervisory
+        authority.
+      </p>
+      <p>
+        You are welcome to contact us at any time regarding this and any further questions about
+        data protection.
+      </p>
+
+      <h3 class="text-lg font-semibold">Analytics tools and third-party tools</h3>
+      <p>
+        When you visit this website, the pages accessed are evaluated statistically. This is done
+        using the open-source software Umami, which we operate ourselves on our own servers; no
+        cookies are set for this purpose, no script runs in your browser, and no data is transmitted
+        to third parties. We do not use tracking or advertising services, or tools from third-party
+        providers. Details can be found in the section "Visitor statistics with Umami".
+      </p>
+
+      <h2 class="text-xl font-semibold">2. Hosting</h2>
+
+      <h3 class="text-lg font-semibold">Hosting on our own servers</h3>
+      <p>
+        We host the content of our website ourselves. The website runs on our own servers, which we
+        operate on our own premises in Germany. We do not use an external hosting provider for the
+        website; the data generated when the website is visited (see "Server log files") is
+        processed on these servers.
+      </p>
+      <p>
+        This is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate interest in
+        presenting our website as reliably and economically, in terms of data, as possible.
+      </p>
+
+      <h2 class="text-xl font-semibold">3. General notes and mandatory information</h2>
+
+      <h3 class="text-lg font-semibold">Data protection</h3>
+      <p>
+        The operators of these pages take the protection of your personal data very seriously. We
+        treat your personal data as confidential and in accordance with the statutory data
+        protection regulations and this privacy policy.
+      </p>
+      <p>
+        When you use this website, various personal data is collected. Personal data is any data
+        that can be used to identify you personally. This privacy policy explains what data we
+        collect and what we use it for. It also explains how and for what purpose this happens.
+      </p>
+      <p>
+        We point out that data transmission over the internet (for example, when communicating by
+        email) can have security gaps. Complete protection of data against access by third parties
+        is not possible.
+      </p>
+
+      <h3 id="responsible" class="text-lg font-semibold">Information about the controller</h3>
+      <p>The controller responsible for data processing on this website is:</p>
+      <p>
+        Simon Ostendorf<br />
+        Frankenstr. 8<br />
+        52070 Aachen, Germany
+      </p>
+      <p>
+        Phone:
+        <a class="text-accent-text hover:underline" href="tel:+4915730971784">+49 1573 0971784</a
+        ><br />
+        Email:
+        <a class="text-accent-text hover:underline" href="mailto:simon@ostendorf.tech"
+          >simon@ostendorf.tech</a
+        >
+      </p>
+      <p>
+        The controller is the natural or legal person who alone, or jointly with others, determines
+        the purposes and means of the processing of personal data (such as names, email addresses,
+        and the like).
+      </p>
+
+      <h3 class="text-lg font-semibold">Storage period</h3>
+      <p>
+        Unless a more specific storage period is stated within this privacy policy, your personal
+        data will remain with us until the purpose for the data processing no longer applies. If you
+        assert a legitimate request for deletion or withdraw your consent to data processing, your
+        data will be deleted, unless we have other legally permissible grounds for storing your
+        personal data (for example, retention periods under tax or commercial law); in the latter
+        case, deletion will take place once those grounds cease to apply.
+      </p>
+
+      <h3 class="text-lg font-semibold">
+        General notes on the legal grounds for data processing on this website
+      </h3>
+      <p>
+        Where you have given consent to data processing, we process your personal data on the basis
+        of Art. 6(1)(a) GDPR, or Art. 9(2)(a) GDPR where special categories of data under Art. 9(1)
+        GDPR are processed. Where you have given explicit consent to the transfer of personal data
+        to third countries, data processing is additionally carried out on the basis of Art.
+        49(1)(a) GDPR. Where you have consented to the storage of cookies or to access to
+        information on your device (for example, via device fingerprinting), data processing is
+        additionally carried out on the basis of Section 25(1) TDDDG (the German
+        Telecommunications-Digital-Services-Data-Protection Act). Consent can be withdrawn at any
+        time. Where your data is required for the performance of a contract or to carry out
+        pre-contractual measures, we process your data on the basis of Art. 6(1)(b) GDPR. We further
+        process your data where this is necessary to comply with a legal obligation, on the basis of
+        Art. 6(1)(c) GDPR. Data processing may also be carried out on the basis of our legitimate
+        interest under Art. 6(1)(f) GDPR. The legal grounds relevant in each individual case are set
+        out in the following paragraphs of this privacy policy.
+      </p>
+
+      <h3 class="text-lg font-semibold">Recipients of personal data</h3>
+      <p>
+        In the course of our business activities, we work together with various external parties.
+        This sometimes requires the transfer of personal data to these external parties. We only
+        pass on personal data to external parties where this is necessary for the performance of a
+        contract, where we are legally obliged to do so (for example, passing data to tax
+        authorities), where we have a legitimate interest under Art. 6(1)(f) GDPR in doing so, or
+        where some other legal basis permits the disclosure. Where we use processors, we only pass
+        on our customers' personal data on the basis of a valid data processing agreement. In the
+        case of joint processing, an agreement on joint controllership is concluded.
+      </p>
+
+      <h3 class="text-lg font-semibold">Withdrawing your consent to data processing</h3>
+      <p>
+        Many data processing operations are only possible with your express consent. You can
+        withdraw consent you have already given at any time. The lawfulness of data processing
+        carried out before the withdrawal remains unaffected by the withdrawal.
+      </p>
+
+      <h3 class="text-lg font-semibold">
+        Right to object to the collection of data in special cases, and to direct marketing (Art. 21
+        GDPR)
+      </h3>
+      <p class="uppercase">
+        Where data processing is based on Art. 6(1)(e) or (f) GDPR, you have the right to object at
+        any time, on grounds relating to your particular situation, to the processing of your
+        personal data; this also applies to profiling based on these provisions. The legal basis on
+        which any processing is based can be found in this privacy policy. If you object, we will no
+        longer process your personal data concerned, unless we can demonstrate compelling legitimate
+        grounds for the processing which override your interests, rights and freedoms, or the
+        processing serves the establishment, exercise or defence of legal claims (objection under
+        Art. 21(1) GDPR).
+      </p>
+      <p class="uppercase">
+        Where your personal data is processed for the purposes of direct marketing, you have the
+        right to object at any time to the processing of personal data concerning you for the
+        purposes of such marketing; this also applies to profiling to the extent it is related to
+        such direct marketing. If you object, your personal data will subsequently no longer be used
+        for the purposes of direct marketing (objection under Art. 21(2) GDPR).
+      </p>
+
+      <h3 class="text-lg font-semibold">
+        Right to lodge a complaint with the competent supervisory authority
+      </h3>
+      <p>
+        In the event of breaches of the GDPR, data subjects have the right to lodge a complaint with
+        a supervisory authority, in particular in the member state of their habitual residence,
+        place of work, or the place of the alleged breach. This right to complain exists without
+        prejudice to any other administrative or judicial remedy.
+      </p>
+
+      <h3 class="text-lg font-semibold">Right to data portability</h3>
+      <p>
+        You have the right to have data that we process automatically on the basis of your consent
+        or in performance of a contract handed over to you or to a third party in a commonly used,
+        machine-readable format. Where you request the direct transfer of the data to another
+        controller, this will only be done to the extent it is technically feasible.
+      </p>
+
+      <h3 class="text-lg font-semibold">Access, rectification and erasure</h3>
+      <p>
+        Within the scope of the applicable statutory provisions, you have the right at any time to
+        free information about your stored personal data, its origin and recipients, and the purpose
+        of the data processing, and, where applicable, a right to have this data corrected or
+        deleted. You are welcome to contact us at any time regarding this and any further questions
+        about personal data.
+      </p>
+
+      <h3 class="text-lg font-semibold">Right to restriction of processing</h3>
+      <p>
+        You have the right to request the restriction of the processing of your personal data. You
+        are welcome to contact us at any time for this purpose. The right to restriction of
+        processing exists in the following cases:
+      </p>
+      <ul class="list-disc pl-6">
+        <li>
+          If you dispute the accuracy of your personal data stored with us, we generally need time
+          to verify this. For the duration of the review, you have the right to demand the
+          restriction of the processing of your personal data.
+        </li>
+        <li>
+          If the processing of your personal data was or is unlawful, you may demand the restriction
+          of the data processing instead of its erasure.
+        </li>
+        <li>
+          If we no longer need your personal data, but you need it to exercise, defend or assert
+          legal claims, you have the right to demand the restriction of the processing of your
+          personal data instead of its erasure.
+        </li>
+        <li>
+          If you have lodged an objection under Art. 21(1) GDPR, a balancing of your interests and
+          ours must take place. As long as it has not yet been determined whose interests prevail,
+          you have the right to demand the restriction of the processing of your personal data.
+        </li>
+      </ul>
+      <p>
+        If you have restricted the processing of your personal data, this data may, other than being
+        stored, only be processed with your consent, or for the establishment, exercise or defence
+        of legal claims, or for the protection of the rights of another natural or legal person, or
+        for reasons of important public interest of the European Union or a member state.
+      </p>
+
+      <h3 class="text-lg font-semibold">SSL or TLS encryption</h3>
+      <p>
+        For security reasons and to protect the transmission of confidential content, such as orders
+        or enquiries you send to us as the site operator, this site uses SSL or TLS encryption. You
+        can recognise an encrypted connection by the fact that the browser's address bar changes
+        from "http://" to "https://" and by the lock symbol in your browser bar.
+      </p>
+      <p>
+        When SSL or TLS encryption is activated, the data you transmit to us cannot be read by third
+        parties.
+      </p>
+
+      <h3 class="text-lg font-semibold">Objection to promotional emails</h3>
+      <p>
+        We hereby object to the use of contact details published in the context of the obligation to
+        provide an imprint for the purpose of sending unsolicited advertising and information
+        material. The operators of these pages expressly reserve the right to take legal action in
+        the event of the unsolicited sending of promotional information, for example through spam
+        emails.
+      </p>
+
+      <h2 class="text-xl font-semibold">4. Data collection on this website</h2>
+
+      <h3 class="text-lg font-semibold">Cookies</h3>
+      <p>
+        This website sets a single cookie: a technical session cookie, and only once you use the
+        contact form. It is set as soon as you select a field of the form, whether with the mouse or
+        with the keyboard. If you only read the pages of this website and do not use the contact
+        form, you receive no cookie at all. It contains only a random identifier that cannot be
+        traced back to you personally, and exists to let our server protect the contact form against
+        cross-site request forgery (CSRF) attacks; it is not used for tracking, analytics or
+        advertising, and is not transmitted to third parties.
+      </p>
+      <p>
+        The cookie is a session cookie with no storage-duration attribute of its own: your browser
+        discards it once you close it. It is also set so that no script on the page can read it
+        (HttpOnly), so that it is only transmitted over an encrypted connection (Secure), and so
+        that it is not sent along to another website (SameSite=Lax).
+      </p>
+      <p>
+        In our assessment, this cookie is technically necessary within the meaning of Section 25(2)
+        no. 2 TDDDG, because the contact form cannot be effectively protected against cross-site
+        request forgery without a session cookie of this kind; consent is therefore not required,
+        and we do not display a cookie banner. Beyond this, we do not store any further information
+        on your device, do not access information stored there, and do not use device fingerprinting
+        in the browser either.
+      </p>
+
+      <h3 class="text-lg font-semibold">Server log files</h3>
+      <p>
+        For every request to this website, our web server automatically writes one log line. It
+        records:
+      </p>
+      <ul class="list-disc pl-6">
+        <li>the time of the request</li>
+        <li>the IP address</li>
+        <li>
+          a random request id our server assigns, so that log lines belonging to one request can be
+          matched to each other
+        </li>
+        <li>the request method (for example, GET or POST)</li>
+        <li>
+          what was requested, as an internal pattern: for a page view, which page in which language
+          (for example "the imprint in German"); for every other request, the kind of request it was
+          (for example a design or image file, the sitemap, a contact form request). Never the full
+          address requested with all its parameters
+        </li>
+        <li>the HTTP status code and the amount of data transferred</li>
+        <li>how long the request took to answer</li>
+      </ul>
+      <p>
+        Your device's browser type (user agent) and any referrer URL are not recorded as part of
+        this.
+      </p>
+      <p>This data is not merged with other data sources.</p>
+      <p>
+        This data is collected on the basis of Art. 6(1)(f) GDPR. The website operator has a
+        legitimate interest in the technically error-free presentation, security and optimisation of
+        its website, and in defending against misuse; the server log files must be collected for
+        this purpose.
+      </p>
+      <p>
+        The log files are retained for a limited period only and are automatically deleted after 30
+        days at the latest. Log files whose further retention is required for evidentiary purposes
+        are excluded from deletion until the incident in question has been finally clarified.
+      </p>
+
+      <h3 class="text-lg font-semibold">Rate limiting</h3>
+      <p>
+        To protect our website against overload and misuse, we limit how many requests a single IP
+        address can make to us within a short period of time. To do this, our server counts, for
+        each address, how many requests it has recently received; where an address makes too many
+        requests, further requests from it are briefly refused.
+      </p>
+      <p>
+        This counter exists only in our server's memory. It is not written to disk and not
+        transmitted to third parties. Once an address has made no further requests for a while, our
+        server automatically discards the associated counter; no further retention takes place.
+      </p>
+      <p>
+        This general rate limiting applies to page views, to the design and image files that belong
+        to them, to the files search engines read, and to requests for addresses that do not exist
+        on this website. The two steps of the contact form have two separate limits of their own
+        instead, described in the "Contact form" section. All three are counted separately.
+      </p>
+      <p>
+        This processing is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate
+        interest in protecting our website against overload and abusive access.
+      </p>
+
+      <h3 id="umami" class="text-lg font-semibold">Visitor statistics with Umami</h3>
+      <p>
+        To understand which content on our website is read and how visitors find us, we compile
+        visitor statistics using the open-source software Umami. We operate Umami ourselves on our
+        own servers in Germany (see "Hosting on our own servers"). We store backup copies of the
+        statistics database with Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, in a
+        data centre in Germany; beyond this, the data is not transmitted to third parties.
+      </p>
+      <p>
+        Umami does not run in your browser: no script is loaded, no cookie is set, and nothing is
+        stored on or read from your device. Instead, our web server reports every page request to
+        Umami, using the information your browser transmits to us in any case when making the
+        request:
+      </p>
+      <ul class="list-disc pl-6">
+        <li>the page requested (without any attached parameters) and its title</li>
+        <li>
+          the referrer URL without parameters, where you come from another website and your browser
+          transmits it
+        </li>
+        <li>your browser's preferred language</li>
+        <li>browser type and version, and operating system used (user agent)</li>
+        <li>IP address</li>
+      </ul>
+      <p>
+        Umami derives the country, region and city from the IP address. From the IP address, the
+        user agent, a secret key and the current month, Umami forms a pseudonymous identifier to
+        group together the page views of one visit; the identifier therefore changes every month.
+        Umami does not store the IP address or the full user agent, only the information derived
+        from them (country, region, city, browser, operating system) together with the pseudonymous
+        identifier. No merging with other data, and no identification of individual visitors, takes
+        place.
+      </p>
+      <p>
+        The statistics data is automatically deleted after 14 months. In the backup copies of the
+        database, it typically remains for up to a further 15 days afterwards.
+      </p>
+      <p>
+        Requests where your browser sends the "Do Not Track" (DNT) or "Global Privacy Control" (GPC)
+        signal are not recorded, nor are requests your browser merely preloads.
+      </p>
+      <p>
+        This processing is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate
+        interest in statistically evaluating the use of our website in order to improve our
+        offering, without passing on our visitors' data to third parties in doing so. You can object
+        to this processing at any time by activating "Do Not Track" or "Global Privacy Control" in
+        your browser, or by contacting us.
+      </p>
+
+      <h3 class="text-lg font-semibold">Contact form</h3>
+      <p>
+        If you send us enquiries using the contact form, your details from the enquiry form,
+        including the contact details you provide there (name, email address and message), are
+        stored with us for the purpose of processing the enquiry and in case of follow-up questions.
+        We do not pass on this data without your consent.
+      </p>
+      <p>
+        Your details are not stored by our web server in a database, but sent as an email via our
+        own mail server to our mailbox. We operate the mail server ourselves on a server we rent
+        from Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, in a data centre in Germany.
+        Transmission from the web server to the mail server is encrypted.
+      </p>
+      <p>
+        To protect against spam, your browser solves a small computational task (a so-called proof
+        of work) when you fill in the form. To do this, it requests a random task from our server
+        and sends the solution back together with the form. This itself sets no further cookies,
+        stores no further information on your device, and uses no third-party services for this
+        purpose; the technical session cookie set when you load any page of this website (see the
+        "Cookies" section) also protects this form against cross-site request forgery. To prevent
+        misuse, our server also processes your IP address briefly in memory in order to limit the
+        number of requests per address; it is not stored permanently for this purpose. The legal
+        basis for this is our legitimate interest in protection against spam and misuse (Art.
+        6(1)(f) GDPR).
+      </p>
+      <p>
+        Processing of this data is carried out on the basis of Art. 6(1)(b) GDPR, where your enquiry
+        relates to the performance of a contract or is necessary to carry out pre-contractual
+        measures. In all other cases, processing is based on our legitimate interest in the
+        effective handling of enquiries addressed to us (Art. 6(1)(f) GDPR), or on your consent
+        (Art. 6(1)(a) GDPR) where this has been requested; consent can be withdrawn at any time.
+      </p>
+      <p>
+        The data you enter in the contact form remains with us until you ask us to delete it,
+        withdraw your consent to its storage, or the purpose for storing the data no longer applies
+        (for example, after your enquiry has been fully processed). Mandatory statutory provisions,
+        in particular retention periods, remain unaffected.
+      </p>
+
+      <h3 class="text-lg font-semibold">Enquiry by email, phone or fax</h3>
+      <p>
+        If you contact us by email, phone or fax, your enquiry, including all personal data arising
+        from it (name, enquiry), is stored and processed by us for the purpose of handling your
+        matter. We do not pass on this data without your consent.
+      </p>
+      <p>
+        Processing of this data is carried out on the basis of Art. 6(1)(b) GDPR, where your enquiry
+        relates to the performance of a contract or is necessary to carry out pre-contractual
+        measures. In all other cases, processing is based on our legitimate interest in the
+        effective handling of enquiries addressed to us (Art. 6(1)(f) GDPR), or on your consent
+        (Art. 6(1)(a) GDPR) where this has been requested; consent can be withdrawn at any time.
+      </p>
+      <p>
+        The data you send to us in enquiries remains with us until you ask us to delete it, withdraw
+        your consent to its storage, or the purpose for storing the data no longer applies (for
+        example, after your matter has been fully handled). Mandatory statutory provisions, in
+        particular statutory retention periods, remain unaffected.
+      </p>
+
+      <h2 class="text-xl font-semibold">5. Social media</h2>
+
+      <h3 class="text-lg font-semibold">Instagram posts on this website</h3>
+      <p>
+        In the "Impressions" section, we display the latest posts from our Instagram account
+        @simonostendorf.vtech. Instagram is provided by Meta Platforms Ireland Limited, Merrion
+        Road, Dublin 4, D04 X2K5, Ireland.
+      </p>
+      <p>
+        Our server regularly retrieves the posts (images, image descriptions and links) via
+        Instagram's application programming interface (API), holds them on our server and delivers
+        them from our own domain. Your browser does not establish any connection to Instagram's or
+        Meta's servers in doing so, and no data about your visit is transmitted to Instagram or
+        Meta. In making this retrieval, our server only transmits its own IP address and our access
+        key to Instagram.
+      </p>
+      <p>
+        Only once you click on a post does it open on Instagram's website. From that point,
+        Instagram's privacy policy applies:
+        <a
+          class="text-accent-text hover:underline"
+          href="https://privacycenter.instagram.com/policy/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >https://privacycenter.instagram.com/policy/</a
+        >.
+      </p>
+      <p>
+        The display of the posts is carried out on the basis of Art. 6(1)(f) GDPR. We have a
+        legitimate interest in illustrating our work, without passing on our visitors' data to third
+        parties in doing so.
+      </p>
+
+      <h3 class="text-lg font-semibold">Links to Instagram, Facebook and WhatsApp</h3>
+      <p>
+        On this website, we link to our profiles on Instagram and Facebook, and to WhatsApp. The
+        provider of Instagram and Facebook is Meta Platforms Ireland Limited, Merrion Road, Dublin
+        4, D04 X2K5, Ireland; the provider of WhatsApp is WhatsApp Ireland Limited, Merrion Road,
+        Dublin 4, D04 X2K5, Ireland.
+      </p>
+      <p>
+        These are simple links. Plugins, "like" buttons or other elements of these services are not
+        embedded on our website, so no data is transmitted to these providers when you visit our
+        website. Only once you click on a link are you forwarded to the respective provider's page;
+        from that point, that provider's privacy policy applies:
+        <a
+          class="text-accent-text hover:underline"
+          href="https://privacycenter.instagram.com/policy/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Instagram</a
+        >,
+        <a
+          class="text-accent-text hover:underline"
+          href="https://www.facebook.com/privacy/policy/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Facebook</a
+        >
+        and
+        <a
+          class="text-accent-text hover:underline"
+          href="https://www.whatsapp.com/legal/privacy-policy-eea"
+          target="_blank"
+          rel="noopener noreferrer"
+          >WhatsApp</a
+        >.
+      </p>
+      <p>
+        If you write to us via WhatsApp, we process your phone number and your message as described
+        in the section "Enquiry by email, phone or fax". The message is transmitted via WhatsApp's
+        servers; WhatsApp's privacy policy applies to this.
       </p>
     </div>
   </GovuePage>
