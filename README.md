@@ -116,6 +116,11 @@ ever used to issue a new one. Remove `CHALLENGE_KEY_PREVIOUS` again once the cha
 minutes) has safely passed. Leaving it unset, as before, means rotating `CHALLENGE_KEY` invalidates
 every challenge already issued the moment the new key takes effect.
 
+`CHALLENGE_KEY_PREVIOUS` is for a planned rotation only. Never set it to a leaked key to keep that
+key verifying a little longer: a leaked `CHALLENGE_KEY` is dropped at once, with nothing put in
+`CHALLENGE_KEY_PREVIOUS` for it, accepting up to ten minutes of broken challenges rather than
+keeping the leaked key alive a moment longer than replacing it takes.
+
 Behind any reverse proxy or ingress, leaving `TRUSTED_PROXY_CIDRS` unset means every
 request is attributed to the proxy's own address, not the visitor's. Every rate limit
 then collapses into one shared bucket for the whole site: about 20 page loads a minute
