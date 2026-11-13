@@ -25,11 +25,13 @@
 # runs Node itself. Only the "website" stage depends on this one; the
 # "feed" stage never triggers it, see this file's own top comment.
 #
-# Digest for node:26.13.1-bookworm-slim (linux/amd64), resolved against
-# Docker Hub's API; re-resolve with
+# Digest for node:26.13.1-bookworm-slim is the multi-platform image index
+# (linux/amd64, linux/arm64, linux/ppc64le), resolved against Docker Hub's
+# API; re-resolve with
 # "docker buildx imagetools inspect node:26.13.1-bookworm-slim" if this
-# patch version ever moves.
-FROM node:26.13.1-bookworm-slim@sha256:18a166e2d50578afe933434857ed2d9059bd1aa398a223e9c89eb4302354f079 AS frontend
+# patch version ever moves. That command reports the index digest below,
+# the same one a plain "docker pull" resolves against on either platform.
+FROM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS frontend
 
 WORKDIR /src/web
 
@@ -61,9 +63,13 @@ RUN pnpm run build && pnpm run prerender
 # produces (and the base image digest it is pinned to) exists in one
 # place for both binaries instead of two.
 #
-# Digest for golang:1.27.4-bookworm (linux/amd64), matching mise.toml's
-# pinned Go patch exactly; resolved against Docker Hub's API.
-FROM golang:1.27.4-bookworm@sha256:fb7cceb528b47141eccd9b60bf3cbd27d5ef5f8cf5b7d338bec866da495b50dc AS go-deps
+# Digest for golang:1.27.4-bookworm is the multi-platform image index
+# (linux/amd64, linux/arm64, linux/386, linux/arm/v7, linux/ppc64le),
+# matching mise.toml's pinned Go patch exactly; resolved against Docker
+# Hub's API. Re-resolve with
+# "docker buildx imagetools inspect golang:1.27.4-bookworm" if this patch
+# version ever moves; that command reports the index digest below.
+FROM golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS go-deps
 
 WORKDIR /src
 
@@ -111,11 +117,12 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/feed ./cmd/feed
 # ca-certificates gap alone. The ":nonroot" tag already runs as uid/gid
 # 65532, not root.
 #
-# Digest for gcr.io/distroless/static-debian12:nonroot (linux/amd64),
-# resolved against gcr.io's registry API; re-resolve with
+# Digest for gcr.io/distroless/static-debian12:nonroot is the multi-platform
+# image index (linux/amd64, linux/arm64, linux/arm/v7, linux/s390x,
+# linux/ppc64le), resolved against gcr.io's registry API; re-resolve with
 # "docker buildx imagetools inspect gcr.io/distroless/static-debian12:nonroot"
-# if this needs refreshing.
-FROM gcr.io/distroless/static-debian12:nonroot@sha256:52dcfbabb7457ea47c82f6e13af8c8a4a1d9f7b0145142b3ecab20f2b888411d AS feed
+# if this needs refreshing; that command reports the index digest below.
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS feed
 
 COPY --from=build-feed /out/feed /usr/local/bin/feed
 
@@ -149,7 +156,7 @@ ENTRYPOINT ["/usr/local/bin/feed"]
 # no "--target", builds this stage: it is deliberately the last one in the
 # file, matching the only image this repository published before cmd/feed
 # existed, see this file's own top comment.
-FROM gcr.io/distroless/static-debian12:nonroot@sha256:52dcfbabb7457ea47c82f6e13af8c8a4a1d9f7b0145142b3ecab20f2b888411d AS website
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS website
 
 COPY --from=build-website /out/website /usr/local/bin/website
 
