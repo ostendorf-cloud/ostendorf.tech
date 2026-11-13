@@ -105,6 +105,15 @@ the single-pod guard above was never meant to prevent: it guards against more th
 existing, not against zero, and scaling back up from 0 is a normal start, not a rolling update,
 so it raises no second-pod risk either.
 
+## Health, readiness and metrics
+
+`/healthz`, `/readyz` and `/metrics` are served on a second, administrative listener
+(`service.adminPort`/`config.adminListenAddr`, default `8081`), never on the public
+`service.port`: `templates/deployment.yaml`'s `startupProbe`, `livenessProbe` and
+`readinessProbe` all point at the `admin` container port, and `templates/ingress.yaml`
+only ever routes to `service.port`. A `ServiceMonitor` or `PodMonitor` (not part of this
+chart) can scrape `service.adminPort` directly, in-cluster.
+
 ## Values
 
 See `values.yaml` for the full, commented list. The ones most deployments touch:
@@ -114,11 +123,13 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `image.repository` | Container image | `ghcr.io/ostendorf-cloud/ostendorf.tech` |
 | `image.tag` | Image tag | `.Chart.AppVersion` |
 | `replicaCount` | Pod replicas: 0 (stopped) or 1, never above (see "Replicas" above) | `1` |
-| `service.port` | Service and container port | `8080` |
+| `service.port` | Public Service and container port, the only one the `Ingress` ever routes to | `8080` |
+| `service.adminPort` | govue's admin listener: health, readiness and metrics, in-cluster only | `8081` |
 | `ingress.enabled` | Create an `Ingress` | `false` |
 | `resources` | Pod resource requests/limits | see `values.yaml` |
 | `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
 | `config.smtpAddr` | SMTP submission server | `mail.ostendorf.cloud:587` |
+| `config.adminListenAddr` | govue's admin listener address (`ADMIN_ADDR`); must match `service.adminPort` | `:8081` |
 | `config.trustedProxyCidrs` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |
 | `config.instagramApiVersion` | Pinned Instagram Graph API version | `v23.0` |
 | `config.instagramPostCount` | Posts loaded per sync, 1 to 100 | `20` |

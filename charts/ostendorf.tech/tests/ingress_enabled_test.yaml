@@ -31,3 +31,16 @@ tests:
       - equal:
           path: spec.rules[0].http.paths[0].backend.service.port.number
           value: 8080
+
+  - it: routes only the public port, never govue's admin listener, even when the two differ from their defaults
+    set:
+      service:
+        port: 9000
+        adminPort: 9001
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 9000
+      - notEqual:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 9001
