@@ -56,6 +56,12 @@ tasks:
     cmds:
       - hadolint Dockerfile
 
+  lint:shell:
+    desc: Shell lint and format check over scripts/
+    cmds:
+      - shellcheck scripts/*.sh
+      - shfmt --diff --indent 2 --case-indent scripts/*.sh
+
   lint:helm:
     desc: Helm chart lint
     cmds:
@@ -186,6 +192,7 @@ tasks:
       - task: lint:actions
       - task: lint:secrets
       - task: lint:docker
+      - task: lint:shell
       - task: lint:helm
       - task: validate:kubeconform
       - task: test:helm
