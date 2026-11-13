@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/routes"
 )
 
 // locales are the only two the site serves. German is the source of truth
@@ -17,11 +19,31 @@ var locales = []string{"de", "en"}
 // routeFiles maps a route slug, the path segment after the locale, to the
 // prerendered file that answers it. The empty slug is the locale's home
 // page. Every value is relative to one locale's own directory.
-var routeFiles = map[string]string{
-	"":        "index.html",
-	"imprint": "imprint/index.html",
-	"privacy": "privacy/index.html",
-	"agb":     "agb/index.html",
+//
+// Built from internal/routes' embedded route table, the single list
+// web/scripts/prerender.ts also reads to decide what it writes: adding a
+// page means editing that one file, routes.json, not this map. A
+// malformed routes.json is a build bug, caught by internal/routes' own
+// tests before it ever reaches this package; see mustRouteFiles.
+var routeFiles = mustRouteFiles()
+
+// mustRouteFiles loads the embedded route table and indexes it by slug.
+// A load failure here can only mean routes.json itself is malformed: it
+// is checked in, not a runtime input, so treating that the way
+// contact.germanTime treats a failed zoneinfo load (a panic, since
+// package webapp cannot start correctly either way) is the right
+// response rather than threading an error through every caller of this
+// package level table.
+func mustRouteFiles() map[string]string {
+	table, err := routes.Load()
+	if err != nil {
+		panic("webapp: " + err.Error())
+	}
+	files := make(map[string]string, len(table))
+	for _, r := range table {
+		files[r.Slug] = r.File
+	}
+	return files
 }
 
 // routeSlugs lists routeFiles' keys in a deterministic, sorted order, so

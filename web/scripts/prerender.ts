@@ -19,30 +19,37 @@ import { createMemoryHistory } from 'vue-router'
 
 import App from '../src/App.vue'
 import { createAppI18n, SUPPORTED_LOCALES, type Locale } from '../src/i18n'
-import { attachLocaleSync, createAppRouter } from '../src/router'
+import { routeTable } from '../src/lib/routeTable'
 import {
   canonical,
   fullTitle,
   hreflangAlternates,
+  NOT_FOUND,
   ogLocale,
   pageMeta,
   type PageRoute,
 } from '../src/lib/seo'
+import { attachLocaleSync, createAppRouter, NOT_FOUND_ROUTE_NAME } from '../src/router'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const distDir = join(here, '../../cmd/website/dist')
 const outDir = join(here, '../../cmd/website/prerendered')
 
-/** pages pairs the router's route name with the SEO route it maps to and
- *  the output filename relative to one locale's own directory under
- *  cmd/website/prerendered. */
-const pages: Array<{ routerName: string; seoRoute: PageRoute; file: string }> = [
-  { routerName: 'home', seoRoute: 'home', file: 'index.html' },
-  { routerName: 'imprint', seoRoute: 'imprint', file: 'imprint/index.html' },
-  { routerName: 'privacy', seoRoute: 'privacy', file: 'privacy/index.html' },
-  { routerName: 'agb', seoRoute: 'agb', file: 'agb/index.html' },
-  { routerName: 'not-found', seoRoute: 'notFound', file: '404.html' },
-]
+/** loadPages turns the shared route table into this script's own page
+ *  list, pairing each entry's name with the router route and the SEO
+ *  route it names (the same string serves both now that PageRoute is a
+ *  plain string), plus the one page the table itself does not carry:
+ *  the 404 page, which answers no route and so is not part of the table
+ *  internal/webapp's sitemap and mux registration read either. */
+function loadPages(): Array<{ routerName: string; seoRoute: PageRoute; file: string }> {
+  const pages = routeTable.map((entry) => ({
+    routerName: entry.name,
+    seoRoute: entry.name,
+    file: entry.file,
+  }))
+  pages.push({ routerName: NOT_FOUND_ROUTE_NAME, seoRoute: NOT_FOUND, file: '404.html' })
+  return pages
+}
 
 interface ManifestEntry {
   file: string
@@ -141,6 +148,7 @@ function escapeHtml(value: string): string {
 
 async function main(): Promise<void> {
   const assets = await loadManifest()
+  const pages = loadPages()
 
   for (const locale of SUPPORTED_LOCALES) {
     for (const page of pages) {

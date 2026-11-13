@@ -8,20 +8,16 @@ import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
 import { isLocale, type Locale } from './i18n'
 import { usePageHead } from './lib/head'
-import type { PageRoute } from './lib/seo'
+import { NOT_FOUND, type PageRoute } from './lib/seo'
+import { NOT_FOUND_ROUTE_NAME } from './router'
 
 const route = useRoute()
 const i18n = useI18n()
 
-const routeNameToPageRoute: Record<string, PageRoute> = {
-  home: 'home',
-  imprint: 'imprint',
-  privacy: 'privacy',
-  agb: 'agb',
-  'not-found': 'notFound',
-}
-
-const pageRoute = computed<PageRoute>(() => routeNameToPageRoute[String(route.name)] ?? 'notFound')
+const pageRoute = computed<PageRoute>(() => {
+  const name = String(route.name)
+  return name === NOT_FOUND_ROUTE_NAME ? NOT_FOUND : name
+})
 const locale = computed<Locale>(() => {
   const value = route.params.locale
   return typeof value === 'string' && isLocale(value) ? value : 'de'

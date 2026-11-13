@@ -1,22 +1,34 @@
 import type { Locale } from '../i18n'
 import { SUPPORTED_LOCALES } from '../i18n'
+import { routeTable } from './routeTable'
 
 /** The site's canonical origin. Overridable through VITE_SITE_URL for a
  *  staging build; the default matches the Go service's own default. */
 export const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'https://ostendorf.tech'
 
-/** PageRoute is every route this milestone prerenders. */
-export type PageRoute = 'home' | 'imprint' | 'privacy' | 'agb' | 'notFound'
+/** NOT_FOUND is the 404 page's own pseudo route: it answers no path of
+ *  its own, so it is deliberately not part of internal/routes' table
+ *  (see internal/routes/routes.go) and is added here, and in
+ *  router/index.ts as NOT_FOUND_ROUTE_NAME, by hand instead of being
+ *  derived from it. */
+export const NOT_FOUND = 'notFound' as const
+
+/** PageRoute is every route this milestone prerenders: every name
+ *  routes.json carries, plus the 404 page. A plain string rather than a
+ *  literal union: routes.json is read at build time, not known to the
+ *  type checker, so the real safety net is seo.test.ts, which checks
+ *  every name routeTable actually carries against titleKeys and
+ *  descriptionKeys below, in both directions. */
+export type PageRoute = string
 
 /** slugs maps a route to its path segment, relative to one locale's own
- *  root. The home page has no segment of its own. */
-const slugs: Record<PageRoute, string> = {
-  home: '',
-  imprint: 'imprint/',
-  privacy: 'privacy/',
-  agb: 'agb/',
-  notFound: '',
-}
+ *  root, derived from routeTable so a page added there needs no edit
+ *  here. The 404 page has no segment of its own, the same empty value
+ *  the home page's own slug happens to share. */
+const slugs: Record<string, string> = Object.fromEntries(
+  routeTable.map((entry): [string, string] => [entry.name, entry.slug]),
+)
+slugs[NOT_FOUND] = ''
 
 /** path is the absolute path of route in locale, always starting and
  *  ending with a slash. */
@@ -48,9 +60,15 @@ export interface PageMeta {
   description: string
 }
 
-/** titleKeys and descriptionKeys name the i18n keys each route's title and
- *  meta description come from. */
-const titleKeys: Record<PageRoute, string> = {
+/** titleKeys and descriptionKeys name the i18n keys each route's title
+ *  and meta description come from. Kept separate from routes.json
+ *  deliberately: routes.json is embedded into the Go binary via
+ *  go:embed and read by Go code that has no use for an i18n key;
+ *  coupling the Go-owned route table's schema to frontend-only i18n key
+ *  strings would leak a frontend concern into a shared, Go-consumed
+ *  resource. Exported so seo.test.ts can check they cover exactly
+ *  routeTable's names plus NOT_FOUND. */
+export const titleKeys: Record<string, string> = {
   home: 'home.meta.title',
   imprint: 'legal.imprint.title',
   privacy: 'legal.privacy.title',
@@ -58,7 +76,7 @@ const titleKeys: Record<PageRoute, string> = {
   notFound: 'notFound.title',
 }
 
-const descriptionKeys: Record<PageRoute, string> = {
+export const descriptionKeys: Record<string, string> = {
   home: 'home.meta.description',
   imprint: 'legal.imprint.metaDescription',
   privacy: 'legal.privacy.metaDescription',
