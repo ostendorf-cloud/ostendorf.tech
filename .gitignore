@@ -2,7 +2,8 @@
 .DS_Store
 
 # Local secrets for docker compose; see .env.example.
-.env
+.env*
+!.env.example
 
 # Agents
 .claude/settings.local.json

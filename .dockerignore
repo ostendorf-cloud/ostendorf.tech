@@ -1,8 +1,8 @@
 .git
 .claude
 bin
-.env
-*.env
+**/.env
+**/.env.*
 *.md
 docs
 web/node_modules
