@@ -1,0 +1,213 @@
+suite: feed deployment with default values
+templates:
+  - templates/deployment-feed.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+  feed:
+    config:
+      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+      openBaoRole: ostendorf-tech-feed
+tests:
+  - it: renders exactly one Deployment named after the website's own fullname with -feed appended
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ostendorf-tech-feed
+
+  - it: uses selector labels whose app.kubernetes.io/name differs from the website's own
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: ostendorf-tech-feed
+      - notEqual:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: ostendorf-tech
+
+  - it: sets the component label to feed
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: feed
+
+  - it: exposes exactly one container port, named http, matching feed.service.port
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports
+          value:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+
+  - it: probes healthz for liveness and readyz for readiness, both on the feed's one port, never the reverse
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: http
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /readyz
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: http
+      - isNull:
+          path: spec.template.spec.containers[0].startupProbe
+
+  - it: probes healthz for startup on the feed's one port when enabled
+    set:
+      feed:
+        startupProbe:
+          enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.port
+          value: http
+
+  - it: wires every one of the eleven plain env vars with their documented defaults
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LISTEN_ADDR
+            value: ":8081"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOG_LEVEL
+            value: "info"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_ADDR
+            value: "https://openbao.openbao.svc.cluster.local:8200"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_AUTH_PATH
+            value: "kubernetes"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_ROLE
+            value: "ostendorf-tech-feed"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_JWT_FILE
+            value: "/var/run/secrets/openbao/token"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TOKEN_PATH
+            value: "instagram.com/api-tokens/data/simonostendorf.vtech"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SYNC_INTERVAL
+            value: "1h"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TOKEN_REFRESH_AGE
+            value: "7d"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: API_VERSION
+            value: "v23.0"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POST_COUNT
+            value: "20"
+
+  - it: moves OPENBAO_JWT_FILE, the volume mount path and the projected source's path together when overridden
+    set:
+      feed:
+        config:
+          openBaoJwtFile: /custom/path/jwt
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_JWT_FILE
+            value: "/custom/path/jwt"
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: "/custom/path"
+      - equal:
+          path: spec.template.spec.volumes[0].projected.sources[0].serviceAccountToken.path
+          value: "jwt"
+
+  - it: never auto-mounts the ServiceAccount token onto the pod
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: fails the render with the documented message when feed.config.openBaoAddr is left empty
+    set:
+      feed:
+        config:
+          openBaoAddr: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: >-
+            feed.config.openBaoAddr is required: set it to the OpenBao address the feed
+            service authenticates against. There is no default, since none could ever
+            point at an OpenBao installation that actually exists.
+
+  - it: fails the render with the documented message when feed.config.openBaoRole is left empty
+    set:
+      feed:
+        config:
+          openBaoRole: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: >-
+            feed.config.openBaoRole is required: set it to the OpenBao Kubernetes auth
+            role the feed service logs in as. There is no default, since none could ever
+            name a role that actually exists in your OpenBao installation.
+
+  - it: always sets resource requests
+    asserts:
+      - isNotNull:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+      - isNotNull:
+          path: spec.template.spec.containers[0].resources.requests.memory
+
+  - it: runs as the distroless nonroot uid/gid with a read-only root filesystem, the same pattern as the website's own
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 65532
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 65532
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop[0]
+          value: ALL
+
+  - it: carries no strategy forcing Recreate, unlike the website's own Deployment
+    asserts:
+      - isNull:
+          path: spec.strategy.type

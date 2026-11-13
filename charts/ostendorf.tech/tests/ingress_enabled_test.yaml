@@ -5,6 +5,10 @@ templates:
 set:
   existingSecret:
     name: ostendorf-tech-secrets
+  feed:
+    config:
+      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+      openBaoRole: ostendorf-tech-feed
   ingress:
     enabled: true
     className: nginx
@@ -33,6 +37,13 @@ tests:
       - equal:
           path: spec.rules[0].http.paths[0].backend.service.port.number
           value: 8080
+
+  - it: never routes to the feed service's own Service
+    template: templates/ingress.yaml
+    asserts:
+      - notEqual:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-ostendorf-tech-feed
 
   - it: routes only the public port, never govue's admin listener, even when the two differ from their defaults
     template: templates/ingress.yaml
