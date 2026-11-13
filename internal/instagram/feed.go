@@ -68,32 +68,53 @@ func (f *Feed) Set(posts []*Post) {
 	f.posts, f.byID = posts, byID
 }
 
+// TokenSource returns the token to call the Graph API with, handling its
+// own refresh. *TokenStore (token.go) is one, backed by OpenBao.
+type TokenSource interface {
+	Token(ctx context.Context) (string, error)
+}
+
 // Syncer refreshes the token when it is due and reloads the feed.
 //
-// The token lives in this struct and nowhere else. old_simon-ostendorf.de
-// kept it in OpenBao and wrote every refresh back, so a refreshed token
-// survived a restart and two replicas could not clobber each other's
-// refresh. This repository has no secret manager client, by design, so a
-// refresh here updates the in-memory token only: a pod that runs for
-// months keeps working, but a restart falls back to the token the
-// environment supplies, with whatever age it has. Meta's long lived tokens
-// last 60 days, so that configured value still has to be rotated by
-// whoever owns the deployment; see the root README.md.
+// It has two mutually exclusive ways of getting a token, described by
+// Tokens below. Left nil, the token lives in this struct and nowhere else.
+// old_simon-ostendorf.de kept it in OpenBao and wrote every refresh back,
+// so a refreshed token survived a restart and two replicas could not
+// clobber each other's refresh. This repository's own internal/webapp has
+// no secret manager client, by design, so a refresh here updates the
+// in-memory token only: a pod that runs for months keeps working, but a
+// restart falls back to the token the environment supplies, with whatever
+// age it has. Meta's long lived tokens last 60 days, so that configured
+// value still has to be rotated by whoever owns the deployment; see the
+// root README.md. Setting Tokens instead, as cmd/feed does, hands all of
+// that over to a store-backed TokenSource such as *TokenStore, which reads,
+// refreshes and writes the token back to OpenBao itself; Syncer then never
+// touches Token/RefreshAge or runs its own refresh against Meta at all.
 type Syncer struct {
 	Client *Client
-	// Token is the access token the environment supplied. Set it before
-	// Run or Sync is ever called; from then on it is read and written only
-	// under mu, because a refresh replaces it in place.
+	// Token is the access token the environment supplied, used only when
+	// Tokens is nil. Set it before Run or Sync is ever called; from then on
+	// it is read and written only under mu, because a refresh replaces it
+	// in place.
 	Token string
 	// RefreshAge is how old the token may get before a refresh is
-	// attempted. Meta refuses to refresh a token younger than 24 hours;
-	// such a refusal is tolerated, logged and retried next cycle, since
-	// the current token keeps working either way.
+	// attempted, used only when Tokens is nil. Meta refuses to refresh a
+	// token younger than 24 hours; such a refusal is tolerated, logged and
+	// retried next cycle, since the current token keeps working either way.
 	RefreshAge time.Duration
-	Count      int
-	Feed       *Feed
-	Logger     *slog.Logger
-	Now        func() time.Time
+	// Tokens, when set, is asked for the token every cycle instead of the
+	// in-memory Token/RefreshAge pair above: a store-backed source already
+	// handles its own refresh and write-back, so Syncer defers to it
+	// entirely rather than running a second, uncoordinated refresh against
+	// Meta. Left nil, Syncer behaves exactly as it always has: Token is the
+	// value the environment supplied and a refresh replaces it in place,
+	// which is the path internal/webapp still uses, having no store to
+	// defer to.
+	Tokens TokenSource
+	Count  int
+	Feed   *Feed
+	Logger *slog.Logger
+	Now    func() time.Time
 
 	mu          sync.Mutex
 	refreshedAt time.Time
@@ -180,11 +201,17 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	return nil
 }
 
-// token returns the token to call the API with, refreshing it first when it
-// has not been refreshed within RefreshAge. A refresh that fails is not an
-// error: the token already in hand is valid until Meta expires it, so the
-// failure is logged and the next cycle tries again.
+// token returns the token to call the API with. When Tokens is set, it is
+// asked and owns every bit of refresh and write-back logic itself.
+// Otherwise this refreshes the in-memory Token first when it has not been
+// refreshed within RefreshAge. A refresh that fails is not an error: the
+// token already in hand is valid until Meta expires it, so the failure is
+// logged and the next cycle tries again.
 func (s *Syncer) token(ctx context.Context) (string, error) {
+	if s.Tokens != nil {
+		return s.Tokens.Token(ctx)
+	}
+
 	s.mu.Lock()
 	token, refreshedAt := s.Token, s.refreshedAt
 	s.mu.Unlock()
