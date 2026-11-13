@@ -70,7 +70,13 @@
         "contactRateLimitPer": { "type": "string" },
         "smtpAddr": { "type": "string", "minLength": 1 },
         "contactTo": { "type": "string", "minLength": 1 },
-        "contactFrom": { "type": "string", "minLength": 1 }
+        "contactFrom": { "type": "string", "minLength": 1 },
+        "instagramApiVersion": { "type": "string", "minLength": 1 },
+        "instagramPostCount": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "instagramRefreshInterval": { "type": "string", "minLength": 1 },
+        "instagramTokenRefreshAge": { "type": "string", "minLength": 1 },
+        "umamiUrl": { "type": "string" },
+        "umamiWebsiteId": { "type": "string" }
       }
     },
     "existingSecret": {
@@ -81,7 +87,8 @@
         "csrfKeyKey": { "type": "string", "minLength": 1 },
         "challengeKeyKey": { "type": "string" },
         "smtpUsernameKey": { "type": "string" },
-        "smtpPasswordKey": { "type": "string" }
+        "smtpPasswordKey": { "type": "string" },
+        "instagramTokenKey": { "type": "string" }
       }
     }
   }

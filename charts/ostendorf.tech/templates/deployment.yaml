@@ -82,6 +82,22 @@ spec:
               value: {{ .Values.config.contactTo | quote }}
             - name: CONTACT_FROM
               value: {{ .Values.config.contactFrom | quote }}
+            - name: INSTAGRAM_API_VERSION
+              value: {{ .Values.config.instagramApiVersion | quote }}
+            - name: INSTAGRAM_POST_COUNT
+              value: {{ .Values.config.instagramPostCount | quote }}
+            - name: INSTAGRAM_REFRESH_INTERVAL
+              value: {{ .Values.config.instagramRefreshInterval | quote }}
+            - name: INSTAGRAM_TOKEN_REFRESH_AGE
+              value: {{ .Values.config.instagramTokenRefreshAge | quote }}
+            {{- if .Values.config.umamiUrl }}
+            - name: UMAMI_URL
+              value: {{ .Values.config.umamiUrl | quote }}
+            {{- end }}
+            {{- if .Values.config.umamiWebsiteId }}
+            - name: UMAMI_WEBSITE_ID
+              value: {{ .Values.config.umamiWebsiteId | quote }}
+            {{- end }}
             - name: CSRF_KEY
               valueFrom:
                 secretKeyRef:
@@ -107,6 +123,13 @@ spec:
                 secretKeyRef:
                   name: {{ include "ostendorf-tech.existingSecretName" . }}
                   key: {{ .Values.existingSecret.smtpPasswordKey }}
+            {{- end }}
+            {{- if .Values.existingSecret.instagramTokenKey }}
+            - name: INSTAGRAM_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ostendorf-tech.existingSecretName" . }}
+                  key: {{ .Values.existingSecret.instagramTokenKey }}
             {{- end }}
           {{- if .Values.startupProbe.enabled }}
           startupProbe:
