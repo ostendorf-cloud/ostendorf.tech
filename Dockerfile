@@ -22,7 +22,7 @@ WORKDIR /src/web
 # was written by the same pnpm a local "task setup" installs.
 RUN npm install --global pnpm@12.19.0
 
-COPY web/package.json web/pnpm-lock.yaml ./
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY web/ ./
