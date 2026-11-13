@@ -4,6 +4,7 @@ templates:
   - templates/service.yaml
   - templates/serviceaccount.yaml
   - templates/ingress.yaml
+  - templates/httproute.yaml
 set:
   existingSecret:
     name: ostendorf-tech-secrets
@@ -300,6 +301,12 @@ tests:
 
   - it: renders no Ingress when disabled
     template: templates/ingress.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders no HTTPRoute when disabled
+    template: templates/httproute.yaml
     asserts:
       - hasDocuments:
           count: 0
