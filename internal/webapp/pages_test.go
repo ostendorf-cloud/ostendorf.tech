@@ -33,26 +33,46 @@ func testPageServer(t *testing.T) *pageServer {
 	return p
 }
 
+// testMux builds a real http.ServeMux the same way production code does:
+// one pattern per locale and route slug via registerRoutes, plus the
+// catch-all pageHandler under "/". Tests dispatch through it rather than
+// calling pageHandler or routeHandler directly, so they observe the
+// actual matched pattern and the actual route interception a bare
+// handler call cannot show.
+func testMux(t *testing.T, p *pageServer) *http.ServeMux {
+	t.Helper()
+	mux := http.NewServeMux()
+	identity := func(h http.Handler) http.Handler { return h }
+	registerRoutes(mux, p, identity)
+	mux.Handle("/", p.pageHandler())
+	return mux
+}
+
 func TestPageHandlerServesKnownRoutes(t *testing.T) {
 	p := testPageServer(t)
-	handler := p.pageHandler()
+	mux := testMux(t, p)
 
 	tests := map[string]struct {
-		path       string
-		wantStatus int
-		wantBody   string
+		path        string
+		wantStatus  int
+		wantBody    string
+		wantPattern string
 	}{
-		"german home":   {"/de/", http.StatusOK, "Startseite"},
-		"german agb":    {"/de/agb/", http.StatusOK, "AGB"},
-		"english home":  {"/en/", http.StatusOK, "Home"},
-		"english terms": {"/en/agb/", http.StatusOK, "Terms"},
+		"german home":     {"/de/", http.StatusOK, "Startseite", "GET /de/{$}"},
+		"german imprint":  {"/de/imprint/", http.StatusOK, "Impressum", "GET /de/imprint/{$}"},
+		"german privacy":  {"/de/privacy/", http.StatusOK, "Datenschutz", "GET /de/privacy/{$}"},
+		"german agb":      {"/de/agb/", http.StatusOK, "AGB", "GET /de/agb/{$}"},
+		"english home":    {"/en/", http.StatusOK, "Home", "GET /en/{$}"},
+		"english imprint": {"/en/imprint/", http.StatusOK, "Imprint", "GET /en/imprint/{$}"},
+		"english privacy": {"/en/privacy/", http.StatusOK, "Privacy", "GET /en/privacy/{$}"},
+		"english agb":     {"/en/agb/", http.StatusOK, "Terms", "GET /en/agb/{$}"},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil)
 			rec := httptest.NewRecorder()
-			handler.ServeHTTP(rec, req)
+			mux.ServeHTTP(rec, req)
 
 			if rec.Code != tc.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tc.wantStatus)
@@ -60,6 +80,42 @@ func TestPageHandlerServesKnownRoutes(t *testing.T) {
 			body, _ := io.ReadAll(rec.Body)
 			if !strings.Contains(string(body), tc.wantBody) {
 				t.Errorf("body = %q, want it to contain %q", body, tc.wantBody)
+			}
+			if req.Pattern != tc.wantPattern {
+				t.Errorf("matched pattern = %q, want %q", req.Pattern, tc.wantPattern)
+			}
+		})
+	}
+}
+
+func TestPageHandlerUnknownRouteThroughMuxServesLocalNotFound(t *testing.T) {
+	p := testPageServer(t)
+	mux := testMux(t, p)
+
+	tests := map[string]struct {
+		path     string
+		wantBody string
+	}{
+		"unknown german route":  {"/de/kontakt/", "Nicht gefunden"},
+		"unknown english route": {"/en/contact/", "Not found"},
+		"unknown locale":        {"/fr/", "Nicht gefunden"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+			}
+			body, _ := io.ReadAll(rec.Body)
+			if !strings.Contains(string(body), tc.wantBody) {
+				t.Errorf("body = %q, want it to contain %q", body, tc.wantBody)
+			}
+			if req.Pattern != "/" {
+				t.Errorf("matched pattern = %q, want the catch-all %q", req.Pattern, "/")
 			}
 		})
 	}
