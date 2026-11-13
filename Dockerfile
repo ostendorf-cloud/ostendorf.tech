@@ -10,7 +10,7 @@
 # Docker Hub's API; re-resolve with
 # "docker buildx imagetools inspect node:26.9.0-bookworm-slim" if this
 # patch version ever moves.
-FROM node:26.9.0-bookworm-slim@sha256:1778ed6290208f56fdb5203b01d7975d0a16cc1549d806c2e44cb99bc96aa377 AS frontend
+FROM node:26.13.1-bookworm-slim@sha256:18a166e2d50578afe933434857ed2d9059bd1aa398a223e9c89eb4302354f079 AS frontend
 
 WORKDIR /src/web
 
