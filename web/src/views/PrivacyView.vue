@@ -353,11 +353,9 @@ const germanHref = computed(
         </li>
         <li>Anfragemethode (z. B. GET oder POST)</li>
         <li>
-          eine grobe, interne Einordnung der Anfrage (z. B. „eine Seite dieser Website“, „eine
-          Asset-Datei“), nicht die vollständige aufgerufene Adresse mit allen enthaltenen
-          Parametern; bei einem gewöhnlichen Seitenaufruf unterscheidet diese Einordnung nicht
-          einmal, welche einzelne Seite aufgerufen wurde – Startseite, Impressum,
-          Datenschutzerklärung, AGB und die Fehlerseite erhalten alle denselben Wert
+          welche Seite dieser Website in welcher Sprache aufgerufen wurde, als internes Muster (z.
+          B. „das Impressum auf Deutsch“), nicht die vollständige aufgerufene Adresse mit allen
+          enthaltenen Parametern
         </li>
         <li>HTTP-Statuscode und übertragene Datenmenge</li>
         <li>Bearbeitungsdauer der Anfrage</li>
@@ -394,9 +392,9 @@ const germanHref = computed(
         automatisch; eine darüberhinausgehende Aufbewahrung findet nicht statt.
       </p>
       <p>
-        Diese allgemeine Ratenbegrenzung gilt für jeden Aufruf unserer Website und ist unabhängig
-        von der im Abschnitt „Kontaktformular“ beschriebenen Begrenzung für das Kontaktformular;
-        beide werden getrennt gezählt.
+        Diese allgemeine Ratenbegrenzung gilt für die Seitenaufrufe unserer Website. Daneben
+        bestehen zwei weitere, eigene Begrenzungen für die beiden Schritte des Kontaktformulars, die
+        im Abschnitt „Kontaktformular“ beschrieben sind. Alle drei werden getrennt gezählt.
       </p>
       <p>
         Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Wir haben ein
@@ -923,10 +921,8 @@ const germanHref = computed(
         </li>
         <li>the request method (for example, GET or POST)</li>
         <li>
-          a coarse, internal category for the request (for example, "a page of this website", "an
-          asset file"), not the full address requested with all its parameters; for an ordinary page
-          view, this category does not even distinguish which page was viewed – the home page, the
-          imprint, the privacy policy, the AGB and the error page all get the same value
+          which page of this website was requested, in which language, as an internal pattern (for
+          example "the imprint in German") rather than the full address with all its parameters
         </li>
         <li>the HTTP status code and the amount of data transferred</li>
         <li>how long the request took to answer</li>
@@ -961,9 +957,9 @@ const germanHref = computed(
         server automatically discards the associated counter; no further retention takes place.
       </p>
       <p>
-        This general rate limiting applies to every request to our website and is independent of the
-        limiting described in the "Contact form" section for the contact form specifically; the two
-        are counted separately.
+        This general rate limiting applies to page requests on our website. Alongside it there are
+        two further, separate limits for the two steps of the contact form, described in the
+        "Contact form" section. All three are counted separately.
       </p>
       <p>
         This processing is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate
