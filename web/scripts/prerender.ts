@@ -19,6 +19,7 @@ import { createMemoryHistory } from 'vue-router'
 
 import App from '../src/App.vue'
 import { createAppI18n, SUPPORTED_LOCALES, type Locale } from '../src/i18n'
+import { HERO_SIZES } from '../src/lib/heroImage'
 import { routeTable } from '../src/lib/routeTable'
 import {
   canonical,
@@ -59,6 +60,29 @@ interface ManifestEntry {
 interface Assets {
   script: string
   styles: string[]
+  heroSrcset: string
+}
+
+/** The hero photograph's AVIF variants, keyed in the manifest by the
+ *  source file each one was built from. Reading them back out of the
+ *  manifest rather than importing them is what keeps the preload pointing
+ *  at the same content hashed files the page itself asks for: this script
+ *  is built separately from the bundle and would otherwise hash them a
+ *  second time, under different names. */
+const HERO_VARIANT = /^src\/assets\/hero-(\d+)\.avif$/
+
+function heroSrcset(manifest: Record<string, ManifestEntry>): string {
+  const variants = Object.entries(manifest)
+    .map(([key, entry]) => {
+      const match = HERO_VARIANT.exec(key)
+      return match ? { width: Number(match[1]), file: entry.file } : undefined
+    })
+    .filter((variant) => variant !== undefined)
+    .sort((a, b) => a.width - b.width)
+  if (variants.length === 0) {
+    throw new Error('prerender: the vite manifest carries no hero AVIF variant to preload')
+  }
+  return variants.map((variant) => `/${variant.file} ${variant.width}w`).join(', ')
 }
 
 async function loadManifest(): Promise<Assets> {
@@ -71,7 +95,7 @@ async function loadManifest(): Promise<Assets> {
   if (!entry) {
     throw new Error('prerender: no index.html entry in the vite manifest, run task web:build first')
   }
-  return { script: entry.file, styles: entry.css ?? [] }
+  return { script: entry.file, styles: entry.css ?? [], heroSrcset: heroSrcset(manifest) }
 }
 
 /** renderBody server-renders the app at routerName, under locale, with a
@@ -107,6 +131,15 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
     .map((href) => `<link rel="stylesheet" href="/${href}">`)
     .join('\n    ')
 
+  // The home page's hero photograph is its Largest Contentful Paint
+  // element, and nothing above it in the document mentions the picture, so
+  // without this the browser only learns about it once the stylesheet and
+  // the markup are both in. No other page carries it.
+  const heroPreload =
+    route === 'home'
+      ? `<link rel="preload" as="image" type="image/avif" fetchpriority="high" imagesrcset="${assets.heroSrcset}" imagesizes="${HERO_SIZES}">\n    `
+      : ''
+
   return `<meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${escapeHtml(title)}</title>
@@ -121,7 +154,7 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
     <meta property="og:description" content="${escapeHtml(meta.description)}">
     <meta property="og:url" content="${url}">
     <meta name="theme-color" content="#07060f">
-    ${styleLinks}
+    ${heroPreload}${styleLinks}
     <script type="module" src="/${assets.script}" defer></script>`
 }
 

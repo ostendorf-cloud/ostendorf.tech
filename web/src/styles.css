@@ -22,3 +22,15 @@
   animation: none;
   mix-blend-mode: normal;
 }
+
+/*
+ * The home page's hero breaks out of the page measure to span the window,
+ * which it does in viewport units. Those count the classic scrollbar a
+ * desktop browser may reserve, so the hero can end up a scrollbar wider
+ * than the room there actually is and push the whole page sideways.
+ * Clipping, rather than hiding, keeps the sticky header sticky and adds no
+ * scroll container of its own.
+ */
+#app {
+  overflow-x: clip;
+}

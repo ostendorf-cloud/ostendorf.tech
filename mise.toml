@@ -47,6 +47,11 @@ kubeconform = "0.7.0"
 # AGENTS.md for the exact command. svgo then optimises the result.
 poppler = "26.11.0"
 "npm:svgo" = "4.1.0"
+# imagemagick encodes the two photographs into the AVIF and WebP variants
+# web/src/assets holds, again once rather than on every build; see AGENTS.md for the
+# commands. Pinned to the patch like every other encoder here, because the output bytes
+# are committed and a different version would rewrite every one of them on the next run.
+imagemagick = "7.1.2_31"
 
 # helm-unittest (charts/ostendorf.tech's own verification plugin) is a Helm plugin, not a
 # conventional CLI, and the baseline forbids "helm plugin install <url>" regardless of Helm

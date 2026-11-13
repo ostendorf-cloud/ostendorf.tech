@@ -212,7 +212,27 @@ pdftocairo -svg Logo_Name.pdf logo-wordmark-light.svg
 svgo --multipass -i logo-wordmark-light.svg -o logo-wordmark-light.svg
 ```
 
-repeated once per variant. The fader mark alone (the icon, `LogoMark.vue`) is not
+repeated once per variant.
+
+`web/src/assets/hero-*.{avif,webp,jpg}` and `portrait-*.{avif,webp,jpg}` are generated
+from `hero.jpg` (2400x1800) and `portrait.jpg` (1200x1200) in old_simon-ostendorf.de's
+`cmd/website/static/img`, never hand edited and never re-cropped. Both are the owner's
+own photographs. The build pipeline does not resize or re-encode anything, on purpose:
+these two pictures change about as often as the logo does, so paying for an image
+pipeline on every `task web:build` would buy nothing. `web/src/lib/heroImage.ts` is the
+one place the variants are listed, with the width of each next to its import, and Vite
+content hashes them from there. The commands:
+
+```sh
+magick hero.jpg -resize 1280x -strip -quality 50 web/src/assets/hero-1280.avif
+magick hero.jpg -resize 1280x -strip -quality 72 -define webp:method=6 web/src/assets/hero-1280.webp
+```
+
+repeated for 640, 960, 1280, 1600, 1920 and 2400, and for the portrait at 460 and 920.
+The JPEG fallback each one carries is the 1280 (hero) and 460 (portrait) width at
+`-quality 78 -sampling-factor 4:2:0 -interlace JPEG`.
+
+The fader mark alone (the icon, `LogoMark.vue`) is not
 generated: it is inline Vue markup ported from old_simon-ostendorf.de's `{{define
 "logo"}}` template block, recoloured through a gradient whose stops read this theme's
 own `--color-accent` and `--color-accent-text` tokens, so it never needs regenerating
