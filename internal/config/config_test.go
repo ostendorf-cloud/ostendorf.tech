@@ -275,6 +275,18 @@ func TestLoadRejectsShortOrNonHexChallengeKeyPrevious(t *testing.T) {
 	}
 }
 
+// TestLoadRejectsChallengeKeyPreviousWithoutCurrent proves a retired key can
+// never end up issuing fresh challenges: handleChallenge always signs with
+// challengeKeys[0], and webapp.go's New falls back to ChallengeKeyPrevious
+// for that slot when ChallengeKey is unset, so setting only the previous key
+// would hand it the role it was rotated out of.
+func TestLoadRejectsChallengeKeyPreviousWithoutCurrent(t *testing.T) {
+	_, err := Load(env(withCSRFKey(map[string]string{"CHALLENGE_KEY_PREVIOUS": validHexKey})))
+	if err == nil || !strings.Contains(err.Error(), "CHALLENGE_KEY_PREVIOUS") {
+		t.Fatalf("Load() error = %v, want a problem naming CHALLENGE_KEY_PREVIOUS", err)
+	}
+}
+
 // TestDecodeKeyErrorNeverQuotesTheInvalidInput is nit 15 from the go-live
 // review: hex.DecodeString's own error text names the offending byte, for
 // example `encoding/hex: invalid byte: U+0058 'X'`, which would put one

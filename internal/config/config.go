@@ -265,6 +265,15 @@ func Load(getenv func(string) string) (Config, error) {
 	challengeKeyPrevious, err := decodeKey(loader.SecretOrFile("CHALLENGE_KEY_PREVIOUS"))
 	fail(wrap("CHALLENGE_KEY_PREVIOUS", err))
 	cfg.ChallengeKeyPrevious = challengeKeyPrevious
+	if len(cfg.ChallengeKeyPrevious) > 0 && len(cfg.ChallengeKey) == 0 {
+		// handleChallenge always issues a fresh challenge under
+		// challengeKeys[0], the current key; webapp.go's New puts
+		// ChallengeKey there when it is set, and falls back to
+		// ChallengeKeyPrevious otherwise. A deployment that set only the
+		// previous key would then have a retired key issuing challenges
+		// again, exactly the thing rotation is meant to retire.
+		fail(wrap("CHALLENGE_KEY_PREVIOUS", errors.New("must not be set without CHALLENGE_KEY, which would then be the one issuing")))
+	}
 
 	csrfKey, err := decodeKey(loader.RequiredSecretOrFile("CSRF_KEY"))
 	fail(wrap("CSRF_KEY", err))
