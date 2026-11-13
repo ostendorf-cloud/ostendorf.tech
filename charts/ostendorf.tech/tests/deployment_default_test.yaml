@@ -45,6 +45,11 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
+            name: ADMIN_ADDR
+            value: ":8081"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
             name: SITE_URL
             value: "https://ostendorf.tech"
       - contains:
@@ -167,17 +172,52 @@ tests:
           path: spec.template.spec.containers[0].securityContext.capabilities.drop[0]
           value: ALL
 
-  - it: probes healthz for liveness and readyz for readiness
+  - it: probes healthz for liveness and readyz for readiness, both on the admin port, never the public one
     template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.containers[0].livenessProbe.httpGet.path
           value: /healthz
       - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: admin
+      - equal:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.path
           value: /readyz
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: admin
       - isNull:
           path: spec.template.spec.containers[0].startupProbe
+
+  - it: probes healthz for startup on the admin port when enabled
+    template: templates/deployment.yaml
+    set:
+      startupProbe:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.port
+          value: admin
+
+  - it: exposes both the public and the admin container port
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: http
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].name
+          value: admin
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 8081
 
   - it: always sets resource requests
     template: templates/deployment.yaml
@@ -215,6 +255,28 @@ tests:
       - equal:
           path: spec.ports[0].port
           value: 8080
+
+  - it: exposes the admin port as a second named port on the Service, alongside the public one
+    template: templates/service.yaml
+    asserts:
+      - equal:
+          path: spec.ports[0].name
+          value: http
+      - equal:
+          path: spec.ports[0].port
+          value: 8080
+      - equal:
+          path: spec.ports[0].targetPort
+          value: http
+      - equal:
+          path: spec.ports[1].name
+          value: admin
+      - equal:
+          path: spec.ports[1].port
+          value: 8081
+      - equal:
+          path: spec.ports[1].targetPort
+          value: admin
 
   - it: creates a ServiceAccount with no RBAC by default
     template: templates/serviceaccount.yaml

@@ -31,10 +31,11 @@
     "securityContext": { "type": "object" },
     "service": {
       "type": "object",
-      "required": ["type", "port"],
+      "required": ["type", "port", "adminPort"],
       "properties": {
         "type": { "type": "string" },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "adminPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
       }
     },
     "ingress": {
@@ -58,6 +59,7 @@
       "type": "object",
       "properties": {
         "listenAddr": { "type": "string", "minLength": 1 },
+        "adminListenAddr": { "type": "string", "minLength": 1 },
         "siteUrl": { "type": "string", "minLength": 1 },
         "logLevel": { "type": "string", "enum": ["debug", "info", "warn", "error"] },
         "trustedProxyCidrs": { "type": "string" },

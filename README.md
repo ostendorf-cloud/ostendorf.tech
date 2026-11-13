@@ -43,14 +43,16 @@ interchangeable, as long as one of them lands the value in the right place befor
 process starts. `CSRF_KEY` is the only variable with no usable default; every other one
 does, so `bin/website` otherwise runs with none of them set.
 It serves the site at `/de/...` and `/en/...`, redirects `/` to the visitor's preferred
-locale, answers `/healthz`, `/readyz` and `/metrics`, and serves `/robots.txt` and
-`/sitemap.xml` built from the same route table the prerenderer uses.
+locale, and serves `/robots.txt` and `/sitemap.xml` built from the same route table the
+prerenderer uses. `/healthz`, `/readyz` and `/metrics` answer on a second, administrative
+listener (`ADMIN_ADDR`), never on this public one; see the Configuration table below.
 
 ## Configuration
 
 | Variable | Purpose | Default | Required |
 | --- | --- | --- | --- |
-| `LISTEN_ADDR` | Address the HTTP server listens on | `:8080` | no |
+| `LISTEN_ADDR` | Address the public HTTP server listens on | `:8080` | no |
+| `ADMIN_ADDR` | Address govue's admin listener listens on: `/healthz`, `/readyz` and `/metrics` | `:8081` | no |
 | `SITE_URL` | The site's own canonical origin, used for SEO tags and the sitemap | `https://ostendorf.tech` | no |
 | `LOG_LEVEL` | `debug`, `info`, `warn` or `error` | `info` | no |
 | `TRUSTED_PROXY_CIDRS` | Comma separated CIDRs or addresses trusted to set `X-Forwarded-For` | none | no |
@@ -141,11 +143,13 @@ minimal non-root runtime stage with no shell) and serves the site at
 `charts/ostendorf.tech/README.md` for a cluster installation.
 
 `scripts/smoke-test-image.sh <image-ref>` starts an already built image the same way,
-with a throwaway `CSRF_KEY`, and asserts it answers `/healthz`, `/readyz`, the home
-page in each locale with its prerendered content intact, `/robots.txt` and
-`/sitemap.xml`. The `docker-build` job in `.github/workflows/checks.yaml` runs it
-against the image it just built, so the container has started and served a real
-request at least once before anyone ever runs it in the cluster.
+with a throwaway `CSRF_KEY`, and asserts its admin listener (`ADMIN_ADDR`, `:8081`)
+answers `/healthz`, `/readyz` and `/metrics`, its public listener serves the home page in
+each locale with its prerendered content intact, `/robots.txt` and `/sitemap.xml`, and
+that the public listener itself no longer answers `/metrics`. The `docker-build` job in
+`.github/workflows/checks.yaml` runs it against the image it just built, so the container
+has started and served a real request at least once before anyone ever runs it in the
+cluster.
 
 ## Development
 

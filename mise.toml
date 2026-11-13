@@ -7,8 +7,26 @@ task = "3"
 # pnpm is pinned to the patch, not the major: the Dockerfile's frontend stage installs
 # one literal version, and the lockfile that stage reads with --frozen-lockfile has to
 # have been written by the same one. A floating major silently drifts the two apart.
+#
+# Pinned to major 12, not 10: pnpm 10.34.7 never writes a git-hosted dependency's
+# "path" subdirectory field into the lockfile's resolution object, not only on an
+# upgrade but even on a fully fresh resolve against a cold store (verified locally;
+# the dependency key's own "#path:/web" suffix is unaffected and cosmetic, since
+# "pnpm install --frozen-lockfile" reads resolution.path, not the key, to decide what
+# to extract). That is pnpm/pnpm#12304, fixed by pnpm/pnpm#12344; nothing in that fix
+# was backported to the 10.x release line. pnpm 11.28.11 carries the fix too, so 12 is
+# one major beyond the strict minimum; it is chosen to match the sibling repository
+# rather than put a third pnpm major into the organisation. 12.19.0 is the patch a cold-store install
+# and a cold-store "pnpm install --frozen-lockfile" were both verified against here.
+#
+# Regenerating web/pnpm-lock.yaml: pnpm 12 enforces a minimum release age and refuses a
+# package published within roughly the last day with ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION.
+# Preserving an existing lockfile then fails where a full fresh resolve succeeds, so
+# regenerate from scratch rather than fighting it. Verify the result with a frozen install
+# into an empty directory with a cold store: inspecting web/node_modules proves nothing,
+# because --frozen-lockfile leaves an already populated tree untouched.
 node = "26"
-pnpm = "10.34.7"
+pnpm = "12.19.0"
 # Pinned to the patch, not "2": a golangci-lint release is built against one Go patch and
 # cannot read the stdlib export data of a newer one, so the two versions move together.
 golangci-lint = "2.15.0"

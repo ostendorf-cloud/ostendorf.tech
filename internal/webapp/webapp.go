@@ -1,8 +1,12 @@
-// Package webapp wires the website's HTTP handler from the pieces govue
-// provides: health, metrics, the security and access log middleware, the
-// client IP resolver, the rate limiter and the CSRF protector. See
-// (*App).handler for the two chains and the order each middleware has to
-// run in, the same shape govue's own example documents.
+// Package webapp wires the website's two HTTP handlers from the pieces
+// govue provides. Handler is the public one: the security and access log
+// middleware, the client IP resolver, the rate limiter and the CSRF
+// protector, in front of the pages, assets and API routes. AdminHandler is
+// the second, smaller one: health, readiness and metrics, reached only from
+// inside the cluster, never through the chart's own Ingress; see
+// (*App).buildHandler and (*App).AdminHandler for the two chains and the
+// order each middleware has to run in, the same shape govue's own example
+// documents.
 package webapp
 
 import (
@@ -77,6 +81,10 @@ type App struct {
 	siteURL *url.URL
 
 	health *health.Registry
+	// metricsHandler answers GET /metrics on the admin handler only; see
+	// AdminHandler. It is built once in New, from the one metrics.Registry
+	// this App ever creates, so the admin handler never has to rebuild it.
+	metricsHandler http.Handler
 
 	limiter          *ratelimit.Limiter
 	rateLimit        *middleware.RateLimit
@@ -151,7 +159,7 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 
 	registry := metrics.NewRegistry()
 	httpMetrics := metrics.NewHTTP(registry)
-	metricsHandler := metrics.Handler(registry)
+	a.metricsHandler = metrics.Handler(registry)
 
 	a.limiter = ratelimit.New(cfg.RateLimitBurst, cfg.RateLimitPer, maxRateLimitKeys)
 	rateLimit, err := middleware.NewRateLimit(middleware.RateLimitConfig{
@@ -294,7 +302,7 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 		return nil, fmt.Errorf("webapp: build app: %w", err)
 	}
 
-	a.handler = a.buildHandler(httpMetrics, metricsHandler)
+	a.handler = a.buildHandler(httpMetrics)
 	return a, nil
 }
 
@@ -359,23 +367,41 @@ func (a *App) warnMailCeiling(ctx context.Context, wait time.Duration) {
 	}
 }
 
-// Handler is the website's whole HTTP handler.
+// Handler is the website's public HTTP handler: pages, assets and the API
+// routes. It answers no health, readiness or metrics route any more; see
+// AdminHandler for those.
 func (a *App) Handler() http.Handler {
 	return a.handler
+}
+
+// AdminHandler is the website's administrative HTTP handler: GET /healthz,
+// GET /readyz and GET /metrics, nothing else. It is served on a second
+// listener (cfg.AdminListenAddr, httpserver.RunAdmin in cmd/website), never
+// on the public one, so a kubelet's probe and a Prometheus scrape reach the
+// pod directly instead of through the chart's own Ingress and the public
+// listener's rate limiter. The chain is deliberately short, the same shape
+// govue's own example/app.go (*app).adminHandler applies: only Recover and
+// RequestID, no security headers, no CORS, no rate limiter, no access log
+// and no metrics instrumentation middleware. A probe or a scraper is not a
+// browser, cannot be forged, must not be throttled or flood the access log,
+// and must not itself become a metric about scraping the metrics endpoint.
+func (a *App) AdminHandler() http.Handler {
+	mux := http.NewServeMux()
+	a.health.Handle(mux)
+	mux.Handle("GET /metrics", a.metricsHandler)
+
+	return middleware.Chain(mux,
+		middleware.Recover(a.logger),
+		middleware.RequestID(a.logger),
+	)
 }
 
 // buildHandler assembles the two chains: one outer chain wrapping the mux,
 // one route chain applied to every handler the mux dispatches to. See
 // docs/concepts/govue.md in govue for why a single flat chain cannot get
 // both the access log and a self-answering middleware right at once.
-func (a *App) buildHandler(httpMetrics *metrics.HTTP, metricsHandler http.Handler) http.Handler {
+func (a *App) buildHandler(httpMetrics *metrics.HTTP) http.Handler {
 	mux := http.NewServeMux()
-
-	// Health and metrics are mounted bare, outside the route chain: a load
-	// balancer polling /healthz must never be rate limited, and a scrape
-	// must never be refused for a missing CSRF token.
-	a.health.Handle(mux)
-	mux.Handle("GET /metrics", metricsHandler)
 
 	// route is the per-handler chain every page and bare resource gets: the
 	// general rate limit, then the CSRF protector's origin check (the

@@ -57,9 +57,12 @@ The global baseline already applies here and is not repeated below.
   `internal/webapp`'s `trackPageView` is the one place it is called from, after a page was
   actually served; the title it reports is read once at startup out of the prerendered
   HTML's own `<title>`, so Go never carries a second copy of the i18n catalogue.
-- `internal/webapp` builds the HTTP handler from govue's packages: health, metrics,
-  the security and access log middleware, the client IP resolver, the rate limiter, a
-  session manager and the CSRF protector. `pages.go` is the catch-all document handler:
+- `internal/webapp` builds two HTTP handlers from govue's packages. `Handler` is the
+  public one: the security and access log middleware, the client IP resolver, the rate
+  limiter, a session manager and the CSRF protector, in front of pages, assets and the
+  API routes. `AdminHandler` is the second, smaller one govue's admin listener serves:
+  health, readiness and metrics, reached only from inside the cluster, never through the
+  chart's own Ingress. `pages.go` is the catch-all document handler:
   the locale redirect at `/`, trailing slash canonicalisation, and serving the matching
   prerendered file or a locale's own 404 page. `pages.go`'s own `routeFiles` is built
   from `internal/routes`' embedded table, not hand written, so the page handler, the
@@ -119,10 +122,17 @@ means the repository takes half of a govue release and not the other half, silen
 `task check:govue-version` (`internal/depsync`) enforces this: it asks `go list -m` for
 the version go.mod actually resolves to, the same resolution `go build` itself uses, and
 pulls the tag out of package.json's `ostendorf-cloud/govue#<tag>&path:/web` specifier,
-then fails naming both versions and both files when they differ. `web/pnpm-lock.yaml` is
-not checked separately: its own specifier field already has to match package.json's for
-`pnpm install --frozen-lockfile` to pass, and its resolved entry pins a commit hash, not
-a tag, so it cannot be compared to a version directly.
+then fails naming both versions and both files when they differ. `web/pnpm-lock.yaml`'s
+own specifier field already has to match package.json's for `pnpm install
+--frozen-lockfile` to pass, and its resolved entry pins a commit hash, not a tag, so it
+cannot be compared to a version directly either. That match is not enough on its own,
+though: pnpm's own git resolver has written a resolution object for this dependency with
+no `path` field at all, even from a fully fresh resolve against a cold store, which
+makes `pnpm install --frozen-lockfile` install the whole govue repository instead of its
+`web/` subdirectory while every specifier still agrees (pnpm/pnpm#12304, fixed by
+pnpm/pnpm#12344, not backported to the pnpm 10 release line as far as this repository
+could establish). `check:govue-version` therefore also reads `web/pnpm-lock.yaml`
+directly and fails when that dependency's resolution carries no `path: /web`.
 
 ## Verify before committing
 

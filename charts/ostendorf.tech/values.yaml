@@ -63,8 +63,16 @@ securityContext:
 service:
   type: ClusterIP
   # Also used as the container port and for the probes: must match the port
-  # encoded in config.listenAddr (default ":8080" for both).
+  # encoded in config.listenAddr (default ":8080" for both). This is the
+  # only port the chart's own Ingress ever routes to.
   port: 8080
+  # govue's admin listener: health, readiness and metrics, never routed by
+  # this chart's own Ingress (templates/ingress.yaml only ever references
+  # service.port above). Reached only from inside the cluster, by a
+  # kubelet's probe or a Prometheus ServiceMonitor/PodMonitor (not part of
+  # this chart). Must match the port encoded in config.adminListenAddr
+  # (default ":8081" for both).
+  adminPort: 8081
 
 ingress:
   enabled: false
@@ -114,6 +122,10 @@ affinity: {}
 # repository root README.md's Configuration section for what each one does.
 config:
   listenAddr: ":8080"
+  # govue's admin listener (ADMIN_ADDR): health, readiness and metrics,
+  # served separately from listenAddr above; see service.adminPort and
+  # templates/deployment.yaml's second container port and probes.
+  adminListenAddr: ":8081"
   siteUrl: "https://ostendorf.tech"
   logLevel: "info"
   # Required once ingress.enabled is true: left empty behind this chart's

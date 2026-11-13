@@ -20,9 +20,9 @@ WORKDIR /src/web
 # the pinned pnpm directly instead. The version below is the exact one
 # mise.toml's "pnpm" tool resolves to, so the lockfile this stage reads
 # was written by the same pnpm a local "task setup" installs.
-RUN npm install --global pnpm@10.34.7
+RUN npm install --global pnpm@12.19.0
 
-COPY web/package.json web/pnpm-lock.yaml ./
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY web/ ./
@@ -75,10 +75,12 @@ FROM gcr.io/distroless/static-debian12:nonroot@sha256:52dcfbabb7457ea47c82f6e13a
 
 COPY --from=build /out/website /usr/local/bin/website
 
-# Matches LISTEN_ADDR's default (":8080", see README.md's Configuration
-# table). Override LISTEN_ADDR and this EXPOSE together if this default
-# port does not fit a deployment.
+# Matches LISTEN_ADDR's and ADMIN_ADDR's defaults (":8080" and ":8081", see
+# README.md's Configuration table): the public listener and govue's own admin
+# listener (health, readiness, metrics). Override the two env vars and these two
+# EXPOSE lines together if either default port does not fit a deployment.
 EXPOSE 8080
+EXPOSE 8081
 
 # Numeric, not "nonroot:nonroot": the same uid/gid the base image's own
 # nonroot user already resolves to, but numeric form is what every
