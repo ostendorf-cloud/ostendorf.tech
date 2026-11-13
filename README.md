@@ -59,6 +59,7 @@ locale, answers `/healthz`, `/readyz` and `/metrics`, and serves `/robots.txt` a
 | `RATE_LIMIT_PER` | The burst's refill period | `1m` | no |
 | `CSRF_KEY` (+ `_FILE`) | Hex encoded, at least 32 bytes. Signs the contact form's CSRF token | none | **yes** |
 | `CHALLENGE_KEY` (+ `_FILE`) | Hex encoded, at least 32 bytes. Signs the proof of work challenge | none | no\* |
+| `CHALLENGE_KEY_PREVIOUS` (+ `_FILE`) | Hex encoded, at least 32 bytes. The key `CHALLENGE_KEY` was just rotated out of; see "Rotating the challenge key" below | none | no |
 | `SMTP_ADDR` | SMTP submission server the contact form sends through | `mail.ostendorf.cloud:587` | no |
 | `SMTP_USERNAME` (+ `_FILE`) | SMTP username | none | no\* |
 | `SMTP_PASSWORD` (+ `_FILE`) | SMTP password | none | no\* |
@@ -75,6 +76,8 @@ locale, answers `/healthz`, `/readyz` and `/metrics`, and serves `/robots.txt` a
 | `INSTAGRAM_TOKEN_REFRESH_AGE` | How old the token may get before a refresh, `1d` to `50d` | `7d` | no |
 | `UMAMI_URL` | Base URL of the Umami page views are reported to. Empty counts nothing | none | no\*\* |
 | `UMAMI_WEBSITE_ID` | Lowercase UUID of the website in Umami | none | no\*\* |
+| `MAIL_RATE_LIMIT_BURST` | Contact mails this service sends in total, across every client address, before waiting | `50` | no |
+| `MAIL_RATE_LIMIT_PER` | That burst's refill period | `1h` | no |
 
 \* Without `CHALLENGE_KEY`, or without both `SMTP_USERNAME` and `SMTP_PASSWORD`, the
 contact form answers "unavailable" instead of failing to start; every other page keeps
@@ -95,6 +98,23 @@ visitor's browser, and a failure reaching Umami never affects the response.
 A refreshed Instagram token lives in memory only. There is no secret manager client here,
 so a restart falls back to whatever `INSTAGRAM_TOKEN` carries: rotate that value before
 Meta expires it, 60 days after it was issued.
+
+`CONTACT_RATE_LIMIT_BURST` bounds one client address; `MAIL_RATE_LIMIT_BURST` bounds the mail
+account itself, across every address at once, which the per-client limit alone cannot do: a
+client address is an IPv6 /64, and a single routed /48 is 65,536 of them. The default, 50 an
+hour, is well above anything one event technology sole trader's contact form is ever expected to
+receive legitimately. Exceeding it answers the same "too many requests" message the per-client
+limit gives, and is logged at warning level, since it means either an attack or a genuine surge
+worth the operator's attention, unlike an ordinary per-client throttle.
+
+### Rotating the challenge key
+
+Set `CHALLENGE_KEY_PREVIOUS` to the key `CHALLENGE_KEY` previously held, in the same change that
+moves `CHALLENGE_KEY` to the new one. A challenge issued just before the rotation, and still
+sitting unsolved in a visitor's browser, verifies against either key; only `CHALLENGE_KEY` is
+ever used to issue a new one. Remove `CHALLENGE_KEY_PREVIOUS` again once the challenge TTL (10
+minutes) has safely passed. Leaving it unset, as before, means rotating `CHALLENGE_KEY` invalidates
+every challenge already issued the moment the new key takes effect.
 
 Behind any reverse proxy or ingress, leaving `TRUSTED_PROXY_CIDRS` unset means every
 request is attributed to the proxy's own address, not the visitor's. Every rate limit

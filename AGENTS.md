@@ -169,11 +169,6 @@ tracked as later milestones:
   deliberate, since the section carries no content worth indexing, but it does mean the
   nav has no Impressionen entry either, because a prerendered nav cannot know whether the
   section will be there.
-- `internal/pow`'s challenge key supports only one key at a time: `CHALLENGE_KEY`
-  rotation (verifying a solution against a previous key while a new one is already
-  being issued, the way old_simon-ostendorf.de's `ChallengeKeys` slice did) is not
-  wired up. Rotating today means every challenge already issued under the old key
-  stops verifying the moment the new one is set.
 
 ## Deviations
 
