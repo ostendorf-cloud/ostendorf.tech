@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -63,6 +65,20 @@ func TestParse(t *testing.T) {
 			]`,
 			wantErr: true,
 		},
+		"duplicate name": {
+			input: `[
+				{"name":"dup","slug":"a","file":"a.html"},
+				{"name":"dup","slug":"b","file":"b.html"}
+			]`,
+			wantErr: true,
+		},
+		"duplicate file": {
+			input: `[
+				{"name":"home","slug":"a","file":"dup.html"},
+				{"name":"other","slug":"b","file":"dup.html"}
+			]`,
+			wantErr: true,
+		},
 	}
 
 	for name, tc := range tests {
@@ -96,5 +112,59 @@ func TestParseRejectsNilData(t *testing.T) {
 
 	if _, err := Parse(nil); err == nil {
 		t.Fatal("Parse(nil) error = nil, want an error")
+	}
+}
+
+// TestParseAgainstSharedFixtures runs Parse against every file under
+// testdata/invalid and testdata/valid, the same fixtures
+// web/src/lib/routeTable.test.ts reads to check the frontend's own
+// validateRouteTable. A fixture added under either directory is
+// exercised by both test suites without any further code change, which
+// is what proves the two validators keep agreeing on a given case rather
+// than merely being alike by eye; see Parse's own doc comment for what it
+// cannot catch.
+func TestParseAgainstSharedFixtures(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid", func(t *testing.T) {
+		t.Parallel()
+		checkFixtures(t, "testdata/invalid", true)
+	})
+	t.Run("valid", func(t *testing.T) {
+		t.Parallel()
+		checkFixtures(t, "testdata/valid", false)
+	})
+}
+
+// checkFixtures runs Parse over every JSON file in dir, each expected to
+// fail when wantErr is true and to succeed otherwise.
+func checkFixtures(t *testing.T, dir string, wantErr bool) {
+	t.Helper()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("os.ReadDir(%q) error = %v", dir, err)
+	}
+	if len(entries) == 0 {
+		t.Fatalf("%q has no fixtures", dir)
+	}
+
+	for _, entry := range entries {
+		t.Run(entry.Name(), func(t *testing.T) {
+			t.Parallel()
+
+			data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+			if err != nil {
+				t.Fatalf("os.ReadFile(%q) error = %v", entry.Name(), err)
+			}
+
+			_, err = Parse(data)
+			if wantErr && err == nil {
+				t.Fatalf("Parse(%s) error = nil, want an error", entry.Name())
+			}
+			if !wantErr && err != nil {
+				t.Fatalf("Parse(%s) error = %v, want nil", entry.Name(), err)
+			}
+		})
 	}
 }
