@@ -24,6 +24,9 @@ linters:
         - fmt.Fprint
         - fmt.Fprintf
         - fmt.Fprintln
+    misspell:
+      ignore-rules:
+        - formulars
     revive:
       rules:
         - name: exported
