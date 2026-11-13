@@ -69,8 +69,10 @@ The global baseline already applies here and is not repeated below.
   website reads from, `GET /api/v1/posts` and `GET /api/v1/posts/{id}/image`, alongside
   `/healthz` and `/readyz` on the one listener. `/healthz` always answers 200 while the
   process is up; `/readyz` answers 503 until one full sync cycle has obtained a usable
-  token and a non-empty feed, and then stays 200 even through a later transient failure,
-  since the last good feed keeps being served regardless. A feed pod that cannot reach
+  token and completed a call to Meta, and then stays 200 even through a later transient
+  failure, since the last good feed keeps being served regardless. A cycle that reaches
+  Meta and finds zero posts still counts: an Instagram account with nothing posted is a
+  real, permanently empty feed, not a readiness failure. A feed pod that cannot reach
   OpenBao or Meta therefore sits at `0/1` ready, retrying, rather than crash-looping or
   serving stale or absent data as if nothing were wrong. Its HTTP surface authenticates
   no caller of its own; it relies on the chart's `NetworkPolicy` admitting only the

@@ -4,7 +4,8 @@
 # asserted without a real OpenBao and a real Meta access token: that the
 # process starts and keeps running, that /healthz answers 200 while
 # /readyz answers 503 the whole time (internal/feed.App.checkReady never
-# passes without a usable token and a synced feed, see
+# passes without a usable token and one completed sync cycle against Meta
+# -- even a cycle that finds zero posts counts, see
 # charts/ostendorf.tech/README.md's "Health, readiness and metrics"
 # section), and that the posts and image routes already answer correctly
 # off an empty, unsynced feed.

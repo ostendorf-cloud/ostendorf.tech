@@ -32,18 +32,25 @@ func (t hostTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 var jpegBytes = append([]byte{0xFF, 0xD8, 0xFF, 0xE0}, bytes.Repeat([]byte{1}, 100)...)
 
 // fakeMeta is a minimal in-process fake of the Graph API's me/media
-// endpoint plus its CDN, just enough for Syncer.Sync to succeed.
+// endpoint plus its CDN, just enough for Syncer.Sync to succeed. empty
+// makes me/media answer with zero posts, the way a genuinely empty
+// Instagram account would.
 type fakeMeta struct {
 	mediaCalls int
+	empty      bool
 }
 
 func (f *fakeMeta) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Host == "graph.test" && strings.HasSuffix(r.URL.Path, "/me/media"):
 		f.mediaCalls++
-		_ = json.NewEncoder(w).Encode(map[string]any{"data": []instagram.Media{
+		media := []instagram.Media{
 			{ID: "1", MediaType: "IMAGE", MediaURL: "https://cdn.test/a.jpg", Permalink: "https://www.instagram.com/p/A/"},
-		}})
+		}
+		if f.empty {
+			media = nil
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": media})
 	case r.Host == "cdn.test" && r.URL.Path == "/a.jpg":
 		w.Header().Set("Content-Type", "image/jpeg")
 		_, _ = w.Write(jpegBytes)
@@ -110,6 +117,28 @@ func TestRunFlipsReadyOnSuccessfulCycle(t *testing.T) {
 	}
 	if len(a.feed.Posts()) != 1 {
 		t.Errorf("posts = %d, want 1", len(a.feed.Posts()))
+	}
+}
+
+// TestRunFlipsReadyOnSuccessfulCycleWithZeroPosts proves a genuinely empty
+// Instagram account reaches readiness like any other account: AGENTS.md,
+// charts/ostendorf.tech/README.md and the smoke test's own header all say
+// readiness needs a usable token and one completed sync cycle against
+// Meta, not a non-empty feed, and this is the case that would catch a
+// regression back to requiring posts.
+func TestRunFlipsReadyOnSuccessfulCycleWithZeroPosts(t *testing.T) {
+	t.Parallel()
+
+	a := newTestAppWithSyncer(&fakeMeta{empty: true}, &fakeTokenSource{token: "tok-1"}, time.Hour)
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	a.run(ctx)
+
+	if !a.ready.Load() {
+		t.Error("ready = false after a cycle that reached Meta and found zero posts, want true")
+	}
+	if len(a.feed.Posts()) != 0 {
+		t.Errorf("posts = %d, want 0", len(a.feed.Posts()))
 	}
 }
 
