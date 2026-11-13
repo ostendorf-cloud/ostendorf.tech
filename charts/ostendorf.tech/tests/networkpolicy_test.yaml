@@ -42,7 +42,9 @@ tests:
           path: spec.ingress[0].ports[0].port
           value: 8081
 
-  - it: follows a non-default nameOverride for the ingress rule's website selector, proving it comes from the shared selectorLabels helper rather than a hardcoded label
+  # A hardcoded label would still match the default name, so the override is
+  # what proves the selector comes from the shared selectorLabels helper.
+  - it: follows a non-default nameOverride for the ingress rule's website selector
     set:
       nameOverride: custom-site
     asserts:
