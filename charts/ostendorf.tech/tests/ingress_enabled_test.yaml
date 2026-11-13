@@ -1,0 +1,33 @@
+suite: ingress enabled
+templates:
+  - templates/ingress.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: ostendorf.tech
+        paths:
+          - path: /
+            pathType: Prefix
+tests:
+  - it: renders one Ingress for the configured host
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+      - equal:
+          path: spec.rules[0].host
+          value: ostendorf.tech
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-ostendorf-tech
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8080

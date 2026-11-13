@@ -11,18 +11,23 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 
+	"github.com/ostendorf-cloud/govue/api"
 	"github.com/ostendorf-cloud/govue/clientip"
 	"github.com/ostendorf-cloud/govue/csrf"
 	"github.com/ostendorf-cloud/govue/health"
 	"github.com/ostendorf-cloud/govue/metrics"
 	"github.com/ostendorf-cloud/govue/middleware"
 	"github.com/ostendorf-cloud/govue/ratelimit"
+	"github.com/ostendorf-cloud/govue/session"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/contact"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/pow"
 )
 
-// maxRateLimitKeys bounds the number of distinct client addresses the rate
+// maxRateLimitKeys bounds the number of distinct client addresses a rate
 // limiter tracks at once, the same bound govue's own example applies; see
 // the ratelimit package for why that bound matters.
 const maxRateLimitKeys = 100_000
@@ -31,11 +36,27 @@ const maxRateLimitKeys = 100_000
 type App struct {
 	logger *slog.Logger
 
+	siteURL *url.URL
+
 	health *health.Registry
 
-	limiter   *ratelimit.Limiter
-	rateLimit *middleware.RateLimit
-	protector *csrf.Protector
+	limiter          *ratelimit.Limiter
+	rateLimit        *middleware.RateLimit
+	challengeRateLim *middleware.RateLimit
+	contactLimiter   *ratelimit.Limiter
+	clientIPs        *clientip.Resolver
+	protector        *csrf.Protector
+
+	sessions *session.Manager
+	csrfKey  []byte
+
+	challenges    *pow.Service
+	challengeKeys [][]byte
+
+	mailer         *contact.Sender
+	smtpCreds      contact.Credentials
+	smtpConfigured bool
+	envelope       contact.Envelope
 
 	security  middleware.Security
 	accessLog middleware.AccessLog
@@ -58,7 +79,10 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 		}
 	}
 
+	a.siteURL = cfg.SiteURL
+
 	clientIPs := clientip.NewResolver(cfg.TrustedProxies)
+	a.clientIPs = clientIPs
 
 	pages, err := newPageServer(dist, prerendered)
 	fail(err)
@@ -75,18 +99,68 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	fail(err)
 	a.rateLimit = rateLimit
 
-	// No session exists yet in this milestone, so Expected always reports
-	// that there is nothing to forge: csrf.Check then passes every unsafe
-	// method on that half alone. The origin check, the other half, still
-	// runs on every unsafe method regardless, which is what this is wired
-	// up for ahead of the contact form a later milestone adds: that form
-	// only has to start deriving a real per-session token, never wire the
-	// protector itself.
-	protector, err := csrf.New(func(*http.Request) (string, bool) { return "", false })
+	challengeLimiter := ratelimit.New(cfg.ChallengeRateLimitBurst, cfg.ChallengeRateLimitPer, maxRateLimitKeys)
+	challengeRateLim, err := middleware.NewRateLimit(middleware.RateLimitConfig{
+		Limiter:  challengeLimiter,
+		ClientIP: clientIPs,
+		// GET /api/v1/challenge is fetched by the page itself, in the
+		// visitor's own locale, so its 429 must read in that locale too,
+		// not govue's fixed English default.
+		Respond: a.challengeRateLimitRespond,
+	})
+	fail(err)
+	a.challengeRateLim = challengeRateLim
+
+	a.contactLimiter = ratelimit.New(cfg.ContactRateLimitBurst, cfg.ContactRateLimitPer, maxRateLimitKeys)
+
+	a.sessions, err = session.New(session.Config{
+		Store:          session.NewMemoryStore(nil),
+		AllowPlainHTTP: cfg.AllowPlainHTTP,
+	})
+	fail(err)
+	a.csrfKey = cfg.CSRFKey
+
+	// Expected is the one place this application connects the session
+	// layer to csrf, which never imports session itself: it reads the
+	// session the request itself carries and derives that session's
+	// token, the same read the example in govue documents. It reads the
+	// store directly rather than through ensureSession's request context,
+	// because the one unsafe route this checks, POST /api/v1/contact,
+	// never runs ensureSession itself: its session was already minted by
+	// an earlier GET, and the browser sends the cookie back on its own.
+	// csrf.Protector.Check still treats "no session" as nothing to forge,
+	// but requireSession now sits in front of this route and refuses a
+	// request that carries no session at all before the protector's own
+	// check would ever run for it; in practice this route's "no session"
+	// case never reaches the protector any more.
+	protector, err := csrf.New(func(r *http.Request) (string, bool) {
+		s, ok, err := a.sessions.Read(r.Context(), r)
+		if err != nil || !ok {
+			return "", false
+		}
+		return csrf.Token(a.csrfKey, s.ID), true
+	})
 	fail(err)
 	a.protector = protector
 
+	a.challenges = pow.NewService(challengeMaxNumber, challengeTTL, challengeMinAge)
+	a.challengeKeys = nil
+	if len(cfg.ChallengeKey) > 0 {
+		a.challengeKeys = [][]byte{cfg.ChallengeKey}
+	}
+
+	heloName := cfg.SiteURL.Hostname()
+	a.mailer = contact.NewSender(cfg.SMTPAddr, heloName)
+	a.smtpCreds = contact.Credentials{Username: cfg.SMTPUsername, Password: cfg.SMTPPassword}
+	a.smtpConfigured = cfg.SMTPUsername != "" && cfg.SMTPPassword != ""
+	a.envelope = contact.Envelope{From: cfg.ContactFrom, To: cfg.ContactTo}
+
 	a.security = middleware.DefaultSecurity()
+	if cfg.AllowPlainHTTP {
+		// A browser that reached this service over plain HTTP must never
+		// be told to upgrade every future visit to HTTPS.
+		a.security.HSTS = 0
+	}
 	a.accessLog = middleware.AccessLog{ClientIP: clientIPs}
 
 	if err := errors.Join(problems...); err != nil {
@@ -120,11 +194,34 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP, metricsHandler http.Handle
 	a.health.Handle(mux)
 	mux.Handle("GET /metrics", metricsHandler)
 
+	// route is the per-handler chain every page and bare resource gets: the
+	// general rate limit, then the CSRF protector's origin check (the
+	// token half only ever refuses an unsafe method, and nothing a page
+	// GET answers is one). No page route carries a session any more: the
+	// only place a session is minted is GET /api/v1/challenge below, which
+	// already returns the CSRF token the frontend actually reads in the
+	// same response body. A page GET's own cookie would never be read by
+	// anything, so minting one there bought nothing and only grew the
+	// session store unbounded for no reason. See requireSession in
+	// session.go for what "no session" means for POST /api/v1/contact now.
 	route := func(h http.Handler) http.Handler {
 		return middleware.Chain(h, a.rateLimit.Middleware, a.protector.Middleware)
 	}
 
 	mux.Handle("GET /assets/", route(a.pages.assetHandler()))
+	mux.Handle("GET /robots.txt", route(a.robotsHandler()))
+	mux.Handle("GET /sitemap.xml", route(a.sitemapHandler()))
+
+	mux.Handle("GET /api/v1/challenge", middleware.Chain(api.Handle(a.handleChallenge), a.challengeRateLim.Middleware, a.ensureSession, a.protector.Middleware))
+	// The contact rate limit is not wired in here: it runs inside
+	// handleContact itself, right after the honeypot check, so a bot that
+	// fills the honeypot never spends the shared budget other visitors
+	// rely on. requireSession refuses a request with no session before the
+	// CSRF protector's own check would ever apply to this route.
+	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.requireSession, a.protector.Middleware))
+	mux.Handle("/api/", route(api.NotFoundHandler()))
+
+	registerRoutes(mux, a.pages, route)
 	mux.Handle("/", route(a.pages.pageHandler()))
 
 	return middleware.Chain(mux,

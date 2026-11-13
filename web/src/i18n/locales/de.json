@@ -13,10 +13,19 @@
     "main": "Hauptmenü",
     "services": "Leistungen",
     "bands": "Bands",
-    "about": "Über mich"
+    "about": "Über mich",
+    "contact": "Kontakt"
   },
   "footer": {
-    "copyright": "Copyright © {year} Simon Ostendorf"
+    "copyright": "Copyright © {year} Simon Ostendorf",
+    "social": {
+      "eyebrow": "Folgen Sie mir",
+      "email": "E-Mail an simon\\@ostendorf.tech",
+      "phone": "Anrufen: +49 1573 0971784",
+      "whatsapp": "WhatsApp: +49 1573 0971784",
+      "instagram": "Instagram: simonostendorf.vtech",
+      "facebook": "Facebook: simonostendorf.vtech"
+    }
   },
   "home": {
     "meta": {
@@ -87,6 +96,37 @@
         "contact": { "label": "Ansprechpartner von der Idee bis zum Abbau" }
       },
       "cta": "Projekt anfragen"
+    },
+    "contact": {
+      "eyebrow": "Anfrage",
+      "title": "Kontakt",
+      "lead": "Erzählen Sie mir von Ihrer Veranstaltung, ich melde mich schnellstmöglich bei Ihnen.",
+      "channelsLabel": "Kontaktwege",
+      "channels": {
+        "email": { "label": "E-Mail", "value": "simon\\@ostendorf.tech" },
+        "phone": { "label": "Telefon", "value": "+49 1573 0971784" },
+        "whatsapp": { "label": "WhatsApp", "value": "+49 1573 0971784" },
+        "instagram": { "label": "Instagram", "value": "simonostendorf.vtech" },
+        "facebook": { "label": "Facebook", "value": "simonostendorf.vtech" }
+      },
+      "form": {
+        "title": "Nachricht senden",
+        "name": "Name",
+        "email": "E-Mail",
+        "message": "Nachricht",
+        "honeypot": "Website",
+        "consent": {
+          "prefix": "Ich bin damit einverstanden, dass die angegebenen Daten gemäß der",
+          "linkLabel": "Datenschutzerklärung",
+          "suffix": "zur Bearbeitung meiner Anfrage gespeichert werden dürfen."
+        },
+        "submit": "Absenden",
+        "submitting": "Wird gesendet …",
+        "hint": "Pflichtfeld. Ein kurzer Rechentest in Ihrem Browser schützt vor Spam, ohne Cookies und ohne Drittanbieter.",
+        "noscript": "Der Spamschutz dieses Formulars braucht JavaScript. Ohne JavaScript erreichen Sie mich per E-Mail an simon\\@ostendorf.tech.",
+        "fallbackError": "Die Nachricht konnte nicht gesendet werden. Bitte schreiben Sie mir an simon\\@ostendorf.tech.",
+        "success": "Vielen Dank für Ihre Nachricht! Ich melde mich so schnell wie möglich bei Ihnen."
+      }
     }
   },
   "bands": {

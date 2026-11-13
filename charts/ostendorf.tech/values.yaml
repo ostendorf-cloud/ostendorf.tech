@@ -1,0 +1,152 @@
+# Default values for ostendorf-tech.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Must stay at 1: internal/webapp/session.go keeps the anonymous session the
+# CSRF protector relies on in govue's in-process session.MemoryStore. A
+# second replica, or two pods briefly coexisting during an ordinary rolling
+# update, can answer a visitor's GET on one pod and their contact form POST
+# on another pod that never saw that session: requireSession then refuses
+# that POST with 403, correctly from that pod's point of view but wrongly
+# from the visitor's, since their session is real, just on the other pod.
+# This breaks the contact form for real visitors; it is an availability
+# problem, not a security hole. templates/deployment.yaml rejects any higher
+# value at render time and runs the Deployment with strategy.type: Recreate,
+# so a rollout never lets two pods coexist either. Raise this only once the
+# webapp moves to a shared session store; see AGENTS.md.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/ostendorf-cloud/ostendorf.tech
+  # Defaults to .Chart.AppVersion when left empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # No RBAC is created: this application makes no Kubernetes API calls of its own.
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# Matches the Dockerfile's distroless "nonroot" base image, uid/gid 65532.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  # Also used as the container port and for the probes: must match the port
+  # encoded in config.listenAddr (default ":8080" for both).
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: ostendorf.tech
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    # No CPU limit: serving a prerendered page and the SPA bundle is
+    # bursty on a page load, not broken for being briefly busy. A memory
+    # limit stays in place as a safety net against a genuine leak.
+    memory: 128Mi
+
+startupProbe:
+  # Disabled by default: startup only loads the embedded frontend and
+  # validates the configuration, neither of which is expected to be slow
+  # enough to need one.
+  enabled: false
+  initialDelaySeconds: 0
+  periodSeconds: 5
+  failureThreshold: 30
+
+livenessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Plain, non-secret configuration. See README.md's values table and the
+# repository root README.md's Configuration section for what each one does.
+config:
+  listenAddr: ":8080"
+  siteUrl: "https://ostendorf.tech"
+  logLevel: "info"
+  # Required once ingress.enabled is true: left empty behind this chart's
+  # own Ingress, clientip.NewResolver attributes every request to the
+  # ingress controller's pod IP, collapsing every rate limiter into one
+  # shared bucket for the whole site instead of one per visitor.
+  # templates/deployment.yaml rejects an install or template render that
+  # leaves this empty while ingress.enabled is true. Set it to the ingress
+  # controller's pod or Service CIDR; see README.md.
+  trustedProxyCidrs: ""
+  allowPlainHttp: false
+  rateLimitBurst: 120
+  rateLimitPer: "1m"
+  challengeRateLimitBurst: 10
+  challengeRateLimitPer: "20s"
+  contactRateLimitBurst: 5
+  contactRateLimitPer: "10m"
+  smtpAddr: "mail.ostendorf.cloud:587"
+  contactTo: "simon@ostendorf.tech"
+  contactFrom: "ostendorf.tech <no-reply@ostendorf.cloud>"
+
+# This chart never creates a Secret from plaintext values (see README.md).
+# Every secret-shaped setting is read from a Secret the installer already
+# has, named here and referenced key by key, so a secret-manager operator
+# that produces different key names is never forced into one shape.
+existingSecret:
+  # Required: name of the existing Secret carrying the keys below. Left
+  # empty here because no default could ever point at something that
+  # actually exists on the cluster; templates/deployment.yaml rejects an
+  # install or template render that leaves this empty, instead of shipping
+  # a Pod that crash-loops on a missing CSRF_KEY.
+  name: ""
+  # Required key: CSRF_KEY has no fallback, so a missing key in the
+  # referenced Secret surfaces as a real Kubernetes error
+  # (CreateContainerConfigError) instead of a silently empty value, and
+  # the server refuses to start without one either way.
+  csrfKeyKey: "CSRF_KEY"
+  # Optional keys: left empty, the corresponding environment variable is
+  # omitted entirely rather than wired to a key that may not exist. The
+  # contact form answers "unavailable" for whichever of these is missing;
+  # every other page still works.
+  challengeKeyKey: ""
+  smtpUsernameKey: ""
+  smtpPasswordKey: ""

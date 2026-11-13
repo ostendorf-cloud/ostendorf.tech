@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { GovueCard, GovuePage } from '@ostendorf-cloud/govue'
 
+import ContactChannels from '../components/ContactChannels.vue'
+import ContactForm from '../components/ContactForm.vue'
 import CountingFacts from '../components/CountingFacts.vue'
 import { bands } from '../data/bands'
 import { experienceYearsFloor } from '../lib/experienceYears'
@@ -48,7 +50,7 @@ const aboutFacts = computed<Fact[]>(() => [
       </p>
       <div class="mt-2 flex flex-wrap gap-3">
         <a
-          href="mailto:simon@ostendorf.tech"
+          href="#contact"
           class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-accent-strong px-4 text-base font-medium text-accent-on transition-colors hover:bg-accent-strong-hover"
         >
           {{ t('home.hero.ctaContact') }}
@@ -158,12 +160,29 @@ const aboutFacts = computed<Fact[]>(() => [
       <CountingFacts :facts="aboutFacts" class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3" />
       <p class="mt-6">
         <a
-          href="mailto:simon@ostendorf.tech"
+          href="#contact"
           class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-accent-strong px-4 text-base font-medium text-accent-on transition-colors hover:bg-accent-strong-hover"
         >
           {{ t('home.about.cta') }}
         </a>
       </p>
+    </section>
+
+    <section id="contact" aria-labelledby="contact-title" class="scroll-mt-20 py-8 sm:py-14">
+      <header class="mb-6 flex flex-col gap-2">
+        <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">
+          {{ t('home.contact.eyebrow') }}
+        </p>
+        <h2 id="contact-title" class="text-2xl font-semibold text-text">
+          {{ t('home.contact.title') }}
+        </h2>
+        <p class="text-lg text-text-muted">{{ t('home.contact.lead') }}</p>
+      </header>
+
+      <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <ContactChannels />
+        <ContactForm />
+      </div>
     </section>
   </GovuePage>
 </template>

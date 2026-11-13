@@ -5,3 +5,8 @@ files:
   - path: web/package.json
     updater: json
     key: version
+  - path: charts/ostendorf.tech/Chart.yaml
+    updater: helm
+  - path: charts/ostendorf.tech/Chart.yaml
+    updater: yaml
+    key: appVersion

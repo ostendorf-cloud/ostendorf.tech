@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -21,6 +22,55 @@ var routeFiles = map[string]string{
 	"imprint": "imprint/index.html",
 	"privacy": "privacy/index.html",
 	"agb":     "agb/index.html",
+}
+
+// routeSlugs lists routeFiles' keys in a deterministic, sorted order, so
+// registering one http.ServeMux pattern per slug never depends on Go's
+// unspecified map iteration order.
+func routeSlugs() []string {
+	slugs := make([]string, 0, len(routeFiles))
+	for slug := range routeFiles {
+		slugs = append(slugs, slug)
+	}
+	slices.Sort(slugs)
+	return slugs
+}
+
+// routePattern builds the http.ServeMux pattern one locale and route slug
+// register under, with {$} anchoring to the exact end of the path so the
+// pattern never matches a child path or a request missing its trailing
+// slash.
+//
+// The locale is a literal, not a wildcard segment: a generic {locale}
+// wildcard here would syntactically conflict with the existing
+// "GET /assets/" registration, because net/http's ServeMux rejects two
+// patterns at registration time unless one matches a strict subset of the
+// other's requests (see "Precedence" in `go doc net/http ServeMux`), and
+// neither "GET /{locale}/{$}" nor "GET /assets/" is a subset of the other
+// ("GET /{locale}/{$}" also matches "/assets/" itself, with "assets"
+// bound to {locale}; "GET /assets/" also matches "/assets/app.js", which
+// "GET /{locale}/{$}" does not). Registering one literal pattern per
+// known locale avoids that ambiguity entirely, since "de" and "en" never
+// overlap with any other top-level route this mux serves, and still
+// yields one distinct, attributable pattern per page per locale.
+func routePattern(locale, slug string) string {
+	if slug == "" {
+		return "GET /" + locale + "/{$}"
+	}
+	return "GET /" + locale + "/" + slug + "/{$}"
+}
+
+// registerRoutes registers one http.ServeMux pattern per known locale and
+// route slug on mux, each handler wrapped by wrap (the middleware chain a
+// caller wants applied, routeSession in production). It is the one place
+// that loops over locales and routeSlugs, so a test exercising the real
+// registration never has to hand-duplicate a route pattern string.
+func registerRoutes(mux *http.ServeMux, p *pageServer, wrap func(http.Handler) http.Handler) {
+	for _, locale := range locales {
+		for _, slug := range routeSlugs() {
+			mux.Handle(routePattern(locale, slug), wrap(p.routeHandler(locale, slug)))
+		}
+	}
 }
 
 // pageServer answers every document and static asset request out of the
@@ -52,9 +102,23 @@ func (p *pageServer) assetHandler() http.Handler {
 	}))
 }
 
+// routeHandler answers one known route slug for one locale, registered
+// once at startup under routePattern(locale, slug) so routeFiles[slug]
+// can be captured directly: the pattern itself pins both the locale and
+// the slug literally, so no per-request lookup or validation is needed.
+func (p *pageServer) routeHandler(locale, slug string) http.Handler {
+	file := locale + "/" + routeFiles[slug]
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p.serveFile(w, http.StatusOK, file)
+	})
+}
+
 // pageHandler is the catch-all document handler: the locale redirect at
-// "/", trailing slash canonicalisation, and serving the prerendered HTML
-// for every known route, or the locale's own 404 page for anything else.
+// "/", trailing slash canonicalisation, and the locale's own 404 page for
+// anything else. Serving a known route's prerendered HTML is handled by
+// the per-slug patterns routeHandler registers; those intercept every
+// known route in real serving, so this handler only ever reaches the 404
+// branch for a genuinely unknown slug.
 func (p *pageServer) pageHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -70,7 +134,7 @@ func (p *pageServer) pageHandler() http.Handler {
 			return
 		}
 
-		locale, rest, ok := splitLocale(path)
+		locale, _, ok := splitLocale(path)
 		if !ok {
 			p.serveNotFound(w, defaultLocale)
 			return
@@ -80,13 +144,7 @@ func (p *pageServer) pageHandler() http.Handler {
 			return
 		}
 
-		slug := strings.Trim(rest, "/")
-		file, ok := routeFiles[slug]
-		if !ok {
-			p.serveNotFound(w, locale)
-			return
-		}
-		p.serveFile(w, http.StatusOK, locale+"/"+file)
+		p.serveNotFound(w, locale)
 	})
 }
 

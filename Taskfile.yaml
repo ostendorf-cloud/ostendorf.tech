@@ -51,6 +51,28 @@ tasks:
     cmds:
       - gitleaks git --no-banner --redact
 
+  lint:docker:
+    desc: Dockerfile lint
+    cmds:
+      - hadolint Dockerfile
+
+  lint:helm:
+    desc: Helm chart lint
+    cmds:
+      - helm lint charts/ostendorf.tech
+
+  validate:kubeconform:
+    desc: Schema validation of the rendered Helm chart
+    vars:
+      SECRET_SET: existingSecret.name=ostendorf-tech-secrets
+    cmds:
+      - helm template charts/ostendorf.tech --set {{.SECRET_SET}} | kubeconform -strict -summary
+
+  test:helm:
+    desc: Helm chart unit tests
+    cmds:
+      - helm unittest charts/ostendorf.tech
+
   build:
     desc: Compile the website binary
     deps: [web:build, prerender]
@@ -132,6 +154,10 @@ tasks:
       - task: lint:yaml
       - task: lint:actions
       - task: lint:secrets
+      - task: lint:docker
+      - task: lint:helm
+      - task: validate:kubeconform
+      - task: test:helm
       - task: web:lint
       - task: web:format
       - task: web:types

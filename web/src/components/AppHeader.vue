@@ -24,6 +24,7 @@ const items = computed<NavItem[]>(() => {
     { href: home('#services'), label: t('nav.services') },
     { href: home('#bands'), label: t('nav.bands') },
     { href: home('#about'), label: t('nav.about') },
+    { href: home('#contact'), label: t('nav.contact') },
   ]
 })
 </script>

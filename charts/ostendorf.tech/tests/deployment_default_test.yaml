@@ -1,0 +1,175 @@
+suite: deployment with default values
+templates:
+  - templates/deployment.yaml
+  - templates/service.yaml
+  - templates/serviceaccount.yaml
+  - templates/ingress.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+tests:
+  - it: renders exactly one replica
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: recreates instead of rolling, so a rollout never briefly runs two pods
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  - it: wires the required secret-backed CSRF key with no fallback
+    template: templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CSRF_KEY
+            valueFrom:
+              secretKeyRef:
+                name: ostendorf-tech-secrets
+                key: CSRF_KEY
+
+  - it: wires the plain env vars with their documented defaults
+    template: templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LISTEN_ADDR
+            value: ":8080"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SITE_URL
+            value: "https://ostendorf.tech"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMTP_ADDR
+            value: "mail.ostendorf.cloud:587"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CONTACT_TO
+            value: "simon@ostendorf.tech"
+
+  - it: omits every optional secret-backed env var when its key is not configured
+    template: templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CHALLENGE_KEY
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMTP_USERNAME
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMTP_PASSWORD
+
+  - it: omits TRUSTED_PROXY_CIDRS when not configured
+    template: templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TRUSTED_PROXY_CIDRS
+
+  - it: never creates a Secret from plaintext values
+    template: templates/deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notEqual:
+          path: kind
+          value: Secret
+
+  - it: runs as the distroless nonroot uid/gid with a read-only root filesystem
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 65532
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 65532
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop[0]
+          value: ALL
+
+  - it: probes healthz for liveness and readyz for readiness
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /readyz
+      - isNull:
+          path: spec.template.spec.containers[0].startupProbe
+
+  - it: always sets resource requests
+    template: templates/deployment.yaml
+    asserts:
+      - isNotNull:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+      - isNotNull:
+          path: spec.template.spec.containers[0].resources.requests.memory
+
+  - it: sets the standard app.kubernetes.io labels including version and chart version
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: ostendorf-tech
+      - equal:
+          path: metadata.labels["app.kubernetes.io/version"]
+          value: "0.1.0"
+      - equal:
+          path: metadata.labels["helm.sh/chart"]
+          value: ostendorf-tech-0.1.0
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: ostendorf-tech
+
+  - it: renders a ClusterIP Service by default
+    template: templates/service.yaml
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - equal:
+          path: spec.ports[0].port
+          value: 8080
+
+  - it: creates a ServiceAccount with no RBAC by default
+    template: templates/serviceaccount.yaml
+    asserts:
+      - isKind:
+          of: ServiceAccount
+
+  - it: renders no Ingress when disabled
+    template: templates/ingress.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
