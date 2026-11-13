@@ -37,6 +37,26 @@ The global baseline already applies here and is not repeated below.
   SMTP, ported from old_simon-ostendorf.de's `internal/contact` with one change: a field
   error carries a stable code instead of a German message, so `internal/webapp` can
   answer in German or English depending on the visitor's own locale.
+- `internal/instagram` loads the home page's Impressionen section server side: the posts
+  and their pictures are fetched from Meta here, kept in memory, and served from this
+  site's own domain, so a visitor's browser never connects to Instagram or Meta. That is
+  not an implementation detail but what `web/src/views/PrivacyView.vue` already promises.
+  Ported from old_simon-ostendorf.de's `internal/instagram` with one change: its `Syncer`
+  read and wrote the access token through OpenBao, so a refreshed token survived a
+  restart. There is no secret manager client here, so the token comes from
+  `INSTAGRAM_TOKEN` (or its `_FILE` twin) and a refresh updates the in-memory copy only.
+  A pod that runs for months keeps working; a restart falls back to the configured value,
+  which therefore still has to be rotated before Meta expires it after 60 days. Without a
+  token no syncer runs at all, the feed stays empty and the section is not rendered.
+- `internal/analytics` reports page views to Umami from the server, ported from
+  old_simon-ostendorf.de's `internal/analytics` unchanged: no script, no cookie, nothing
+  read from the visitor's device, which again is what the privacy policy states. It
+  counts nothing unless `UMAMI_URL` and `UMAMI_WEBSITE_ID` are both set, leaves out a
+  prefetch, Do Not Track, Global Privacy Control and any client that is not a public
+  address, and drops a view rather than letting a slow Umami hold a response.
+  `internal/webapp`'s `trackPageView` is the one place it is called from, after a page was
+  actually served; the title it reports is read once at startup out of the prerendered
+  HTML's own `<title>`, so Go never carries a second copy of the i18n catalogue.
 - `internal/webapp` builds the HTTP handler from govue's packages: health, metrics,
   the security and access log middleware, the client IP resolver, the rate limiter, a
   session manager and the CSRF protector. `pages.go` is the catch-all document handler:
@@ -137,12 +157,18 @@ when the theme changes.
 
 ## Scope of this milestone
 
-The home page's hero, Leistungen, Bands, Über mich and Kontakt sections, the imprint,
-privacy and AGB pages, crawling (`robots.txt`, `sitemap.xml`), the container image and
-the Helm chart are implemented. Left out, tracked as later milestones:
+The home page's hero, Leistungen, Impressionen, Bands, Über mich and Kontakt sections,
+the imprint, privacy and AGB pages, crawling (`robots.txt`, `sitemap.xml`), the Instagram
+feed, the Umami hookup, the container image and the Helm chart are implemented. Left out,
+tracked as later milestones:
 
-- The Impressionen (Instagram) section stays excluded from the home page.
-- The Umami hookup is a later milestone.
+- The Impressionen section is rendered by the browser after the page loads, from
+  `GET /api/v1/instagram`, not baked into the prerendered HTML: the feed changes while
+  the binary does not, and `task prerender` runs at build time with no access token. A
+  crawler that executes no JavaScript therefore does not see the section. That is
+  deliberate, since the section carries no content worth indexing, but it does mean the
+  nav has no Impressionen entry either, because a prerendered nav cannot know whether the
+  section will be there.
 - `internal/pow`'s challenge key supports only one key at a time: `CHALLENGE_KEY`
   rotation (verifying a solution against a previous key while a new one is already
   being issued, the way old_simon-ostendorf.de's `ChallengeKeys` slice did) is not
