@@ -13,7 +13,6 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/ostendorf-cloud/govue/clientip"
@@ -155,26 +154,14 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.ContactFrom, err = mail.ParseAddress(loader.String("CONTACT_FROM", DefaultContactFrom))
 	fail(wrap("CONTACT_FROM", err))
 
-	username, err := secretValue(resolved, "SMTP_USERNAME")
-	fail(wrap("SMTP_USERNAME", err))
-	cfg.SMTPUsername = username
+	cfg.SMTPUsername = loader.SecretOrFile("SMTP_USERNAME")
+	cfg.SMTPPassword = loader.SecretOrFile("SMTP_PASSWORD")
 
-	password, err := secretValue(resolved, "SMTP_PASSWORD")
-	fail(wrap("SMTP_PASSWORD", err))
-	cfg.SMTPPassword = password
-
-	challengeKeyRaw, err := secretValue(resolved, "CHALLENGE_KEY")
-	fail(wrap("CHALLENGE_KEY", err))
-	challengeKey, err := decodeKey(challengeKeyRaw)
+	challengeKey, err := decodeKey(loader.SecretOrFile("CHALLENGE_KEY"))
 	fail(wrap("CHALLENGE_KEY", err))
 	cfg.ChallengeKey = challengeKey
 
-	csrfKeyRaw, err := secretValue(resolved, "CSRF_KEY")
-	fail(wrap("CSRF_KEY", err))
-	if err == nil && csrfKeyRaw == "" {
-		fail(wrap("CSRF_KEY", errors.New("is required")))
-	}
-	csrfKey, err := decodeKey(csrfKeyRaw)
+	csrfKey, err := decodeKey(loader.RequiredSecretOrFile("CSRF_KEY"))
 	fail(wrap("CSRF_KEY", err))
 	cfg.CSRFKey = csrfKey
 
@@ -202,29 +189,6 @@ func resolvedGetenv(getenv func(string) string) func(string) string {
 		return os.Getenv
 	}
 	return getenv
-}
-
-// secretValue resolves one configuration value that may be a secret: either
-// name's own value, or the trimmed content of the file name+"_FILE" points
-// at. Setting both is an error, so a deployment is never in doubt about
-// which one wins. This is what lets OpenBao, External Secrets, a Kubernetes
-// secret mount and a plain .env file all supply the same variable without
-// this package, or anything above it, knowing which one is in use.
-func secretValue(resolved func(string) string, name string) (string, error) {
-	direct := strings.TrimSpace(resolved(name))
-	filePath := strings.TrimSpace(resolved(name + "_FILE"))
-	switch {
-	case direct != "" && filePath != "":
-		return "", fmt.Errorf("%s and %s_FILE are both set, set only one", name, name)
-	case filePath != "":
-		raw, err := os.ReadFile(filePath)
-		if err != nil {
-			return "", fmt.Errorf("%s_FILE: read %s: %w", name, filePath, err)
-		}
-		return strings.TrimRight(string(raw), "\r\n"), nil
-	default:
-		return direct, nil
-	}
 }
 
 // decodeKey decodes raw as hex and checks its length. An empty raw means the
