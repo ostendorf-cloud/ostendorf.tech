@@ -25,9 +25,9 @@
 # runs Node itself. Only the "website" stage depends on this one; the
 # "feed" stage never triggers it, see this file's own top comment.
 #
-# Digest for node:26.9.0-bookworm-slim (linux/amd64), resolved against
+# Digest for node:26.13.1-bookworm-slim (linux/amd64), resolved against
 # Docker Hub's API; re-resolve with
-# "docker buildx imagetools inspect node:26.9.0-bookworm-slim" if this
+# "docker buildx imagetools inspect node:26.13.1-bookworm-slim" if this
 # patch version ever moves.
 FROM node:26.13.1-bookworm-slim@sha256:18a166e2d50578afe933434857ed2d9059bd1aa398a223e9c89eb4302354f079 AS frontend
 
@@ -99,48 +99,22 @@ COPY internal/ internal/
 
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/feed ./cmd/feed
 
-# Runtime stage for cmd/website: distroless/static-debian12 carries only a
+# Runtime stage for cmd/feed: distroless/static-debian12 carries only a
 # minimal root filesystem, ca-certificates and tzdata, nothing else, no
 # shell, no package manager. ca-certificates is what this image needs it
-# for: the contact form's SMTP sender verifies the mail server's
-# certificate (internal/contact/smtp.go) against the OS trust store at
-# connect time. tzdata is not needed from the image itself; internal/
-# contact/message.go imports "time/tzdata" to embed Europe/Berlin into the
-# binary directly. "scratch" was considered and rejected for exactly that
-# ca-certificates gap. The ":nonroot" tag already runs as uid/gid 65532,
-# not root.
+# for: internal/openbao's client and internal/instagram's Meta client both
+# make outbound TLS connections (OpenBao's API and the Graph API),
+# verified against the OS trust store. tzdata is unused by this binary:
+# cmd/feed and the packages it imports have no need for time zones at
+# all, let alone the "time/tzdata" import cmd/website's own runtime stage
+# uses below. "scratch" was considered and rejected for the
+# ca-certificates gap alone. The ":nonroot" tag already runs as uid/gid
+# 65532, not root.
 #
 # Digest for gcr.io/distroless/static-debian12:nonroot (linux/amd64),
 # resolved against gcr.io's registry API; re-resolve with
 # "docker buildx imagetools inspect gcr.io/distroless/static-debian12:nonroot"
 # if this needs refreshing.
-FROM gcr.io/distroless/static-debian12:nonroot@sha256:52dcfbabb7457ea47c82f6e13af8c8a4a1d9f7b0145142b3ecab20f2b888411d AS website
-
-COPY --from=build-website /out/website /usr/local/bin/website
-
-# Matches LISTEN_ADDR's and ADMIN_ADDR's defaults (":8080" and ":8081", see
-# README.md's Configuration table): the public listener and govue's own admin
-# listener (health, readiness, metrics). Override the two env vars and these two
-# EXPOSE lines together if either default port does not fit a deployment.
-EXPOSE 8080
-EXPOSE 8081
-
-# Numeric, not "nonroot:nonroot": the same uid/gid the base image's own
-# nonroot user already resolves to, but numeric form is what every
-# container runtime can resolve without reading /etc/passwd, redundant
-# here since the base image already defaults to it, kept explicit anyway.
-USER 65532:65532
-
-ENTRYPOINT ["/usr/local/bin/website"]
-
-# Runtime stage for cmd/feed: same distroless base and the same reasoning
-# as the website's own runtime stage above. ca-certificates is what this
-# image needs it for here: internal/openbao's client and internal/
-# instagram's Meta client both make outbound TLS connections (OpenBao's
-# API and the Graph API), verified against the OS trust store. Nothing in
-# cmd/feed or the packages it imports needs tzdata or imports
-# "time/tzdata"; it is simply part of this base image either way, unused
-# by this binary the same way it is unused by the website's own.
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:52dcfbabb7457ea47c82f6e13af8c8a4a1d9f7b0145142b3ecab20f2b888411d AS feed
 
 COPY --from=build-feed /out/feed /usr/local/bin/feed
@@ -152,8 +126,42 @@ COPY --from=build-feed /out/feed /usr/local/bin/feed
 # the API routes on this one port, so there is only one EXPOSE line here.
 EXPOSE 8081
 
-# Numeric, not "nonroot:nonroot"; see the website's own runtime stage
-# comment above for why.
+# Numeric, not "nonroot:nonroot": the same uid/gid the base image's own
+# nonroot user already resolves to, but numeric form is what every
+# container runtime can resolve without reading /etc/passwd, redundant
+# here since the base image already defaults to it, kept explicit anyway.
 USER 65532:65532
 
 ENTRYPOINT ["/usr/local/bin/feed"]
+
+# Runtime stage for cmd/website: same distroless base and the same
+# ca-certificates/no-shell reasoning as cmd/feed's own runtime stage
+# above. ca-certificates is what this image needs it for here: the
+# contact form's SMTP sender verifies the mail server's certificate
+# (internal/contact/smtp.go) against the OS trust store at connect time.
+# Unlike cmd/feed, this binary does care about a time zone, but tzdata is
+# still not needed from the image itself: internal/contact/message.go
+# imports "time/tzdata" to embed Europe/Berlin into the binary directly,
+# so the base image's own bundled tzdata ends up just as unused here as
+# it is for cmd/feed, for a different reason.
+#
+# This is also why a bare "docker build ." or "docker compose build", with
+# no "--target", builds this stage: it is deliberately the last one in the
+# file, matching the only image this repository published before cmd/feed
+# existed, see this file's own top comment.
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:52dcfbabb7457ea47c82f6e13af8c8a4a1d9f7b0145142b3ecab20f2b888411d AS website
+
+COPY --from=build-website /out/website /usr/local/bin/website
+
+# Matches LISTEN_ADDR's and ADMIN_ADDR's defaults (":8080" and ":8081", see
+# README.md's Configuration table): the public listener and govue's own admin
+# listener (health, readiness, metrics). Override the two env vars and these two
+# EXPOSE lines together if either default port does not fit a deployment.
+EXPOSE 8080
+EXPOSE 8081
+
+# Numeric, not "nonroot:nonroot"; see cmd/feed's own runtime stage comment
+# above for why.
+USER 65532:65532
+
+ENTRYPOINT ["/usr/local/bin/website"]
