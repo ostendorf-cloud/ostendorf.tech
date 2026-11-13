@@ -455,6 +455,140 @@ func TestTokenStore_Token_successfulWriteResetsTheEscalationClock(t *testing.T) 
 	}
 }
 
+// TestTokenStore_Token_freshTokenResetsTheEscalationClock proves the early
+// return for a token still within RefreshAge clears unstoredSince, the same
+// as a successful own write does. That path is exactly what a cycle sees
+// after another replica, or an operator by hand, persists a token following
+// an earlier write failure here: without the reset, a single unrelated
+// hiccup long afterwards would wrongly escalate to Error on its very first
+// occurrence, inheriting a clock that should have been cleared.
+func TestTokenStore_Token_freshTokenResetsTheEscalationClock(t *testing.T) {
+	t.Parallel()
+
+	bao := newFakeBao()
+	bao.exists[testPath] = true
+	bao.secrets[testPath] = map[string]any{
+		"access_token": "stale-token",
+		"refreshed_at": testNow.Add(-100 * time.Hour).Format(time.RFC3339),
+	}
+	bao.versions[testPath] = 1
+	bao.failWriteOnce = true
+	refresher := &fakeRefresher{fresh: "fresh-token"}
+
+	now := testNow
+	var logs bytes.Buffer
+	store := newTestStoreWithClock(t, bao, refresher, &logs, func() time.Time { return now })
+
+	// First call: write fails, unstoredSince is set to now.
+	if _, err := store.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+
+	// Between calls, another replica (or an operator) persists a fresh
+	// token directly, the way this process never managed to.
+	now = testNow.Add(2 * time.Hour)
+	bao.secrets[testPath] = map[string]any{
+		"access_token": "someone-elses-fresh-token",
+		"refreshed_at": now.Format(time.RFC3339),
+	}
+	bao.versions[testPath]++
+	callsBefore := refresher.callCount()
+	logs.Reset()
+	token, err := store.Token(t.Context())
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if token != "someone-elses-fresh-token" {
+		t.Errorf("token = %q, want the fresh token now in OpenBao", token)
+	}
+	if refresher.callCount() != callsBefore {
+		t.Errorf("refresher called %d more time(s), want 0 for a fresh token", refresher.callCount()-callsBefore)
+	}
+
+	// Third call, comfortably past writeFailureEscalateAfter measured from
+	// the first failure: the stored token above is stale again by now
+	// (RefreshAge is 24h), and this write fails too. Had the early return
+	// above not cleared unstoredSince, this would already be more than
+	// writeFailureEscalateAfter past the first failure and log at Error.
+	now = now.Add(25 * time.Hour)
+	bao.failWriteOnce = true
+	logs.Reset()
+	if _, err := store.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if strings.Contains(logs.String(), "level=ERROR") {
+		t.Errorf("write failure logged at Error after the fresh-token path reset the escalation clock, want Warn:\n%s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "level=WARN") {
+		t.Errorf("write failure did not log at Warn:\n%s", logs.String())
+	}
+}
+
+// TestTokenStore_Token_refreshFailureResetsTheEscalationClock covers the
+// fourth path that means the token is persisted, beyond the successful own
+// write, the CAS mismatch re-read and the fresh-token early return: a
+// refresh attempt against Meta failing leaves Token returning exactly the
+// token it just read from OpenBao, unmodified and never written to, so that
+// token is persisted too and the clock must clear here as well.
+func TestTokenStore_Token_refreshFailureResetsTheEscalationClock(t *testing.T) {
+	t.Parallel()
+
+	bao := newFakeBao()
+	bao.exists[testPath] = true
+	bao.secrets[testPath] = map[string]any{
+		"access_token": "stale-token",
+		"refreshed_at": testNow.Add(-100 * time.Hour).Format(time.RFC3339),
+	}
+	bao.versions[testPath] = 1
+	bao.failWriteOnce = true
+	refresher := &fakeRefresher{fresh: "fresh-token"}
+
+	now := testNow
+	var logs bytes.Buffer
+	store := newTestStoreWithClock(t, bao, refresher, &logs, func() time.Time { return now })
+
+	// First call: write fails, unstoredSince is set to now.
+	if _, err := store.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+
+	// Second call, 2 hours later: the stored token is still stale (the
+	// earlier write never landed), but this time the refresh against Meta
+	// itself fails, so Token returns exactly what it just read from
+	// OpenBao and never attempts a write.
+	now = testNow.Add(2 * time.Hour)
+	refresher.err = errors.New("meta: rate limited")
+	logs.Reset()
+	writesBefore := bao.writes
+	token, err := store.Token(t.Context())
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if token != "stale-token" {
+		t.Errorf("token = %q, want the current token unchanged", token)
+	}
+	if bao.writes != writesBefore {
+		t.Errorf("wrote %d more time(s), want 0 when the refresh itself failed", bao.writes-writesBefore)
+	}
+
+	// Third call, comfortably past writeFailureEscalateAfter measured from
+	// the first failure but not from the second: a write failure here must
+	// still log at Warn if the refresh failure above reset the clock.
+	now = now.Add(23 * time.Hour)
+	refresher.err = nil
+	bao.failWriteOnce = true
+	logs.Reset()
+	if _, err := store.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if strings.Contains(logs.String(), "level=ERROR") {
+		t.Errorf("write failure logged at Error after the refresh-failure path reset the escalation clock, want Warn:\n%s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "level=WARN") {
+		t.Errorf("write failure did not log at Warn:\n%s", logs.String())
+	}
+}
+
 func TestTokenStore_Token_noUsableToken(t *testing.T) {
 	t.Parallel()
 

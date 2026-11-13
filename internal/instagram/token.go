@@ -109,11 +109,18 @@ func (s *TokenStore) Token(ctx context.Context) (string, error) {
 	now := s.Now()
 	refreshedAt, err := time.Parse(time.RFC3339, secret.String(refreshedAtKey))
 	if err == nil && now.Sub(refreshedAt) < s.RefreshAge {
+		// token is exactly what was just read from OpenBao: persisted,
+		// whether by this process earlier, another replica, or an
+		// operator's hand write. Any earlier unwritten refresh is moot.
+		s.unstoredSince = time.Time{}
 		return token, nil
 	}
 
 	fresh, err := s.Refresher.RefreshToken(ctx, token)
 	if err != nil {
+		// token is still exactly what was just read from OpenBao: stale by
+		// age, but persisted, so nothing is unstored right now either.
+		s.unstoredSince = time.Time{}
 		// Meta's 60 day window leaves weeks of slack; try again next cycle.
 		s.Logger.Warn("instagram token refresh failed, using the current token", "error", err.Error())
 		return token, nil
