@@ -6,6 +6,7 @@ import { GovueCard, GovuePage } from '@ostendorf-cloud/govue'
 import ContactChannels from '../components/ContactChannels.vue'
 import ContactForm from '../components/ContactForm.vue'
 import CountingFacts from '../components/CountingFacts.vue'
+import InstagramFeed from '../components/InstagramFeed.vue'
 import { bands } from '../data/bands'
 import { experienceYearsFloor } from '../lib/experienceYears'
 import type { Fact } from '../lib/facts'
@@ -111,6 +112,10 @@ const aboutFacts = computed<Fact[]>(() => [
         </GovueCard>
       </div>
     </section>
+
+    <!-- Renders itself only once the server side feed has something to
+         show; see InstagramFeed.vue. -->
+    <InstagramFeed />
 
     <section id="bands" aria-labelledby="bands-title" class="scroll-mt-20 py-8 sm:py-14">
       <header class="mb-6 flex flex-col gap-2">
