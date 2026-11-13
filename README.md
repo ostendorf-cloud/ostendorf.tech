@@ -68,10 +68,33 @@ locale, answers `/healthz`, `/readyz` and `/metrics`, and serves `/robots.txt` a
 | `CHALLENGE_RATE_LIMIT_PER` | That burst's refill period | `20s` | no |
 | `CONTACT_RATE_LIMIT_BURST` | Contact submissions one client address may make before waiting | `5` | no |
 | `CONTACT_RATE_LIMIT_PER` | That burst's refill period | `10m` | no |
+| `INSTAGRAM_TOKEN` (+ `_FILE`) | Instagram access token the Impressionen section is loaded with. Empty renders no section at all | none | no |
+| `INSTAGRAM_API_VERSION` | Pinned Instagram Graph API version | `v23.0` | no |
+| `INSTAGRAM_POST_COUNT` | Posts loaded per sync, 1 to 100 | `20` | no |
+| `INSTAGRAM_REFRESH_INTERVAL` | How often the feed is reloaded, at least `1m` | `1h` | no |
+| `INSTAGRAM_TOKEN_REFRESH_AGE` | How old the token may get before a refresh, `1d` to `50d` | `7d` | no |
+| `UMAMI_URL` | Base URL of the Umami page views are reported to. Empty counts nothing | none | no\*\* |
+| `UMAMI_WEBSITE_ID` | Lowercase UUID of the website in Umami | none | no\*\* |
 
 \* Without `CHALLENGE_KEY`, or without both `SMTP_USERNAME` and `SMTP_PASSWORD`, the
 contact form answers "unavailable" instead of failing to start; every other page keeps
 working. `CSRF_KEY` has no such fallback: the server refuses to start without it.
+
+\*\* `UMAMI_URL` and `UMAMI_WEBSITE_ID` are set together or not at all; exactly one of
+them is refused at startup rather than silently counting nothing.
+
+The Impressionen section and the visitor statistic are both switched off by default and
+both run server side only. Without `INSTAGRAM_TOKEN` no feed is loaded and the section is
+not rendered; the rest of the page is unaffected, and a failure reaching Meta never
+changes what a visitor sees. The posts and their pictures are fetched by this server and
+served from this domain, so a visitor's browser never connects to Instagram or Meta.
+Without `UMAMI_URL` and `UMAMI_WEBSITE_ID` no page view is reported; with them, this
+server reports each view to Umami itself, with no script, cookie or beacon in the
+visitor's browser, and a failure reaching Umami never affects the response.
+
+A refreshed Instagram token lives in memory only. There is no secret manager client here,
+so a restart falls back to whatever `INSTAGRAM_TOKEN` carries: rotate that value before
+Meta expires it, 60 days after it was issued.
 
 Behind any reverse proxy or ingress, leaving `TRUSTED_PROXY_CIDRS` unset means every
 request is attributed to the proxy's own address, not the visitor's. Every rate limit

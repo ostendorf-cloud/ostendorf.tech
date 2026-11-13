@@ -39,18 +39,21 @@ func testPageServer(t *testing.T) *pageServer {
 // calling pageHandler or routeHandler directly, so they observe the
 // actual matched pattern and the actual route interception a bare
 // handler call cannot show.
-func testMux(t *testing.T, p *pageServer) *http.ServeMux {
+//
+// track is the page view hook; a test that only cares about serving
+// passes nil, which is also what a deployment without Umami uses.
+func testMux(t *testing.T, p *pageServer, track func(*http.Request, string)) *http.ServeMux {
 	t.Helper()
 	mux := http.NewServeMux()
 	identity := func(h http.Handler) http.Handler { return h }
-	registerRoutes(mux, p, identity)
+	registerRoutes(mux, p, identity, track)
 	mux.Handle("/", p.pageHandler())
 	return mux
 }
 
 func TestPageHandlerServesKnownRoutes(t *testing.T) {
 	p := testPageServer(t)
-	mux := testMux(t, p)
+	mux := testMux(t, p, nil)
 
 	tests := map[string]struct {
 		path        string
@@ -90,7 +93,7 @@ func TestPageHandlerServesKnownRoutes(t *testing.T) {
 
 func TestPageHandlerUnknownRouteThroughMuxServesLocalNotFound(t *testing.T) {
 	p := testPageServer(t)
-	mux := testMux(t, p)
+	mux := testMux(t, p, nil)
 
 	tests := map[string]struct {
 		path     string
@@ -218,6 +221,127 @@ func TestAssetHandlerServesAndCachesImmutably(t *testing.T) {
 	}
 	if got := rec.Header().Get("Cache-Control"); got != "public, max-age=31536000, immutable" {
 		t.Errorf("Cache-Control = %q, want immutable", got)
+	}
+}
+
+// trackedView is one call of the page view hook, as a test observes it.
+type trackedView struct {
+	path  string
+	title string
+}
+
+// recordingTracker is the page view hook as a test fake: it records what
+// the route handler reports instead of sending anything anywhere.
+type recordingTracker struct {
+	views []trackedView
+}
+
+func (r *recordingTracker) track(req *http.Request, title string) {
+	r.views = append(r.views, trackedView{path: req.URL.Path, title: title})
+}
+
+// titledPageServer serves prerendered pages carrying the <title> element
+// web/scripts/prerender.ts really writes, so the title a page view reports
+// is read from the same place a visitor's browser tab reads it.
+func titledPageServer(t *testing.T) *pageServer {
+	t.Helper()
+	dist := fstest.MapFS{"assets/app.js": &fstest.MapFile{Data: []byte("console.log('app')")}}
+	prerendered := fstest.MapFS{
+		"de/index.html":         &fstest.MapFile{Data: []byte("<html><head><title>Simon Ostendorf &#8211; Veranstaltungstechnik</title></head><body>Startseite</body></html>")},
+		"de/imprint/index.html": &fstest.MapFile{Data: []byte("<html><head><title>Impressum – Simon Ostendorf</title></head><body>Impressum</body></html>")},
+		// No title at all: a page view still counts, with none.
+		"de/privacy/index.html": &fstest.MapFile{Data: []byte("<html><body>Datenschutz</body></html>")},
+		// Malformed: an opening tag that never closes.
+		"de/agb/index.html": &fstest.MapFile{Data: []byte("<html><head><title>AGB</head><body>AGB</body></html>")},
+		"de/404.html":       &fstest.MapFile{Data: []byte("<html><body>Nicht gefunden</body></html>")},
+		"en/index.html":     &fstest.MapFile{Data: []byte("<html><head><title>Simon Ostendorf &#8211; Event technology</title></head><body>Home</body></html>")},
+		"en/404.html":       &fstest.MapFile{Data: []byte("<html><body>Not found</body></html>")},
+	}
+	p, err := newPageServer(dist, prerendered)
+	if err != nil {
+		t.Fatalf("newPageServer() error = %v", err)
+	}
+	return p
+}
+
+func TestPageTitlesAreReadFromThePrerenderedHTML(t *testing.T) {
+	p := titledPageServer(t)
+
+	tests := map[string]struct {
+		file string
+		want string
+	}{
+		// prerender.ts escapes the title it writes; the entity is read
+		// back as the character a visitor's tab shows.
+		"escaped entity is decoded": {"de/index.html", "Simon Ostendorf – Veranstaltungstechnik"},
+		"plain title":               {"de/imprint/index.html", "Impressum – Simon Ostendorf"},
+		"english title":             {"en/index.html", "Simon Ostendorf – Event technology"},
+		"page without a title":      {"de/privacy/index.html", ""},
+		"unclosed title element":    {"de/agb/index.html", ""},
+		// Never prerendered at all in this fixture.
+		"missing file": {"en/imprint/index.html", ""},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := p.titles[tc.file]; got != tc.want {
+				t.Errorf("title of %s = %q, want %q", tc.file, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPageViewIsTrackedWithItsTitle(t *testing.T) {
+	p := titledPageServer(t)
+	tracker := &recordingTracker{}
+	mux := testMux(t, p, tracker.track)
+
+	for _, path := range []string{"/de/", "/de/imprint/", "/de/privacy/"} {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d, want %d", path, rec.Code, http.StatusOK)
+		}
+	}
+
+	want := []trackedView{
+		{path: "/de/", title: "Simon Ostendorf – Veranstaltungstechnik"},
+		{path: "/de/imprint/", title: "Impressum – Simon Ostendorf"},
+		// A page whose HTML carries no title is still a page view; only
+		// the title is missing, which Umami then leaves out.
+		{path: "/de/privacy/", title: ""},
+	}
+	if len(tracker.views) != len(want) {
+		t.Fatalf("tracked %+v, want %+v", tracker.views, want)
+	}
+	for i, view := range tracker.views {
+		if view != want[i] {
+			t.Errorf("view %d = %+v, want %+v", i, view, want[i])
+		}
+	}
+}
+
+func TestOnlyARealPageViewIsTracked(t *testing.T) {
+	// A redirect, a 404 and a page whose file never got prerendered are
+	// not page views: the visitor never received that page.
+	p := titledPageServer(t)
+	tracker := &recordingTracker{}
+	mux := testMux(t, p, tracker.track)
+
+	for _, path := range []string{
+		"/",            // locale redirect
+		"/de/imprint",  // trailing slash redirect
+		"/de/kontakt/", // unknown route, 404
+		"/fr/",         // unknown locale, 404
+		"/en/imprint/", // known route whose file is missing, falls back to 404
+	} {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
+		mux.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	if len(tracker.views) != 0 {
+		t.Errorf("tracked %+v, want nothing", tracker.views)
 	}
 }
 

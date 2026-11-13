@@ -57,6 +57,7 @@ by name.
 | `CHALLENGE_KEY` | `existingSecret.challengeKeyKey` | unset (omitted) | No |
 | `SMTP_USERNAME` | `existingSecret.smtpUsernameKey` | unset (omitted) | No |
 | `SMTP_PASSWORD` | `existingSecret.smtpPasswordKey` | unset (omitted) | No |
+| `INSTAGRAM_TOKEN` | `existingSecret.instagramTokenKey` | unset (omitted) | No |
 
 `CSRF_KEY` has no fallback: a `Secret` missing it fails the pod at the Kubernetes level
 (`CreateContainerConfigError`), and the server would refuse to start without one anyway.
@@ -64,6 +65,11 @@ by name.
 environment variable entirely, rather than referencing a key that may not exist in your
 `Secret`; the contact form answers "unavailable" while any of them is missing, and every other
 page keeps working.
+
+`INSTAGRAM_TOKEN` left unset omits the variable the same way, and the home page's Impressionen
+section is then not rendered at all; every other section keeps working. A refreshed token lives
+in the pod's memory only, since this application has no secret manager client: rotate the value
+in the `Secret` before Meta expires it after 60 days.
 
 Every key is at least 32 random bytes, hex encoded, for example:
 
@@ -99,6 +105,12 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
 | `config.smtpAddr` | SMTP submission server | `mail.ostendorf.cloud:587` |
 | `config.trustedProxyCidrs` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |
+| `config.instagramApiVersion` | Pinned Instagram Graph API version | `v23.0` |
+| `config.instagramPostCount` | Posts loaded per sync, 1 to 100 | `20` |
+| `config.instagramRefreshInterval` | How often the feed is reloaded | `1h` |
+| `config.instagramTokenRefreshAge` | How old the access token may get before a refresh, `1d` to `50d` | `7d` |
+| `config.umamiUrl` | Base URL of the Umami that page views are reported to, empty counts nothing | `""` |
+| `config.umamiWebsiteId` | Lowercase UUID of the website in Umami, set together with `config.umamiUrl` | `""` |
 | `existingSecret.name` | Name of the existing `Secret` | `""` (required) |
 
 ## Upgrading

@@ -126,6 +126,27 @@ config:
   smtpAddr: "mail.ostendorf.cloud:587"
   contactTo: "simon@ostendorf.tech"
   contactFrom: "ostendorf.tech <no-reply@ostendorf.cloud>"
+  # The home page's Impressionen section. It renders only while the server
+  # actually holds posts, which needs existingSecret.instagramTokenKey
+  # below; the settings here only shape how that feed is loaded and are
+  # inert without a token.
+  instagramApiVersion: "v23.0"
+  instagramPostCount: 20
+  instagramRefreshInterval: "1h"
+  # Meta refuses to refresh a token younger than 24 hours, and a long
+  # lived token expires after 60 days, which bounds this at both ends. A
+  # refreshed token lives in the pod's memory only: this application has
+  # no secret manager client, so a restart falls back to the Secret's own
+  # value, which still has to be rotated before it expires.
+  instagramTokenRefreshAge: "7d"
+  # Page views are reported to Umami by the server itself, never by a
+  # script in the visitor's browser. Both empty count nothing; setting
+  # only one of the two is refused at startup rather than half-enabling
+  # the feature. umamiWebsiteId is the lowercase UUID Umami shows for the
+  # website, and umamiUrl its own base URL, typically the in-cluster
+  # Service.
+  umamiUrl: ""
+  umamiWebsiteId: ""
 
 # This chart never creates a Secret from plaintext values (see README.md).
 # Every secret-shaped setting is read from a Secret the installer already
@@ -150,3 +171,7 @@ existingSecret:
   challengeKeyKey: ""
   smtpUsernameKey: ""
   smtpPasswordKey: ""
+  # The Instagram access token. Left empty, the Impressionen section is
+  # switched off entirely: no feed is loaded and the page renders no
+  # section at all, with every other part of the site unaffected.
+  instagramTokenKey: ""
