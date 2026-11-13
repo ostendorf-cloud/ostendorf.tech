@@ -14,10 +14,13 @@ FROM node:26.9.0-bookworm-slim@sha256:1778ed6290208f56fdb5203b01d7975d0a16cc1549
 
 WORKDIR /src/web
 
-# corepack ships with Node and pins pnpm to the exact version mise.toml's
-# "pnpm" tool resolves to, so the lockfile this stage reads was written by
-# the same pnpm a local "task setup" installs.
-RUN corepack enable && corepack prepare pnpm@10.34.7 --activate
+# corepack no longer ships with Node: the Node.js TSC voted to stop
+# bundling it by default starting with Node.js 25 (nodejs/corepack#722),
+# and this image's Node 26 reflects that; npm still ships, so npm installs
+# the pinned pnpm directly instead. The version below is the exact one
+# mise.toml's "pnpm" tool resolves to, so the lockfile this stage reads
+# was written by the same pnpm a local "task setup" installs.
+RUN npm install --global pnpm@10.34.7
 
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
