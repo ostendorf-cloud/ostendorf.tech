@@ -18,10 +18,11 @@ const germanHref = computed(
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
       <p class="text-text-muted">
         Kurz vorab: Diese Website setzt ein einziges, rein technisches Cookie zum Schutz des
-        Kontaktformulars (siehe Abschnitt „Cookies“), aber keine Tracking- oder Werbedienste, und
-        bindet keine Inhalte von Drittanbietern ein. Ihr Browser lädt alle Inhalte ausschließlich
-        von unserem eigenen Server. Eine Besucherstatistik erstellen wir selbst auf unseren eigenen
-        Servern, ohne Skript in Ihrem Browser und ohne sonst etwas auf Ihrem Endgerät zu speichern.
+        Kontaktformulars (siehe Abschnitt „Cookies“), nutzt aber keine Tracking- oder Werbedienste
+        und bindet keine Inhalte von Drittanbietern ein. Ihr Browser lädt alle Inhalte
+        ausschließlich von unserem eigenen Server. Eine Besucherstatistik erstellen wir selbst auf
+        unseren eigenen Servern, ohne Skript in Ihrem Browser und ohne sonst etwas auf Ihrem
+        Endgerät zu speichern.
       </p>
 
       <h2 class="text-xl font-semibold">1. Datenschutz auf einen Blick</h2>
@@ -317,12 +318,13 @@ const germanHref = computed(
       <h3 class="text-lg font-semibold">Cookies</h3>
       <p>
         Diese Website setzt ein einziges Cookie: ein technisches Sitzungs-Cookie, und zwar erst
-        dann, wenn Sie das Kontaktformular benutzen. Es wird gesetzt, sobald Sie das erste Feld des
-        Formulars anklicken. Wenn Sie die Seiten dieser Website nur lesen und das Kontaktformular
-        nicht benutzen, erhalten Sie kein Cookie. Es enthält ausschließlich eine zufällige, nicht
-        auf Sie persönlich zurückführbare Kennung und dient dazu, unserem Server zu ermöglichen, das
-        Kontaktformular vor Cross-Site-Request-Forgery-Angriffen (CSRF) zu schützen; es wird nicht
-        zu Tracking, Analyse oder Werbung verwendet und nicht an Dritte übermittelt.
+        dann, wenn Sie das Kontaktformular benutzen. Es wird gesetzt, sobald Sie ein Feld des
+        Formulars auswählen, gleich ob mit der Maus oder mit der Tastatur. Wenn Sie die Seiten
+        dieser Website nur lesen und das Kontaktformular nicht benutzen, erhalten Sie kein Cookie.
+        Es enthält ausschließlich eine zufällige, nicht auf Sie persönlich zurückführbare Kennung
+        und dient dazu, unserem Server zu ermöglichen, das Kontaktformular vor
+        Cross-Site-Request-Forgery-Angriffen (CSRF) zu schützen; es wird nicht zu Tracking, Analyse
+        oder Werbung verwendet und nicht an Dritte übermittelt.
       </p>
       <p>
         Das Cookie ist ein Sitzungs-Cookie ohne eigenes Speicherdauer-Attribut: Ihr Browser verwirft
@@ -395,9 +397,10 @@ const germanHref = computed(
       </p>
       <p>
         Diese allgemeine Ratenbegrenzung gilt für Seitenaufrufe, für die zugehörigen Design- und
-        Bilddateien und für die Dateien, die Suchmaschinen auslesen. Für die beiden Schritte des
-        Kontaktformulars gelten stattdessen zwei eigene Begrenzungen, die im Abschnitt
-        „Kontaktformular“ beschrieben sind. Alle drei werden getrennt gezählt.
+        Bilddateien, für die Dateien, die Suchmaschinen auslesen, und für Anfragen an Adressen, die
+        es auf dieser Website nicht gibt. Für die beiden Schritte des Kontaktformulars gelten
+        stattdessen zwei eigene Begrenzungen, die im Abschnitt „Kontaktformular“ beschrieben sind.
+        Alle drei werden getrennt gezählt.
       </p>
       <p>
         Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Wir haben ein
@@ -888,12 +891,12 @@ const germanHref = computed(
       <h3 class="text-lg font-semibold">Cookies</h3>
       <p>
         This website sets a single cookie: a technical session cookie, and only once you use the
-        contact form. It is set as soon as you click into the form's first field. If you only read
-        the pages of this website and do not use the contact form, you receive no cookie at all. It
-        contains only a random identifier that cannot be traced back to you personally, and exists
-        to let our server protect the contact form against cross-site request forgery (CSRF)
-        attacks; it is not used for tracking, analytics or advertising, and is not transmitted to
-        third parties.
+        contact form. It is set as soon as you select a field of the form, whether with the mouse or
+        with the keyboard. If you only read the pages of this website and do not use the contact
+        form, you receive no cookie at all. It contains only a random identifier that cannot be
+        traced back to you personally, and exists to let our server protect the contact form against
+        cross-site request forgery (CSRF) attacks; it is not used for tracking, analytics or
+        advertising, and is not transmitted to third parties.
       </p>
       <p>
         The cookie is a session cookie with no storage-duration attribute of its own: your browser
@@ -963,9 +966,9 @@ const germanHref = computed(
       </p>
       <p>
         This general rate limiting applies to page views, to the design and image files that belong
-        to them, and to the files search engines read. The two steps of the contact form have two
-        separate limits of their own instead, described in the "Contact form" section. All three are
-        counted separately.
+        to them, to the files search engines read, and to requests for addresses that do not exist
+        on this website. The two steps of the contact form have two separate limits of their own
+        instead, described in the "Contact form" section. All three are counted separately.
       </p>
       <p>
         This processing is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate
