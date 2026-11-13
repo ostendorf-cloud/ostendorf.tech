@@ -130,6 +130,7 @@ func ValidEmail(s string) bool {
 			return false
 		}
 		for _, r := range label {
+			//nolint:staticcheck // De Morgan's form negates three range checks separately instead of one grouped "is alphanumeric" disjunction, which reads worse
 			if r != '-' && !('a' <= r && r <= 'z' || 'A' <= r && r <= 'Z' || '0' <= r && r <= '9') {
 				return false
 			}
