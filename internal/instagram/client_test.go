@@ -1,7 +1,9 @@
 package instagram
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -66,6 +68,45 @@ func TestImageRejectsDisallowedHost(t *testing.T) {
 	}
 	if transport.calls != 0 {
 		t.Errorf("transport called %d times, want 0", transport.calls)
+	}
+}
+
+// failingTransport fails every request the way an unreachable host or a
+// reset connection would. net/http.Client.Do wraps a RoundTripper error
+// into a *url.Error carrying the full request URL, access_token query
+// string included: exactly what scrub (client.go) exists to strip before
+// it reaches a returned error or, from internal/feed/sync.go, a log line.
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("connection refused")
+}
+
+// TestMediaAndRefreshTokenScrubTheAccessTokenOnTransportFailure drives both
+// of the only two calls that carry the access token in a URL (Media and
+// RefreshToken) through a failing transport and asserts the token appears
+// in neither returned error. TokenStore's own leak test (token_test.go)
+// covers every path through TokenStore.Token, but RefreshToken there is a
+// fake Refresher, never the real Client; this is the one test that
+// exercises the real HTTP path and would turn red if scrub were removed or
+// broken, which nothing previously did.
+func TestMediaAndRefreshTokenScrubTheAccessTokenOnTransportFailure(t *testing.T) {
+	t.Parallel()
+
+	const secretToken = "leak-test-access-token-must-not-appear"
+	client := NewClient("v23.0")
+	client.HTTP = &http.Client{Transport: failingTransport{}}
+
+	if _, err := client.Media(t.Context(), secretToken, 10); err == nil {
+		t.Fatal("Media() error = nil, want an error from the failing transport")
+	} else if strings.Contains(err.Error(), secretToken) {
+		t.Errorf("Media() error contains the access token: %q", err.Error())
+	}
+
+	if _, err := client.RefreshToken(t.Context(), secretToken); err == nil {
+		t.Fatal("RefreshToken() error = nil, want an error from the failing transport")
+	} else if strings.Contains(err.Error(), secretToken) {
+		t.Errorf("RefreshToken() error contains the access token: %q", err.Error())
 	}
 }
 
