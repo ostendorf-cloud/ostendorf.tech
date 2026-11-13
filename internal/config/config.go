@@ -31,11 +31,15 @@ const minKeyBytes = 32
 
 // Defaults applied to a field left unset in the environment.
 const (
-	DefaultListenAddr     = ":8080"
-	DefaultSiteURL        = "https://ostendorf.tech"
-	DefaultLogLevel       = "info"
-	DefaultRateLimitBurst = 120
-	DefaultRateLimitPer   = time.Minute
+	DefaultListenAddr = ":8080"
+	// DefaultAdminListenAddr is govue's own admin listener default, named
+	// ADMIN_ADDR to match its example: health, readiness and metrics serve
+	// from here instead of the public listener; see internal/webapp.
+	DefaultAdminListenAddr = ":8081"
+	DefaultSiteURL         = "https://ostendorf.tech"
+	DefaultLogLevel        = "info"
+	DefaultRateLimitBurst  = 120
+	DefaultRateLimitPer    = time.Minute
 
 	DefaultSMTPAddr  = "mail.ostendorf.cloud:587"
 	DefaultContactTo = "simon@ostendorf.tech"
@@ -103,8 +107,13 @@ var umamiWebsiteID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 // Config is the website's whole configuration, read once in main.
 type Config struct {
 	ListenAddr string
-	SiteURL    *url.URL
-	LogLevel   slog.Level
+	// AdminListenAddr is govue's admin listener: health, readiness and
+	// metrics serve from here, never from ListenAddr, so a kubelet and a
+	// scraper reach the pod directly without a public route; see
+	// internal/webapp.
+	AdminListenAddr string
+	SiteURL         *url.URL
+	LogLevel        slog.Level
 
 	// TrustedProxies are the TCP peers whose X-Forwarded-For entry clientip
 	// trusts. Empty means every request is attributed to its TCP peer.
@@ -215,6 +224,7 @@ func Load(getenv func(string) string) (Config, error) {
 
 	cfg := Config{
 		ListenAddr:              loader.String("LISTEN_ADDR", DefaultListenAddr),
+		AdminListenAddr:         loader.String("ADMIN_ADDR", DefaultAdminListenAddr),
 		SiteURL:                 loader.URL("SITE_URL", DefaultSiteURL),
 		RateLimitBurst:          loader.Int("RATE_LIMIT_BURST", DefaultRateLimitBurst, 1, 100_000),
 		RateLimitPer:            loader.Duration("RATE_LIMIT_PER", DefaultRateLimitPer, time.Second, time.Hour),

@@ -57,9 +57,12 @@ The global baseline already applies here and is not repeated below.
   `internal/webapp`'s `trackPageView` is the one place it is called from, after a page was
   actually served; the title it reports is read once at startup out of the prerendered
   HTML's own `<title>`, so Go never carries a second copy of the i18n catalogue.
-- `internal/webapp` builds the HTTP handler from govue's packages: health, metrics,
-  the security and access log middleware, the client IP resolver, the rate limiter, a
-  session manager and the CSRF protector. `pages.go` is the catch-all document handler:
+- `internal/webapp` builds two HTTP handlers from govue's packages. `Handler` is the
+  public one: the security and access log middleware, the client IP resolver, the rate
+  limiter, a session manager and the CSRF protector, in front of pages, assets and the
+  API routes. `AdminHandler` is the second, smaller one govue's admin listener serves:
+  health, readiness and metrics, reached only from inside the cluster, never through the
+  chart's own Ingress. `pages.go` is the catch-all document handler:
   the locale redirect at `/`, trailing slash canonicalisation, and serving the matching
   prerendered file or a locale's own 404 page. `pages.go`'s own `routeFiles` is built
   from `internal/routes`' embedded table, not hand written, so the page handler, the

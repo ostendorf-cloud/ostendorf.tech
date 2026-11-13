@@ -40,6 +40,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.ListenAddr != DefaultListenAddr {
 		t.Errorf("ListenAddr = %q, want %q", cfg.ListenAddr, DefaultListenAddr)
 	}
+	if cfg.AdminListenAddr != DefaultAdminListenAddr {
+		t.Errorf("AdminListenAddr = %q, want %q", cfg.AdminListenAddr, DefaultAdminListenAddr)
+	}
 	if cfg.SiteURL == nil || cfg.SiteURL.String() != DefaultSiteURL {
 		t.Errorf("SiteURL = %v, want %q", cfg.SiteURL, DefaultSiteURL)
 	}
@@ -107,6 +110,7 @@ func TestLoadDefaults(t *testing.T) {
 func TestLoadOverrides(t *testing.T) {
 	cfg, err := Load(env(withCSRFKey(map[string]string{
 		"LISTEN_ADDR":         ":9090",
+		"ADMIN_ADDR":          ":9091",
 		"SITE_URL":            "https://example.test",
 		"LOG_LEVEL":           "debug",
 		"TRUSTED_PROXY_CIDRS": "10.0.0.0/8, 192.168.1.1",
@@ -124,6 +128,9 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.ListenAddr != ":9090" {
 		t.Errorf("ListenAddr = %q, want :9090", cfg.ListenAddr)
+	}
+	if cfg.AdminListenAddr != ":9091" {
+		t.Errorf("AdminListenAddr = %q, want :9091", cfg.AdminListenAddr)
 	}
 	if cfg.SiteURL.String() != "https://example.test" {
 		t.Errorf("SiteURL = %v, want https://example.test", cfg.SiteURL)

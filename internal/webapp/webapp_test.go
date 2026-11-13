@@ -103,16 +103,41 @@ func testApp(t *testing.T) *App {
 	return app
 }
 
-func TestAppServesLivenessAndReadiness(t *testing.T) {
+// TestAppPublicHandlerServesNoOperationalEndpoints proves the move to the
+// admin listener actually happened on the public side: /healthz, /readyz
+// and /metrics moved to AdminHandler (see
+// TestAppAdminHandlerServesHealthReadinessAndMetrics), so none of the three
+// may still answer on the public handler. pageHandler's catch-all answers
+// every unknown path with the locale's own 404 page, which is what a
+// request for any of these three now actually is from the public
+// handler's point of view.
+func TestAppPublicHandlerServesNoOperationalEndpoints(t *testing.T) {
 	app := testApp(t)
 	handler := app.Handler()
 
-	for _, path := range []string{"/healthz", "/readyz"} {
+	for _, path := range []string{"/healthz", "/readyz", "/metrics"} {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("GET %s on the public handler status = %d, want %d", path, rec.Code, http.StatusNotFound)
+		}
+	}
+}
+
+// TestAppAdminHandlerServesHealthReadinessAndMetrics proves the admin
+// handler, not the public one, now answers all three operational routes;
+// see AdminHandler.
+func TestAppAdminHandlerServesHealthReadinessAndMetrics(t *testing.T) {
+	app := testApp(t)
+	handler := app.AdminHandler()
+
+	for _, path := range []string{"/healthz", "/readyz", "/metrics"} {
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Errorf("GET %s status = %d, want %d", path, rec.Code, http.StatusOK)
+			t.Errorf("GET %s on the admin handler status = %d, want %d", path, rec.Code, http.StatusOK)
 		}
 	}
 }
@@ -123,19 +148,9 @@ func TestAppDrainingFailsReadiness(t *testing.T) {
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
-	app.Handler().ServeHTTP(rec, req)
+	app.AdminHandler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
-	}
-}
-
-func TestAppServesMetrics(t *testing.T) {
-	app := testApp(t)
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
-	rec := httptest.NewRecorder()
-	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
 

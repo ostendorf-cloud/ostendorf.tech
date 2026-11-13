@@ -1,6 +1,7 @@
-// Command website serves ostendorf.tech: the built Vue SPA, prerendered
-// HTML for every route and locale, and the operational endpoints
-// /healthz, /readyz and /metrics.
+// Command website serves ostendorf.tech: the built Vue SPA and prerendered
+// HTML for every route and locale on its public listener, and the
+// operational endpoints /healthz, /readyz and /metrics on a second,
+// administrative listener, reached only from inside the cluster.
 package main
 
 import (
@@ -55,13 +56,17 @@ func run() error {
 	// token and no Umami, and neither can keep the server from serving.
 	app.Start(ctx)
 
-	return httpserver.Run(ctx, httpserver.Config{
+	return httpserver.RunAdmin(ctx, httpserver.Config{
 		Addr:    cfg.ListenAddr,
 		Handler: app.Handler(),
 		Logger:  logger,
 		// Failing the readiness probe before the drain delay starts is
 		// what lets a load balancer stop sending new requests before the
-		// server stops accepting connections at all.
+		// server stops accepting connections at all. This runs once, for
+		// both listeners, however many are running.
 		BeforeShutdown: app.Health().Drain,
+	}, httpserver.AdminConfig{
+		Addr:    cfg.AdminListenAddr,
+		Handler: app.AdminHandler(),
 	})
 }
