@@ -151,9 +151,13 @@ the Helm chart are implemented. Left out, tracked as later milestones:
 
 ## Deviations
 
-- No `LICENSE` file and no Apache-2.0 header on any source file: this is a private
-  business repository, never distributed, so the baseline's default license does not
-  apply. The reusable license-header workflow is not called for the same reason.
+- `LICENSE` is proprietary, all rights reserved, not the baseline's Apache-2.0: this is
+  one business's own website, and reusing it would misidentify the source of a service.
+  No per-file licence header and no reusable license-header workflow for the same
+  reason; the single `LICENSE` carries it. `NOTICE` records what `LICENSE` does not
+  cover: the dependencies and their own terms, the brand and imagery, the page texts
+  including the band descriptions that belong to those bands, and why the legal pages
+  must not be copied.
 - `.github/workflows/dco.yaml` calls `ostendorf-cloud/workflows`'s reusable workflow at
   `v0.1.1`, the latest tag that exists, not a floating `v0` major tag:
   `ostendorf-cloud/workflows` has not cut one yet. Repoint at `v0` once it exists.
