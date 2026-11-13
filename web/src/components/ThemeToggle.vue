@@ -79,11 +79,16 @@ function onToggle(event: MouseEvent): void {
         },
       )
     })
-    .catch(() => {
-      // transition.ready rejects when the browser skips the transition,
-      // for example a second click arriving before the first one
-      // finished; cycleMode above already ran, so the mode change itself
-      // is not lost, only its reveal.
+    .catch((reason: unknown) => {
+      // transition.ready rejects when the browser skips the transition, for
+      // example a second click arriving before the first one finished.
+      // cycleMode above already ran, so the mode change itself is not lost,
+      // only its reveal, and that is not worth telling anyone about. A
+      // failure from animate() lands here too and is a real defect, so it
+      // goes to the console rather than disappearing with the expected case.
+      if (!(reason instanceof DOMException && reason.name === 'AbortError')) {
+        console.error('theme reveal failed', reason)
+      }
     })
 }
 </script>
