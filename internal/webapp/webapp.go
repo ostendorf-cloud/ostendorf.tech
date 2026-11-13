@@ -43,7 +43,8 @@ type App struct {
 	limiter          *ratelimit.Limiter
 	rateLimit        *middleware.RateLimit
 	challengeRateLim *middleware.RateLimit
-	contactRateLim   *middleware.RateLimit
+	contactLimiter   *ratelimit.Limiter
+	clientIPs        *clientip.Resolver
 	protector        *csrf.Protector
 
 	sessions *session.Manager
@@ -81,6 +82,7 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.siteURL = cfg.SiteURL
 
 	clientIPs := clientip.NewResolver(cfg.TrustedProxies)
+	a.clientIPs = clientIPs
 
 	pages, err := newPageServer(dist, prerendered)
 	fail(err)
@@ -98,14 +100,18 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.rateLimit = rateLimit
 
 	challengeLimiter := ratelimit.New(cfg.ChallengeRateLimitBurst, cfg.ChallengeRateLimitPer, maxRateLimitKeys)
-	challengeRateLim, err := middleware.NewRateLimit(middleware.RateLimitConfig{Limiter: challengeLimiter, ClientIP: clientIPs})
+	challengeRateLim, err := middleware.NewRateLimit(middleware.RateLimitConfig{
+		Limiter:  challengeLimiter,
+		ClientIP: clientIPs,
+		// GET /api/v1/challenge is fetched by the page itself, in the
+		// visitor's own locale, so its 429 must read in that locale too,
+		// not govue's fixed English default.
+		Respond: a.challengeRateLimitRespond,
+	})
 	fail(err)
 	a.challengeRateLim = challengeRateLim
 
-	contactLimiter := ratelimit.New(cfg.ContactRateLimitBurst, cfg.ContactRateLimitPer, maxRateLimitKeys)
-	contactRateLim, err := middleware.NewRateLimit(middleware.RateLimitConfig{Limiter: contactLimiter, ClientIP: clientIPs})
-	fail(err)
-	a.contactRateLim = contactRateLim
+	a.contactLimiter = ratelimit.New(cfg.ContactRateLimitBurst, cfg.ContactRateLimitPer, maxRateLimitKeys)
 
 	a.sessions, err = session.New(session.Config{
 		Store:          session.NewMemoryStore(nil),
@@ -122,8 +128,11 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	// because the one unsafe route this checks, POST /api/v1/contact,
 	// never runs ensureSession itself: its session was already minted by
 	// an earlier GET, and the browser sends the cookie back on its own.
-	// "No session" still means nothing to forge, the same answer this
-	// milestone's predecessor always gave.
+	// csrf.Protector.Check still treats "no session" as nothing to forge,
+	// but requireSession now sits in front of this route and refuses a
+	// request that carries no session at all before the protector's own
+	// check would ever run for it; in practice this route's "no session"
+	// case never reaches the protector any more.
 	protector, err := csrf.New(func(r *http.Request) (string, bool) {
 		s, ok, err := a.sessions.Read(r.Context(), r)
 		if err != nil || !ok {
@@ -185,19 +194,18 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP, metricsHandler http.Handle
 	a.health.Handle(mux)
 	mux.Handle("GET /metrics", metricsHandler)
 
-	// route is the plain per-handler chain: the general rate limit, then
-	// the CSRF protector's origin check (the token half only ever refuses
-	// an unsafe method, and nothing here answers one). It is for a bare
-	// resource that needs no session of its own: a static asset,
-	// robots.txt and sitemap.xml.
+	// route is the per-handler chain every page and bare resource gets: the
+	// general rate limit, then the CSRF protector's origin check (the
+	// token half only ever refuses an unsafe method, and nothing a page
+	// GET answers is one). No page route carries a session any more: the
+	// only place a session is minted is GET /api/v1/challenge below, which
+	// already returns the CSRF token the frontend actually reads in the
+	// same response body. A page GET's own cookie would never be read by
+	// anything, so minting one there bought nothing and only grew the
+	// session store unbounded for no reason. See requireSession in
+	// session.go for what "no session" means for POST /api/v1/contact now.
 	route := func(h http.Handler) http.Handler {
 		return middleware.Chain(h, a.rateLimit.Middleware, a.protector.Middleware)
-	}
-	// routeSession adds ensureSession ahead of the protector, so a GET
-	// that may lead to the contact form's POST has already minted a
-	// session and set its cookie by the time it answers.
-	routeSession := func(h http.Handler) http.Handler {
-		return middleware.Chain(h, a.rateLimit.Middleware, a.ensureSession, a.protector.Middleware)
 	}
 
 	mux.Handle("GET /assets/", route(a.pages.assetHandler()))
@@ -205,11 +213,16 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP, metricsHandler http.Handle
 	mux.Handle("GET /sitemap.xml", route(a.sitemapHandler()))
 
 	mux.Handle("GET /api/v1/challenge", middleware.Chain(api.Handle(a.handleChallenge), a.challengeRateLim.Middleware, a.ensureSession, a.protector.Middleware))
-	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.contactRateLim.Middleware, a.protector.Middleware))
+	// The contact rate limit is not wired in here: it runs inside
+	// handleContact itself, right after the honeypot check, so a bot that
+	// fills the honeypot never spends the shared budget other visitors
+	// rely on. requireSession refuses a request with no session before the
+	// CSRF protector's own check would ever apply to this route.
+	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.requireSession, a.protector.Middleware))
 	mux.Handle("/api/", route(api.NotFoundHandler()))
 
-	registerRoutes(mux, a.pages, routeSession)
-	mux.Handle("/", routeSession(a.pages.pageHandler()))
+	registerRoutes(mux, a.pages, route)
+	mux.Handle("/", route(a.pages.pageHandler()))
 
 	return middleware.Chain(mux,
 		middleware.Recover(a.logger),

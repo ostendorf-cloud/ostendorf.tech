@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ostendorf-cloud/govue/api"
 	"github.com/ostendorf-cloud/govue/session"
 )
 
@@ -47,6 +48,26 @@ func (a *App) ensureSession(next http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, sessionContextKey{}, s)
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// requireSession refuses a request that carries no session at all, rather
+// than letting the CSRF protector treat "no session" as nothing to
+// forge. It never mints one — only ensureSession does that, on
+// GET /api/v1/challenge, which every real visit to the contact form
+// runs first. A POST reaching this route with no session therefore
+// never went through that normal flow at all.
+func (a *App) requireSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, ok, err := a.sessions.Read(r.Context(), r)
+		if err != nil {
+			a.logger.ErrorContext(r.Context(), "session: read", "error", err.Error())
+		}
+		if !ok {
+			api.WriteError(w, r, api.PermissionDenied("missing session"))
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 
