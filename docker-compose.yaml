@@ -20,4 +20,4 @@ services:
       CONTACT_TO: "${CONTACT_TO}"
       CONTACT_FROM: "${CONTACT_FROM}"
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"

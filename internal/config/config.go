@@ -70,6 +70,18 @@ const (
 	// 24 hours, and a long lived token expires after 60 days, which is
 	// what bounds this setting at both ends.
 	DefaultInstagramTokenRefreshAge = 7 * 24 * time.Hour
+
+	// DefaultMailRateLimitBurst and DefaultMailRateLimitPer bound every
+	// contact mail this service sends in total, independent of who is
+	// asking; see internal/webapp for why the per-client limit above
+	// cannot stand in for this one. 50 an hour is well above anything a
+	// single event technology sole trader's contact form is ever expected
+	// to receive legitimately (a handful a day, generously multiplied for
+	// a busy week or a marketing push), while still being orders of
+	// magnitude below what an attacker spreading requests across many
+	// client addresses could otherwise drive the mail account to.
+	DefaultMailRateLimitBurst = 50
+	DefaultMailRateLimitPer   = time.Hour
 )
 
 // Instagram refresh bounds, the range INSTAGRAM_TOKEN_REFRESH_AGE and
@@ -136,12 +148,21 @@ type Config struct {
 	// than the service refusing to start.
 	ChallengeKey []byte
 
+	// ChallengeKeyPrevious verifies a challenge issued under a key that
+	// was just rotated out, while ChallengeKey carries the new one. Every
+	// challenge still has to be issued under ChallengeKey; this only
+	// widens what Verify accepts, for the challengeTTL window where a
+	// challenge handed out just before the rotation is still in flight.
+	// Left unset, rotating CHALLENGE_KEY invalidates every challenge
+	// issued under the old key the moment the new one takes effect.
+	ChallengeKeyPrevious []byte
+
 	// ChallengeRateLimitBurst/Per bound GET /api/v1/challenge; see
 	// DefaultChallengeRateLimitBurst.
 	ChallengeRateLimitBurst int
 	ChallengeRateLimitPer   time.Duration
-	// ContactRateLimitBurst/Per bound POST /api/v1/contact; see
-	// DefaultContactRateLimitBurst.
+	// ContactRateLimitBurst/Per bound POST /api/v1/contact per client
+	// address; see DefaultContactRateLimitBurst.
 	ContactRateLimitBurst int
 	ContactRateLimitPer   time.Duration
 
@@ -176,6 +197,12 @@ type Config struct {
 	// internal/analytics is what keeps that true.
 	UmamiURL       string
 	UmamiWebsiteID string
+
+	// MailRateLimitBurst/Per bound every contact mail this service sends
+	// in total, across every client address; see
+	// DefaultMailRateLimitBurst.
+	MailRateLimitBurst int
+	MailRateLimitPer   time.Duration
 }
 
 // Load reads every setting from the environment through getenv and
@@ -203,6 +230,8 @@ func Load(getenv func(string) string) (Config, error) {
 			minInstagramRefreshInterval, maxInstagramRefreshInterval),
 		InstagramTokenRefreshAge: loader.Duration("INSTAGRAM_TOKEN_REFRESH_AGE", DefaultInstagramTokenRefreshAge,
 			minInstagramTokenRefreshAge, maxInstagramTokenRefreshAge),
+		MailRateLimitBurst: loader.Int("MAIL_RATE_LIMIT_BURST", DefaultMailRateLimitBurst, 1, 100_000),
+		MailRateLimitPer:   loader.Duration("MAIL_RATE_LIMIT_PER", DefaultMailRateLimitPer, time.Second, 24*time.Hour),
 	}
 
 	var problems []error
@@ -232,6 +261,19 @@ func Load(getenv func(string) string) (Config, error) {
 	challengeKey, err := decodeKey(loader.SecretOrFile("CHALLENGE_KEY"))
 	fail(wrap("CHALLENGE_KEY", err))
 	cfg.ChallengeKey = challengeKey
+
+	challengeKeyPrevious, err := decodeKey(loader.SecretOrFile("CHALLENGE_KEY_PREVIOUS"))
+	fail(wrap("CHALLENGE_KEY_PREVIOUS", err))
+	cfg.ChallengeKeyPrevious = challengeKeyPrevious
+	if len(cfg.ChallengeKeyPrevious) > 0 && len(cfg.ChallengeKey) == 0 {
+		// handleChallenge always issues a fresh challenge under
+		// challengeKeys[0], the current key; webapp.go's New puts
+		// ChallengeKey there when it is set, and falls back to
+		// ChallengeKeyPrevious otherwise. A deployment that set only the
+		// previous key would then have a retired key issuing challenges
+		// again, exactly the thing rotation is meant to retire.
+		fail(wrap("CHALLENGE_KEY_PREVIOUS", errors.New("must not be set without CHALLENGE_KEY, which would then be the one issuing")))
+	}
 
 	csrfKey, err := decodeKey(loader.RequiredSecretOrFile("CSRF_KEY"))
 	fail(wrap("CSRF_KEY", err))
@@ -316,7 +358,13 @@ func decodeKey(raw string) ([]byte, error) {
 	}
 	key, err := hex.DecodeString(raw)
 	if err != nil {
-		return nil, fmt.Errorf("must be hex encoded: %w", err)
+		// hex.DecodeString's own error text names the offending byte, for
+		// example "encoding/hex: invalid byte: U+0058 'X'", which would put
+		// one character of the key itself on stderr and into the pod log
+		// if it were wrapped into this error with %w. The caller never
+		// needs that detail to fix a misconfigured key, so it is dropped
+		// here.
+		return nil, errors.New("must be hex encoded")
 	}
 	if len(key) < minKeyBytes {
 		return nil, fmt.Errorf("decodes to %d bytes, at least %d are required", len(key), minKeyBytes)

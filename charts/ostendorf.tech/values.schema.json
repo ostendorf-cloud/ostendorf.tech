@@ -68,6 +68,8 @@
         "challengeRateLimitPer": { "type": "string" },
         "contactRateLimitBurst": { "type": "integer", "minimum": 1 },
         "contactRateLimitPer": { "type": "string" },
+        "mailRateLimitBurst": { "type": "integer", "minimum": 1 },
+        "mailRateLimitPer": { "type": "string" },
         "smtpAddr": { "type": "string", "minLength": 1 },
         "contactTo": { "type": "string", "minLength": 1 },
         "contactFrom": { "type": "string", "minLength": 1 },
@@ -86,6 +88,7 @@
         "name": { "type": "string" },
         "csrfKeyKey": { "type": "string", "minLength": 1 },
         "challengeKeyKey": { "type": "string" },
+        "challengeKeyPreviousKey": { "type": "string" },
         "smtpUsernameKey": { "type": "string" },
         "smtpPasswordKey": { "type": "string" },
         "instagramTokenKey": { "type": "string" }

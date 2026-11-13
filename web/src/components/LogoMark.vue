@@ -7,10 +7,16 @@ import { useId } from 'vue'
  * channel faders, four knobs cut out of the tracks they sit between.
  *
  * The gradient stops are bound to this theme's own accent tokens through
- * an inline style on each <stop>, rather than a fixed pair of hex values,
- * so the mark recolours itself with the theme and the light/dark mode
- * exactly like every other role coloured element on the page, instead of
- * carrying a colour of its own that could drift from the token contract.
+ * the stop-color rule in <style> below, rather than a fixed pair of hex
+ * values, so the mark recolours itself with the theme and the light/dark
+ * mode exactly like every other role coloured element on the page,
+ * instead of carrying a colour of its own that could drift from the
+ * token contract. That rule has to live in a stylesheet and not an
+ * inline style attribute on each <stop>: middleware.DefaultSecurity's
+ * Content-Security-Policy sets style-src 'self' with no 'unsafe-inline',
+ * and a nonce only ever covers an inline <style> or <script> tag, never
+ * a style="..." attribute, so a browser enforcing that policy refuses an
+ * inline stop-color outright and the gradient disappears.
  */
 const gradientId = `logo-mark-gradient-${useId()}`
 const maskId = `logo-mark-cut-${useId()}`
@@ -27,8 +33,8 @@ const maskId = `logo-mark-cut-${useId()}`
         y2="80.6"
         gradientUnits="userSpaceOnUse"
       >
-        <stop offset="0" style="stop-color: var(--color-accent)" />
-        <stop offset="1" style="stop-color: var(--color-accent-text)" />
+        <stop offset="0" class="logo-mark-stop-start" />
+        <stop offset="1" class="logo-mark-stop-end" />
       </linearGradient>
       <mask :id="maskId" maskUnits="userSpaceOnUse" x="-10" y="-10" width="100" height="101">
         <rect x="-10" y="-10" width="100" height="101" fill="#fff" />
@@ -53,3 +59,13 @@ const maskId = `logo-mark-cut-${useId()}`
     </g>
   </svg>
 </template>
+
+<style scoped>
+.logo-mark-stop-start {
+  stop-color: var(--color-accent);
+}
+
+.logo-mark-stop-end {
+  stop-color: var(--color-accent-text);
+}
+</style>

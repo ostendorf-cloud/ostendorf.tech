@@ -39,6 +39,11 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "ostendorf-tech.serviceAccountName" . }}
+      # This application makes no Kubernetes API calls of its own; see
+      # templates/serviceaccount.yaml and values.yaml. Set on the pod too,
+      # not only the ServiceAccount, since the pod spec's own value would
+      # otherwise win if it were ever left unset here.
+      automountServiceAccountToken: false
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -76,6 +81,10 @@ spec:
               value: {{ .Values.config.contactRateLimitBurst | quote }}
             - name: CONTACT_RATE_LIMIT_PER
               value: {{ .Values.config.contactRateLimitPer | quote }}
+            - name: MAIL_RATE_LIMIT_BURST
+              value: {{ .Values.config.mailRateLimitBurst | quote }}
+            - name: MAIL_RATE_LIMIT_PER
+              value: {{ .Values.config.mailRateLimitPer | quote }}
             - name: SMTP_ADDR
               value: {{ .Values.config.smtpAddr | quote }}
             - name: CONTACT_TO
@@ -109,6 +118,13 @@ spec:
                 secretKeyRef:
                   name: {{ include "ostendorf-tech.existingSecretName" . }}
                   key: {{ .Values.existingSecret.challengeKeyKey }}
+            {{- end }}
+            {{- if .Values.existingSecret.challengeKeyPreviousKey }}
+            - name: CHALLENGE_KEY_PREVIOUS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ostendorf-tech.existingSecretName" . }}
+                  key: {{ .Values.existingSecret.challengeKeyPreviousKey }}
             {{- end }}
             {{- if .Values.existingSecret.smtpUsernameKey }}
             - name: SMTP_USERNAME

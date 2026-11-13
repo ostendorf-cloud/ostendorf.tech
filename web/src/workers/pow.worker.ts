@@ -1,9 +1,11 @@
 /**
  * Solves the contact form's proof of work challenge off the main thread.
  * Bundled as its own chunk through Vite's `new Worker(new URL(...))`
- * convention (see lib/pow.ts); never imported directly by application
- * code. Cookie-free and third-party-free: this file never touches
- * document, fetch or anything outside the one message it answers.
+ * convention (see lib/contactChallenge.ts, which instantiates it, and
+ * lib/pow-solve.ts, which does the actual solving); never imported
+ * directly by application code. Cookie-free and third-party-free: this
+ * file never touches document, fetch or anything outside the one message
+ * it answers.
  */
 import { solve } from '../lib/pow-solve'
 

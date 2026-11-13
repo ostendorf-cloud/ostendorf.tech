@@ -57,6 +57,16 @@ tests:
           content:
             name: CONTACT_TO
             value: "simon@ostendorf.tech"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MAIL_RATE_LIMIT_BURST
+            value: "50"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MAIL_RATE_LIMIT_PER
+            value: "1h"
 
   - it: omits every optional secret-backed env var when its key is not configured
     template: templates/deployment.yaml
@@ -65,6 +75,10 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: CHALLENGE_KEY
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CHALLENGE_KEY_PREVIOUS
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
@@ -207,6 +221,20 @@ tests:
     asserts:
       - isKind:
           of: ServiceAccount
+
+  - it: never auto-mounts the ServiceAccount token onto the ServiceAccount itself
+    template: templates/serviceaccount.yaml
+    asserts:
+      - equal:
+          path: automountServiceAccountToken
+          value: false
+
+  - it: never auto-mounts the ServiceAccount token onto the pod either
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
 
   - it: renders no Ingress when disabled
     template: templates/ingress.yaml

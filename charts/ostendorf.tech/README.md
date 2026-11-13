@@ -55,16 +55,25 @@ by name.
 | --- | --- | --- | --- |
 | `CSRF_KEY` | `existingSecret.csrfKeyKey` | `CSRF_KEY` | Yes |
 | `CHALLENGE_KEY` | `existingSecret.challengeKeyKey` | unset (omitted) | No |
+| `CHALLENGE_KEY_PREVIOUS` | `existingSecret.challengeKeyPreviousKey` | unset (omitted) | No |
 | `SMTP_USERNAME` | `existingSecret.smtpUsernameKey` | unset (omitted) | No |
 | `SMTP_PASSWORD` | `existingSecret.smtpPasswordKey` | unset (omitted) | No |
 | `INSTAGRAM_TOKEN` | `existingSecret.instagramTokenKey` | unset (omitted) | No |
 
 `CSRF_KEY` has no fallback: a `Secret` missing it fails the pod at the Kubernetes level
 (`CreateContainerConfigError`), and the server would refuse to start without one anyway.
-`CHALLENGE_KEY`, `SMTP_USERNAME` and `SMTP_PASSWORD` left unset omit the corresponding
-environment variable entirely, rather than referencing a key that may not exist in your
-`Secret`; the contact form answers "unavailable" while any of them is missing, and every other
-page keeps working.
+`CHALLENGE_KEY`, `CHALLENGE_KEY_PREVIOUS`, `SMTP_USERNAME` and `SMTP_PASSWORD` left unset omit
+the corresponding environment variable entirely, rather than referencing a key that may not
+exist in your `Secret`; the contact form answers "unavailable" while `CHALLENGE_KEY` or either
+SMTP credential is missing, and every other page keeps working.
+
+## Rotating the challenge key
+
+Set `existingSecret.challengeKeyPreviousKey` to the key `CHALLENGE_KEY` previously pointed at,
+in the same render that moves `existingSecret.challengeKeyKey` to the new one. A proof of work
+challenge issued just before the rotation is still accepted for as long as both keys are
+present; the server only ever issues new challenges under the current key. Remove
+`challengeKeyPreviousKey` again once the challenge TTL (10 minutes) has safely passed.
 
 `INSTAGRAM_TOKEN` left unset omits the variable the same way, and the home page's Impressionen
 section is then not rendered at all; every other section keeps working. A refreshed token lives
@@ -87,8 +96,14 @@ refuses that POST with 403, correctly from that pod's point of view but wrongly 
 visitor's, since their session is real, just on the other pod. This breaks the contact form for
 real visitors; it is an availability problem, not a security hole. `templates/deployment.yaml`
 rejects a higher value at render time and runs the Deployment with `strategy.type: Recreate`, so
-a rollout never lets two pods coexist either. Raising `replicaCount` is possible only once the
-webapp moves to a shared session store instead of the in-memory one.
+a rollout never lets two pods coexist either. Raising `replicaCount` above 1 is possible only
+once the webapp moves to a shared session store instead of the in-memory one.
+
+`replicaCount: 0` is deliberately still allowed. Stopping the site entirely, for a maintenance
+window or to pause the deployment, is a legitimate and intentional use of `replicaCount` that
+the single-pod guard above was never meant to prevent: it guards against more than one pod
+existing, not against zero, and scaling back up from 0 is a normal start, not a rolling update,
+so it raises no second-pod risk either.
 
 ## Values
 
@@ -98,7 +113,7 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | --- | --- | --- |
 | `image.repository` | Container image | `ghcr.io/ostendorf-cloud/ostendorf.tech` |
 | `image.tag` | Image tag | `.Chart.AppVersion` |
-| `replicaCount` | Pod replicas, must stay at 1 (see "Replicas" above) | `1` |
+| `replicaCount` | Pod replicas: 0 (stopped) or 1, never above (see "Replicas" above) | `1` |
 | `service.port` | Service and container port | `8080` |
 | `ingress.enabled` | Create an `Ingress` | `false` |
 | `resources` | Pod resource requests/limits | see `values.yaml` |

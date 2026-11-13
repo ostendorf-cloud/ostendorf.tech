@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sync/atomic"
 	"time"
 
 	"github.com/ostendorf-cloud/govue/api"
@@ -35,6 +36,12 @@ import (
 // limiter tracks at once, the same bound govue's own example applies; see
 // the ratelimit package for why that bound matters.
 const maxRateLimitKeys = 100_000
+
+// mailLimiterKey is the one bucket mailLimiter ever tracks: every contact
+// mail this service sends counts against it, regardless of who asked. See
+// mailLimiter's own comment for why a per-client limiter cannot do this
+// job, and handleContact for where it is checked.
+const mailLimiterKey = "mail"
 
 // maxSessions bounds how many anonymous sessions session.MemoryStore keeps
 // at once, deliberately far below govue's own 10000 default.
@@ -75,8 +82,17 @@ type App struct {
 	rateLimit        *middleware.RateLimit
 	challengeRateLim *middleware.RateLimit
 	contactLimiter   *ratelimit.Limiter
+	mailLimiter      *ratelimit.Limiter
 	clientIPs        *clientip.Resolver
 	protector        *csrf.Protector
+
+	// mailCeilingWarnedAt is the unix nanosecond timestamp warnMailCeiling
+	// last actually logged at, zero meaning "never yet"; mailCeilingWarnEvery
+	// is how long it waits before logging again. Together they keep a
+	// sustained flood of refused submissions from turning into one warning
+	// per request: see warnMailCeiling.
+	mailCeilingWarnedAt  atomic.Int64
+	mailCeilingWarnEvery time.Duration
 
 	sessions *session.Manager
 	csrfKey  []byte
@@ -138,7 +154,14 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	metricsHandler := metrics.Handler(registry)
 
 	a.limiter = ratelimit.New(cfg.RateLimitBurst, cfg.RateLimitPer, maxRateLimitKeys)
-	rateLimit, err := middleware.NewRateLimit(middleware.RateLimitConfig{Limiter: a.limiter, ClientIP: clientIPs})
+	rateLimit, err := middleware.NewRateLimit(middleware.RateLimitConfig{
+		Limiter:  a.limiter,
+		ClientIP: clientIPs,
+		// This limiter guards every page, asset, robots.txt and sitemap.xml
+		// request, so a browser denied here is asking for HTML, not govue's
+		// JSON error envelope; see pageRateLimitRespond.
+		Respond: a.pageRateLimitRespond,
+	})
 	fail(err)
 	a.rateLimit = rateLimit
 
@@ -155,6 +178,22 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.challengeRateLim = challengeRateLim
 
 	a.contactLimiter = ratelimit.New(cfg.ContactRateLimitBurst, cfg.ContactRateLimitPer, maxRateLimitKeys)
+
+	// mailLimiter has exactly one key (mailLimiterKey), so maxKeys is 1,
+	// not maxRateLimitKeys: clientip.Key groups IPv6 clients by /64, which
+	// is the right shape for a per-client bucket but means a single
+	// routed /48 is 65,536 independent buckets through contactLimiter
+	// above. That leaves no ceiling on the mail account itself, only on
+	// each slice an attacker could split their traffic into. mailLimiter
+	// is checked in handleContact, after the honeypot and independent of
+	// contactLimiter, so it bounds every mail this service ever sends in
+	// the same window, no matter how many addresses asked.
+	a.mailLimiter = ratelimit.New(cfg.MailRateLimitBurst, cfg.MailRateLimitPer, 1)
+	// warnMailCeiling logs at most once per window; a window the same
+	// length as the ceiling's own is what keeps one log line per burst of
+	// refusals, however long that burst runs, rather than one per refused
+	// request.
+	a.mailCeilingWarnEvery = cfg.MailRateLimitPer
 
 	a.sessions, err = session.New(session.Config{
 		Store:          session.NewMemoryStore(nil, maxSessions),
@@ -187,9 +226,17 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.protector = protector
 
 	a.challenges = pow.NewService(challengeMaxNumber, challengeTTL, challengeMinAge)
+	// a.challengeKeys[0], the current key, is what Create signs a fresh
+	// challenge with; Verify accepts a solution signed with any key in
+	// the slice, current first. That is what lets a challenge issued just
+	// before CHALLENGE_KEY was rotated still verify, for as long as
+	// CHALLENGE_KEY_PREVIOUS still names the key it was issued under.
 	a.challengeKeys = nil
 	if len(cfg.ChallengeKey) > 0 {
-		a.challengeKeys = [][]byte{cfg.ChallengeKey}
+		a.challengeKeys = append(a.challengeKeys, cfg.ChallengeKey)
+	}
+	if len(cfg.ChallengeKeyPrevious) > 0 {
+		a.challengeKeys = append(a.challengeKeys, cfg.ChallengeKeyPrevious)
 	}
 
 	heloName := cfg.SiteURL.Hostname()
@@ -221,6 +268,21 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	}
 
 	a.security = middleware.DefaultSecurity()
+	// DefaultSecurity's policy sets no worker-src, so a browser falls back
+	// to script-src 'self' for the contact form's proof of work Worker:
+	// web/src/lib/contactChallenge.ts instantiates it from a same-origin
+	// module URL (new Worker(new URL('../workers/pow.worker.ts',
+	// import.meta.url), {type: 'module'})), compiled by Vite into a
+	// same-origin chunk under /assets/, never a blob: URL, and CSP Level 3
+	// (https://www.w3.org/TR/CSP3/#directive-worker-src) specifies exactly
+	// that fallback when worker-src is absent and script-src is present,
+	// supported by every browser this site targets. The fallback alone
+	// would already be enough to let the form submit. worker-src 'self' is
+	// set explicitly anyway: the cost is one directive, and it removes any
+	// future dependence on fallback behaviour if the bundler ever changes
+	// how this Worker is built, on a path where being wrong means the
+	// contact form never submits at all.
+	a.security.Policy.Add("worker-src", "'self'")
 	if cfg.AllowPlainHTTP {
 		// A browser that reached this service over plain HTTP must never
 		// be told to upgrade every future visit to HTTPS.
@@ -273,6 +335,30 @@ func (a *App) trackPageView(r *http.Request, title string) {
 	}
 }
 
+// warnMailCeiling logs that the mail ceiling (mailLimiter) refused a
+// submission, at most once per mailCeilingWarnEvery: a sustained flood of
+// refused requests, each one already answered with its own 429, must not
+// also turn into one WarnContext call per request, which would make the
+// access log itself the amplifier the ceiling exists to guard against. The
+// compare-and-swap loop is what lets several requests race on the same
+// window without more than one of them winning the log line: a losing
+// attempt simply means another goroutine already logged recently enough,
+// never a reason to retry logging itself.
+func (a *App) warnMailCeiling(ctx context.Context, wait time.Duration) {
+	now := time.Now()
+	for {
+		last := a.mailCeilingWarnedAt.Load()
+		if now.Sub(time.Unix(0, last)) < a.mailCeilingWarnEvery {
+			return
+		}
+		if a.mailCeilingWarnedAt.CompareAndSwap(last, now.UnixNano()) {
+			a.logger.WarnContext(ctx, "contact form: mail ceiling reached, refusing submissions",
+				"retry_after", wait.String())
+			return
+		}
+	}
+}
+
 // Handler is the website's whole HTTP handler.
 func (a *App) Handler() http.Handler {
 	return a.handler
@@ -310,12 +396,23 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP, metricsHandler http.Handle
 	mux.Handle("GET /sitemap.xml", route(a.sitemapHandler()))
 
 	mux.Handle("GET /api/v1/challenge", middleware.Chain(api.Handle(a.handleChallenge), a.challengeRateLim.Middleware, a.ensureSession, a.protector.Middleware))
-	// The contact rate limit is not wired in here: it runs inside
-	// handleContact itself, right after the honeypot check, so a bot that
-	// fills the honeypot never spends the shared budget other visitors
-	// rely on. requireSession refuses a request with no session before the
-	// CSRF protector's own check would ever apply to this route.
-	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.requireSession, a.protector.Middleware))
+	// a.rateLimit.Middleware sits outermost here, the same position route()
+	// gives it on every other route: it bounds raw request volume per
+	// client, the general 120-per-minute-per-client budget every page,
+	// asset and other API route already spends from. That is a different
+	// limiter, with a different bucket, from contactLimiter: the per-client
+	// contact submission budget (5 per 10 minutes by default), which
+	// handleContact still checks on its own, right after the honeypot, so a
+	// bot that fills the honeypot never spends the budget real visitors
+	// behind the same address rely on. mailLimiter is a third, separate
+	// limiter again, one bucket shared by every client: it bounds mail this
+	// service actually attempts to send, checked only once a submission has
+	// cleared validation and proof of work. All three now apply to this
+	// route, each closing a gap the other two leave open; none substitutes
+	// for either of the others. requireSession refuses a request with no
+	// session before the CSRF protector's own check would ever apply to
+	// this route.
+	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.rateLimit.Middleware, a.requireSession, a.protector.Middleware))
 
 	// The Impressionen section's two reads. Both are plain public GETs:
 	// no session, no CSRF token, nothing written. They answer from the

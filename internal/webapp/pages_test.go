@@ -170,6 +170,20 @@ func TestPageHandlerCanonicalizesTrailingSlash(t *testing.T) {
 	}
 }
 
+func TestPageHandlerCanonicalizesTrailingSlashPreservesQuery(t *testing.T) {
+	p := testPageServer(t)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/imprint?utm_source=x", nil)
+	rec := httptest.NewRecorder()
+	p.pageHandler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMovedPermanently {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMovedPermanently)
+	}
+	if got := rec.Header().Get("Location"); got != "/de/imprint/?utm_source=x" {
+		t.Errorf("Location = %q, want /de/imprint/?utm_source=x", got)
+	}
+}
+
 func TestPageHandlerUnknownRouteServesLocalNotFound(t *testing.T) {
 	p := testPageServer(t)
 
