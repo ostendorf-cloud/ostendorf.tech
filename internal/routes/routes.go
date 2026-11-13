@@ -1,11 +1,13 @@
 // Package routes is the website's one route table. internal/webapp's page
-// handler, sitemap and per-page mux registration, and
-// web/scripts/prerender.ts's static renderer, each build their own list
-// from routes.json, embedded here, instead of restating it: a page added
-// to one side and not the other is no longer possible, because there is
-// only one list left to edit. See AGENTS.md for how each side reads it,
-// and cmd/website's own test for the check that the prerendered output
-// this table describes actually exists.
+// handler, sitemap and per-page mux registration, web/scripts/prerender.ts's
+// static renderer, and the frontend's own router (web/src/router/index.ts)
+// and SEO metadata (web/src/lib/seo.ts), through the shared
+// web/src/lib/routeTable.ts, each build their own list from routes.json,
+// embedded here, instead of restating it: a page added to one side and not
+// the other is no longer possible, because there is only one list left to
+// edit. See AGENTS.md for how each side reads it, and cmd/website's own test
+// for the check that the prerendered output this table describes actually
+// exists.
 package routes
 
 import (

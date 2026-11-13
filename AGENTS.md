@@ -18,10 +18,11 @@ The global baseline already applies here and is not repeated below.
   repository: `internal/openbao` from old_simon-ostendorf.de is deliberately not ported.
 - `internal/routes` is the website's one route table: `routes.json`, checked in and
   embedded through `//go:embed`, lists every page as a name, a slug and the prerendered
-  file that answers it. `internal/webapp` and `web/scripts/prerender.ts` each read this
-  one file to build their own list instead of restating it, so a page added to one side
-  and not the other can no longer happen; see `internal/webapp`'s own bullet below for
-  what proves that in practice.
+  file that answers it. `internal/webapp`, `web/scripts/prerender.ts`, and the frontend's
+  own `web/src/router/index.ts` and `web/src/lib/seo.ts`, through the shared
+  `web/src/lib/routeTable.ts`, each read this one file to build their own list instead
+  of restating it, so a page added to one side and not the other can no longer happen;
+  see `internal/webapp`'s own bullet below for what proves that in practice.
 - `internal/pow` issues and verifies the contact form's proof of work challenge, ported
   from old_simon-ostendorf.de's `internal/pow` unchanged: the algorithm is a contract
   with the browser worker that solves it.
@@ -62,8 +63,10 @@ The global baseline already applies here and is not repeated below.
   holds the app; `web/src/lib/contactChallenge.ts` and `web/src/workers/pow.worker.ts`
   are the contact form's proof of work client, a Web Worker kept cookie-free and
   third-party-free; `web/scripts/prerender.ts` is the static site generation step `task
-  prerender` runs, reading its own page list from `internal/routes/routes.json` rather
-  than restating it.
+  prerender` runs. `web/src/lib/routeTable.ts` is the one place the frontend reads
+  `internal/routes/routes.json` from; `web/scripts/prerender.ts`, `web/src/router/index.ts`
+  (the Vue Router table) and `web/src/lib/seo.ts` (the `PageRoute` list and its slugs) all
+  import it instead of restating the page list themselves.
 - `charts/ostendorf.tech/` is the Helm chart, `Dockerfile` the multi-stage container
   build, `docker-compose.yaml` a local development stack for the one.
 
