@@ -141,7 +141,7 @@ func readTitles(prerendered fs.FS) map[string]string {
 			if err != nil {
 				continue
 			}
-			if title := titleOf(data); title != "" {
+			if title := TitleOf(data); title != "" {
 				titles[file] = title
 			}
 		}
@@ -149,12 +149,12 @@ func readTitles(prerendered fs.FS) map[string]string {
 	return titles
 }
 
-// titleOf is the text of the one <title> element web/scripts/prerender.ts
+// TitleOf is the text of the one <title> element web/scripts/prerender.ts
 // writes into every page it generates. It is a plain cut rather than an
 // HTML parse because the input is this repository's own build output, not
 // anything a visitor sends, and prerender.ts escapes the title before
 // writing it, which html.UnescapeString here reverses.
-func titleOf(data []byte) string {
+func TitleOf(data []byte) string {
 	_, rest, ok := strings.Cut(string(data), "<title>")
 	if !ok {
 		return ""

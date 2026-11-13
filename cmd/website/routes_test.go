@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/routes"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/webapp"
 )
 
 // TestPrerenderedOutputMatchesRouteTable is the check that proves
@@ -85,7 +86,12 @@ func TestPrerenderedOutputMatchesRouteTable(t *testing.T) {
 // Titel"). A missing title degrades to an empty one rather than failing a
 // request, which is deliberate but would be invisible: this test is what
 // makes web/scripts/prerender.ts dropping or reshaping the element a
-// failing check instead of a quietly emptier statistic.
+// failing check instead of a quietly emptier statistic. It calls
+// webapp.TitleOf itself, the exact function internal/webapp reads a page's
+// title from, so the two can never drift apart; TitleOf returns an empty
+// string for a missing title, an unclosed tag and an empty title alike, so
+// this test reports one combined failure rather than reimplementing the
+// cut to tell those cases apart.
 func TestPrerenderedPagesCarryATitle(t *testing.T) {
 	table, err := routes.Load()
 	if err != nil {
@@ -113,18 +119,8 @@ func TestPrerenderedPagesCarryATitle(t *testing.T) {
 				// TestPrerenderedOutputMatchesRouteTable.
 				continue
 			}
-			_, rest, ok := strings.Cut(string(data), "<title>")
-			if !ok {
-				t.Errorf("%s has no <title> element for the page view to report", name)
-				continue
-			}
-			title, _, ok := strings.Cut(rest, "</title>")
-			if !ok {
-				t.Errorf("%s has an unclosed <title> element", name)
-				continue
-			}
-			if strings.TrimSpace(title) == "" {
-				t.Errorf("%s has an empty <title>", name)
+			if webapp.TitleOf(data) == "" {
+				t.Errorf("%s has no usable <title> element for the page view to report", name)
 			}
 		}
 	}
