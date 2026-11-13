@@ -85,7 +85,6 @@ func newTestAppWithSyncer(meta *fakeMeta, tokens *fakeTokenSource, interval time
 		Count:  20,
 		Feed:   f,
 		Logger: discardLogger(),
-		Now:    time.Now,
 	}
 
 	a := &App{logger: discardLogger(), feed: f, syncer: syncer, interval: interval, health: health.New()}

@@ -6,11 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ostendorf-cloud/ostendorf.tech/internal/instagram"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/feedclient"
 )
 
 // jpeg is a picture only in the sense that matters here: the bytes the
-// feed holds and the handler hands back unchanged.
+// cache holds and the handler hands back unchanged.
 var jpeg = []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x01, 0x02, 0x03}
 
 func decodeFeed(t *testing.T, body []byte) instagramFeedResponse {
@@ -22,13 +22,13 @@ func decodeFeed(t *testing.T, body []byte) instagramFeedResponse {
 	return feed
 }
 
-func TestInstagramFeedIsEmptyWithoutAToken(t *testing.T) {
-	// No INSTAGRAM_TOKEN: no syncer runs, so the feed never fills and the
-	// endpoint answers an empty list rather than an error. The frontend
-	// renders no Impressionen section at all for this answer.
+func TestInstagramFeedIsEmptyWithoutAFeedServiceConfigured(t *testing.T) {
+	// No FEED_SERVICE_URL: no syncer runs, so the cache never fills and
+	// the endpoint answers an empty list rather than an error. The
+	// frontend renders no Impressionen section at all for this answer.
 	app := testApp(t)
-	if app.instagramSyncer != nil {
-		t.Error("a syncer was built without a configured token")
+	if app.feedSyncer != nil {
+		t.Error("a syncer was built without a configured feed service")
 	}
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/instagram", nil)
@@ -52,7 +52,7 @@ func TestInstagramFeedIsEmptyWithoutAToken(t *testing.T) {
 
 func TestInstagramFeedListsPosts(t *testing.T) {
 	app := testApp(t)
-	app.instagramFeed.Set([]*instagram.Post{
+	app.feedCache.Set([]*feedclient.CachedPost{
 		{ID: "1", Permalink: "https://www.instagram.com/p/A/", Alt: "Lichtpult im Saal", Image: jpeg, ContentType: "image/jpeg", ETag: `"abc"`},
 		{ID: "2", Permalink: "https://www.instagram.com/p/B/", Alt: "Bühne von hinten", Image: jpeg, ContentType: "image/jpeg", ETag: `"def"`},
 	})
@@ -75,7 +75,8 @@ func TestInstagramFeedListsPosts(t *testing.T) {
 
 	// One post carries exactly id, alt and permalink. The picture itself
 	// is fetched per post from this service's own image endpoint, so the
-	// bytes never travel in this response, and nothing links to Meta.
+	// bytes never travel in this response, and nothing links to the feed
+	// service or Meta.
 	var raw struct {
 		Posts []map[string]any `json:"posts"`
 	}
@@ -91,7 +92,7 @@ func TestInstagramFeedListsPosts(t *testing.T) {
 
 func TestInstagramImageServesTheCachedPicture(t *testing.T) {
 	app := testApp(t)
-	app.instagramFeed.Set([]*instagram.Post{
+	app.feedCache.Set([]*feedclient.CachedPost{
 		{ID: "1", Permalink: "https://www.instagram.com/p/A/", Alt: "Lichtpult im Saal", Image: jpeg, ContentType: "image/jpeg", ETag: `"abc"`},
 	})
 
@@ -118,7 +119,7 @@ func TestInstagramImageServesTheCachedPicture(t *testing.T) {
 
 func TestInstagramImageNotFound(t *testing.T) {
 	app := testApp(t)
-	app.instagramFeed.Set([]*instagram.Post{
+	app.feedCache.Set([]*feedclient.CachedPost{
 		{ID: "1", Permalink: "https://www.instagram.com/p/A/", Image: jpeg, ContentType: "image/jpeg", ETag: `"abc"`},
 	})
 
@@ -143,36 +144,32 @@ func TestInstagramImageNotFound(t *testing.T) {
 	}
 }
 
-func TestInstagramSyncerBuiltWhenTokenConfigured(t *testing.T) {
+func TestFeedSyncerBuiltWhenFeedServiceConfigured(t *testing.T) {
 	cfg := testConfig(t, map[string]string{
-		"INSTAGRAM_TOKEN":      "IGAA-token",
-		"INSTAGRAM_POST_COUNT": "9",
+		"FEED_SERVICE_URL": "http://feed.ostendorf-tech.svc.cluster.local",
 	})
 	dist, prerendered := testFS()
 	app, err := New(cfg, discardLogger(), dist, prerendered)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	if app.instagramSyncer == nil {
-		t.Fatal("no syncer built for a configured token")
+	if app.feedSyncer == nil {
+		t.Fatal("no syncer built for a configured feed service")
 	}
-	if app.instagramSyncer.Count != 9 {
-		t.Errorf("Count = %d, want the configured 9", app.instagramSyncer.Count)
-	}
-	if app.instagramSyncer.Feed != app.instagramFeed {
-		t.Error("the syncer fills a different feed than the handlers read")
+	if app.feedSyncer.Cache != app.feedCache {
+		t.Error("the syncer fills a different cache than the handlers read")
 	}
 	// Start is deliberately not called here: this syncer points at the
-	// real Graph API, and no test in this repository talks to the
-	// network. What Start does with a syncer is covered by
-	// internal/instagram's own Run test.
+	// configured feed service, and no test in this repository talks to
+	// the network. What Start does with a syncer is covered by
+	// internal/feedclient's own Run test.
 }
 
 func TestStartWithoutFeedOrAnalyticsRunsNothing(t *testing.T) {
 	// The default deployment configures neither, and Start has to be
 	// callable anyway: main calls it unconditionally.
 	app := testApp(t)
-	if app.instagramSyncer != nil || app.analyticsClient != nil {
+	if app.feedSyncer != nil || app.analyticsClient != nil {
 		t.Fatal("a background worker was built without configuration for it")
 	}
 	app.Start(t.Context())

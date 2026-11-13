@@ -32,7 +32,7 @@ import (
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/analytics"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/contact"
-	"github.com/ostendorf-cloud/ostendorf.tech/internal/instagram"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/feedclient"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/pow"
 )
 
@@ -118,13 +118,17 @@ type App struct {
 
 	pages *pageServer
 
-	// instagramFeed is always present, even when no token is configured:
-	// an empty feed is a valid answer, so no handler has to nil check it.
-	// instagramSyncer is what fills it, and exists only when a token is
-	// configured; Start is what sets it running.
-	instagramFeed     *instagram.Feed
-	instagramSyncer   *instagram.Syncer
-	instagramInterval time.Duration
+	// feedCache is always present, even when no feed service is
+	// configured: an empty cache is a valid answer, so no handler has to
+	// nil check it. feedSyncer is what fills it from the feed service
+	// (internal/feedclient), and exists only when FEED_SERVICE_URL is
+	// set; Start is what sets it running. There is no Meta client, no
+	// Instagram credential and no OpenBao client anywhere in this
+	// package or its callers: internal/feed, a separate binary, owns
+	// all of that instead.
+	feedCache           *feedclient.Cache
+	feedSyncer          *feedclient.Syncer
+	feedRefreshInterval time.Duration
 
 	// analyticsClient reports page views to Umami server to server. Nil
 	// counts nothing, which is what a deployment with no UMAMI_URL gets.
@@ -253,19 +257,15 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.smtpConfigured = cfg.SMTPUsername != "" && cfg.SMTPPassword != ""
 	a.envelope = contact.Envelope{From: cfg.ContactFrom, To: cfg.ContactTo}
 
-	// The feed exists either way; only the syncer that fills it depends on
-	// a token being configured.
-	a.instagramFeed = &instagram.Feed{}
-	a.instagramInterval = cfg.InstagramRefreshInterval
-	if cfg.InstagramToken != "" {
-		a.instagramSyncer = &instagram.Syncer{
-			Client:     instagram.NewClient(cfg.InstagramAPIVersion),
-			Token:      cfg.InstagramToken,
-			RefreshAge: cfg.InstagramTokenRefreshAge,
-			Count:      cfg.InstagramPostCount,
-			Feed:       a.instagramFeed,
-			Logger:     logger,
-			Now:        time.Now,
+	// The cache exists either way; only the syncer that fills it depends
+	// on a feed service being configured.
+	a.feedCache = &feedclient.Cache{}
+	a.feedRefreshInterval = cfg.FeedRefreshInterval
+	if cfg.FeedServiceURL != "" {
+		a.feedSyncer = &feedclient.Syncer{
+			Client: feedclient.New(cfg.FeedServiceURL),
+			Cache:  a.feedCache,
+			Logger: logger,
 		}
 	}
 
@@ -312,17 +312,17 @@ func (a *App) Health() *health.Registry {
 }
 
 // Start launches the background work the handler itself never does: the
-// Instagram feed's sync loop and the Umami reporter's send loop. Both stop
+// feed service sync loop and the Umami reporter's send loop. Both stop
 // with ctx. It returns at once, and does nothing at all for a deployment
 // that configured neither, so main always calls it unconditionally.
 //
-// Neither loop is part of readiness. A feed that has not loaded yet, or an
-// Umami that cannot be reached, must never keep this service from serving
-// pages, which is the whole reason they live out here rather than inside a
-// request.
+// Neither loop is part of readiness. A cache that has not loaded yet, or
+// an Umami that cannot be reached, must never keep this service from
+// serving pages, which is the whole reason they live out here rather than
+// inside a request.
 func (a *App) Start(ctx context.Context) {
-	if a.instagramSyncer != nil {
-		go a.instagramSyncer.Run(ctx, a.instagramInterval)
+	if a.feedSyncer != nil {
+		go a.feedSyncer.Run(ctx, a.feedRefreshInterval)
 	}
 	if a.analyticsClient != nil {
 		go a.analyticsClient.Run(ctx)
@@ -442,8 +442,13 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP) http.Handler {
 
 	// The Impressionen section's two reads. Both are plain public GETs:
 	// no session, no CSRF token, nothing written. They answer from the
-	// copy of the feed this server already fetched from Meta, which is
-	// what keeps a visitor's browser away from Meta entirely.
+	// copy feedCache already fetched from the feed service, which is what
+	// keeps a visitor's browser away from the feed service, Instagram and
+	// Meta entirely. The route paths keep their original, content-shaped
+	// names rather than taking the feed service's own "feed" naming: it
+	// is this website's public contract with the browser, documented by
+	// web/src, and changing it is not a consequence of swapping what
+	// serves it.
 	mux.Handle("GET /api/v1/instagram", route(api.Handle(a.handleInstagramFeed)))
 	mux.Handle("GET /api/v1/instagram/{id}", route(http.HandlerFunc(a.handleInstagramImage)))
 

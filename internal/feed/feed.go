@@ -74,7 +74,6 @@ func New(cfg feedconfig.Config, logger *slog.Logger) *App {
 		Count:  cfg.PostCount,
 		Feed:   f,
 		Logger: logger,
-		Now:    time.Now,
 	}
 
 	a := &App{logger: logger, feed: f, syncer: syncer, interval: cfg.SyncInterval, health: health.New()}
