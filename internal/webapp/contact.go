@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ostendorf-cloud/govue/api"
+	"github.com/ostendorf-cloud/govue/clientip"
 	"github.com/ostendorf-cloud/govue/csrf"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/contact"
@@ -71,6 +72,19 @@ func requestLocale(raw string) string {
 	return defaultLocale
 }
 
+// challengeRateLimitRespond answers a denied GET /api/v1/challenge request
+// in the visitor's own locale, read the same way handleChallenge reads it,
+// instead of govue's fixed English default: this route is fetched by the
+// page itself, so its 429 is as much a user facing message as any other
+// answer it gives.
+func (a *App) challengeRateLimitRespond(w http.ResponseWriter, r *http.Request, wait time.Duration) {
+	locale := requestLocale(r.URL.Query().Get("locale"))
+	messages := messagesFor(locale)
+	err := api.New(http.StatusTooManyRequests, api.CodeTooManyRequests, messages.tooMany)
+	err.RetryAfter = wait
+	api.WriteError(w, r, err)
+}
+
 // handleChallenge issues a proof of work challenge for the session
 // ensureSession resolved. The rate limit and the session both come from
 // the route chain; this handler only has to mind the challenge key.
@@ -79,7 +93,11 @@ func (a *App) handleChallenge(w http.ResponseWriter, r *http.Request) error {
 	messages := messagesFor(locale)
 
 	if len(a.challengeKeys) == 0 {
-		return api.Unavailable(messages.unavailable)
+		// Below 500 on purpose: api.WriteError collapses any 5xx to a fixed
+		// "internal error", which would swallow this localized message
+		// before it ever reached the visitor. The Code stays unavailable;
+		// only the status moves.
+		return api.New(http.StatusConflict, api.CodeUnavailable, messages.unavailable)
 	}
 	challenge, err := a.challenges.Create(a.challengeKeys[0])
 	if err != nil {
@@ -106,7 +124,11 @@ func (a *App) handleContact(w http.ResponseWriter, r *http.Request) error {
 	messages := messagesFor(locale)
 
 	if !a.smtpConfigured || len(a.challengeKeys) == 0 {
-		return api.Unavailable(messages.unavailable)
+		// Below 500 on purpose: api.WriteError collapses any 5xx to a fixed
+		// "internal error", which would swallow this localized message
+		// before it ever reached the visitor. The Code stays unavailable;
+		// only the status moves.
+		return api.New(http.StatusConflict, api.CodeUnavailable, messages.unavailable)
 	}
 
 	req := contact.Request{Name: body.Name, Email: body.Email, Message: body.Message, Consent: body.Consent, Honeypot: body.Website}
@@ -115,6 +137,14 @@ func (a *App) handleContact(w http.ResponseWriter, r *http.Request) error {
 		// Bots get the same answer as people, so they learn nothing.
 		a.logger.InfoContext(r.Context(), "contact form: honeypot filled, dropped")
 		return api.Write(w, http.StatusOK, contactResponse{Message: messages.sent})
+	}
+
+	// Only after the honeypot: bots filling it must not use up the budget of
+	// people behind the same address.
+	if allowed, wait := a.contactLimiter.Take(clientip.Key(a.clientIPs.Resolve(r))); !allowed {
+		err := api.New(http.StatusTooManyRequests, api.CodeTooManyRequests, messages.tooMany)
+		err.RetryAfter = wait
+		return err
 	}
 
 	if fe := req.Validate(); fe != nil {
@@ -133,7 +163,7 @@ func (a *App) handleContact(w http.ResponseWriter, r *http.Request) error {
 		case errors.Is(err, pow.ErrTooFast):
 			return api.Invalid(messages.poWTooFast)
 		case errors.Is(err, pow.ErrBusy):
-			return api.Unavailable(messages.tooMany)
+			return api.New(http.StatusTooManyRequests, api.CodeTooManyRequests, messages.tooMany)
 		default:
 			return api.Invalid(messages.poWFailed)
 		}
@@ -148,7 +178,11 @@ func (a *App) handleContact(w http.ResponseWriter, r *http.Request) error {
 	defer cancel()
 	if err := a.mailer.Send(ctx, a.smtpCreds, a.envelope.From.Address, a.envelope.To.Address, msg); err != nil {
 		a.logger.ErrorContext(r.Context(), "contact form: send mail", "error", err.Error())
-		return api.New(http.StatusBadGateway, api.CodeUnavailable, messages.sendFailed).WithCause(err)
+		// Below 500 on purpose: api.WriteError collapses any 5xx to a fixed
+		// "internal error", which would swallow this localized message
+		// before it ever reached the visitor. The Code stays unavailable;
+		// only the status moves.
+		return api.New(http.StatusUnprocessableEntity, api.CodeUnavailable, messages.sendFailed).WithCause(err)
 	}
 	a.logger.InfoContext(r.Context(), "contact form: mail sent")
 	return api.Write(w, http.StatusOK, contactResponse{Message: messages.sent})

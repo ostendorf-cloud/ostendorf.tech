@@ -46,6 +46,24 @@ func testConfig(t *testing.T, env map[string]string) config.Config {
 	return cfg
 }
 
+// decodeErrorMessage decodes the api package's one error envelope,
+// {"error":{"code":...,"message":...}}, and returns the message, so a test
+// can tell a localized message from the fixed "internal error" placeholder
+// a 5xx would otherwise collapse to.
+func decodeErrorMessage(t *testing.T, body []byte) string {
+	t.Helper()
+	var envelope struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		t.Fatalf("decode error envelope: %v", err)
+	}
+	return envelope.Error.Message
+}
+
 func testFS() (dist, prerendered fstest.MapFS) {
 	dist = fstest.MapFS{
 		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('app')")},
@@ -198,8 +216,14 @@ func TestAppChallengeUnavailableWithoutKey(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge", nil)
 	rec := httptest.NewRecorder()
 	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusConflict, rec.Body)
+	}
+	// The status has to stay below 500, or api.WriteError would collapse
+	// this localized message to the fixed "internal error" placeholder.
+	message := decodeErrorMessage(t, rec.Body.Bytes())
+	if message != contactMessagesDE.unavailable {
+		t.Errorf("message = %q, want the localized unavailable message %q", message, contactMessagesDE.unavailable)
 	}
 }
 
@@ -239,15 +263,94 @@ func TestAppChallengeIssuesTokenAndSessionCookie(t *testing.T) {
 	}
 }
 
+// TestAppChallengeRateLimitAnswersInTheVisitorsLocale proves
+// challengeRateLimitRespond is actually wired in: a 429 from GET
+// /api/v1/challenge's own rate limiter must read in the locale the request
+// asked for, not govue's fixed English default.
+func TestAppChallengeRateLimitAnswersInTheVisitorsLocale(t *testing.T) {
+	cfg := testConfig(t, map[string]string{
+		"CHALLENGE_KEY":              validHexKey,
+		"CHALLENGE_RATE_LIMIT_BURST": "1",
+		"CHALLENGE_RATE_LIMIT_PER":   "1m",
+	})
+	dist, prerendered := testFS()
+	app, err := New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	get := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge?locale=de", nil)
+		rec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	first := get()
+	if first.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want %d, body = %s", first.Code, http.StatusOK, first.Body)
+	}
+
+	second := get()
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request status = %d, want %d, body = %s", second.Code, http.StatusTooManyRequests, second.Body)
+	}
+	message := decodeErrorMessage(t, second.Body.Bytes())
+	if message != contactMessagesDE.tooMany {
+		t.Errorf("message = %q, want the localized tooMany message %q, not govue's English default", message, contactMessagesDE.tooMany)
+	}
+}
+
 func TestAppContactUnavailableWithoutCredentials(t *testing.T) {
-	app := testApp(t)
+	// CHALLENGE_KEY is set so GET /api/v1/challenge itself succeeds and
+	// returns a usable CSRF token below; SMTP credentials stay unset, which
+	// is what still makes handleContact's own "not configured" check fire.
+	cfg := testConfig(t, map[string]string{"CHALLENGE_KEY": validHexKey})
+	dist, prerendered := testFS()
+	app, err := New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// requireSession now refuses a contact POST with no session outright,
+	// and the CSRF protector requires a matching token for one that does;
+	// neither of those is what this test means to exercise. A GET first,
+	// carrying its cookie and CSRF token on the POST, gets past both so
+	// the request actually reaches handleContact's own "not configured"
+	// check, same as before requireSession existed.
+	getReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge", nil)
+	getRec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(getRec, getReq)
+	cookies := getRec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("no session cookie set by the challenge request")
+	}
+	var challenge struct {
+		CSRFToken string `json:"csrfToken"`
+	}
+	if err := json.Unmarshal(getRec.Body.Bytes(), &challenge); err != nil {
+		t.Fatalf("decode challenge: %v", err)
+	}
+
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact",
 		strings.NewReader(`{"name":"Erika","email":"erika@example.test","message":"hi","consent":true}`))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(csrf.HeaderName, challenge.CSRFToken)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
 	rec := httptest.NewRecorder()
 	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusServiceUnavailable, rec.Body)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusConflict, rec.Body)
+	}
+	// A status-only assertion here is exactly why this bug shipped: the
+	// handler answered the right status with the wrong, English-collapsed
+	// body. The message has to be the localized German text, not the fixed
+	// "internal error" placeholder a 5xx would have produced.
+	message := decodeErrorMessage(t, rec.Body.Bytes())
+	if message != contactMessagesDE.unavailable {
+		t.Errorf("message = %q, want the localized unavailable message %q", message, contactMessagesDE.unavailable)
 	}
 }
 
@@ -270,14 +373,95 @@ func contactTestApp(t *testing.T) *App {
 }
 
 func TestAppContactHoneypotSilentlyAccepted(t *testing.T) {
+	cfg := testConfig(t, map[string]string{
+		"CHALLENGE_KEY":            validHexKey,
+		"SMTP_USERNAME":            "no-reply@example.test",
+		"SMTP_PASSWORD":            "s3cret",
+		"CONTACT_RATE_LIMIT_BURST": "1",
+		"CONTACT_RATE_LIMIT_PER":   "1m",
+	})
+	dist, prerendered := testFS()
+	app, err := New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// requireSession now refuses a contact POST with no session, and the
+	// CSRF protector requires a matching token for one that does. A GET
+	// first, carrying its cookie and CSRF token on every POST below, is
+	// what the honeypot path still needs to reach handleContact at all;
+	// without it, this test would only be proving requireSession works,
+	// not the honeypot.
+	getReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge", nil)
+	getRec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(getRec, getReq)
+	cookies := getRec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("no session cookie set by the challenge request")
+	}
+	var challenge struct {
+		CSRFToken string `json:"csrfToken"`
+	}
+	if err := json.Unmarshal(getRec.Body.Bytes(), &challenge); err != nil {
+		t.Fatalf("decode challenge: %v", err)
+	}
+
+	post := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(csrf.HeaderName, challenge.CSRFToken)
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+		rec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	honeypotBody := `{"name":"Eve","email":"eve@example.test","message":"buy now","consent":true,"website":"https://spam.example"}`
+
+	// The burst is 1: a honeypot-filled submission must never consume it,
+	// however many times a bot sends one, since the honeypot check runs
+	// before the rate limit check in handleContact.
+	for i := range 3 {
+		rec := post(honeypotBody)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("honeypot request %d status = %d, want %d, body = %s", i, rec.Code, http.StatusOK, rec.Body)
+		}
+	}
+
+	// A genuine-looking submission (lacking the proof of work, so it fails
+	// validation further down, but only after the budget check runs) proves
+	// the limiter itself still works and was never touched by the honeypot
+	// requests above: the first one still has the whole burst available.
+	genuineBody := `{"name":"Erika","email":"erika@example.test","message":"hi","consent":true}`
+	first := post(genuineBody)
+	if first.Code == http.StatusTooManyRequests {
+		t.Fatalf("first genuine submission already rate limited, body = %s", first.Body)
+	}
+	second := post(genuineBody)
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("second genuine submission status = %d, want %d (rate limited), body = %s",
+			second.Code, http.StatusTooManyRequests, second.Body)
+	}
+}
+
+// TestAppContactRefusedWithNoSessionAtAll proves requireSession, not the
+// CSRF protector's origin/token check, is what refuses a contact POST that
+// never went through GET /api/v1/challenge at all. Both checks answer 403,
+// so this names the missing-session path specifically, distinct from
+// TestAppContactRejectsMissingCSRFTokenOnceASessionExists (session exists,
+// token missing) and TestAppContactUnavailableWithoutCredentials (reaches
+// handleContact's own "not configured" check, after both of those pass).
+func TestAppContactRefusedWithNoSessionAtAll(t *testing.T) {
 	app := contactTestApp(t)
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact",
-		strings.NewReader(`{"name":"Eve","email":"eve@example.test","message":"buy now","consent":true,"website":"https://spam.example"}`))
+		strings.NewReader(`{"name":"Erika","email":"erika@example.test","message":"hi","consent":true}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusForbidden, rec.Body)
 	}
 }
 
@@ -361,8 +545,14 @@ func TestAppContactFullPipelineReachesTheMailer(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadGateway {
-		t.Fatalf("status = %d, want %d (the mailer's dial failure), body = %s", rec.Code, http.StatusBadGateway, rec.Body)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d (the mailer's dial failure), body = %s", rec.Code, http.StatusUnprocessableEntity, rec.Body)
+	}
+	// Below 500, so the localized message must survive, not collapse to
+	// api.WriteError's fixed "internal error" placeholder.
+	message := decodeErrorMessage(t, rec.Body.Bytes())
+	if message != contactMessagesDE.sendFailed {
+		t.Errorf("message = %q, want the localized sendFailed message %q", message, contactMessagesDE.sendFailed)
 	}
 }
 
