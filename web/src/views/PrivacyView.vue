@@ -316,12 +316,13 @@ const germanHref = computed(
 
       <h3 class="text-lg font-semibold">Cookies</h3>
       <p>
-        Diese Website setzt ein einziges Cookie: ein technisches Sitzungs-Cookie, das bei jedem
-        Seitenaufruf gesetzt wird, sofern Ihr Browser noch keines hat. Es enthält ausschließlich
-        eine zufällige, nicht auf Sie persönlich zurückführbare Kennung und dient dazu, unserem
-        Server zu ermöglichen, das Kontaktformular vor Cross-Site-Request-Forgery-Angriffen (CSRF)
-        zu schützen; es wird nicht zu Tracking, Analyse oder Werbung verwendet und nicht an Dritte
-        übermittelt.
+        Diese Website setzt ein einziges Cookie: ein technisches Sitzungs-Cookie, und zwar erst
+        dann, wenn Sie das Kontaktformular benutzen. Es wird gesetzt, sobald Sie das erste Feld des
+        Formulars anklicken. Wenn Sie die Seiten dieser Website nur lesen und das Kontaktformular
+        nicht benutzen, erhalten Sie kein Cookie. Es enthält ausschließlich eine zufällige, nicht
+        auf Sie persönlich zurückführbare Kennung und dient dazu, unserem Server zu ermöglichen, das
+        Kontaktformular vor Cross-Site-Request-Forgery-Angriffen (CSRF) zu schützen; es wird nicht
+        zu Tracking, Analyse oder Werbung verwendet und nicht an Dritte übermittelt.
       </p>
       <p>
         Das Cookie ist ein Sitzungs-Cookie ohne eigenes Speicherdauer-Attribut: Ihr Browser verwirft
@@ -885,11 +886,13 @@ const germanHref = computed(
 
       <h3 class="text-lg font-semibold">Cookies</h3>
       <p>
-        This website sets a single cookie: a technical session cookie, set on every page view where
-        your browser does not already have one. It contains only a random identifier that cannot be
-        traced back to you personally, and exists to let our server protect the contact form against
-        cross-site request forgery (CSRF) attacks; it is not used for tracking, analytics or
-        advertising, and is not transmitted to third parties.
+        This website sets a single cookie: a technical session cookie, and only once you use the
+        contact form. It is set as soon as you click into the form's first field. If you only read
+        the pages of this website and do not use the contact form, you receive no cookie at all. It
+        contains only a random identifier that cannot be traced back to you personally, and exists
+        to let our server protect the contact form against cross-site request forgery (CSRF)
+        attacks; it is not used for tracking, analytics or advertising, and is not transmitted to
+        third parties.
       </p>
       <p>
         The cookie is a session cookie with no storage-duration attribute of its own: your browser
