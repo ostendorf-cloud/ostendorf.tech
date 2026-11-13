@@ -112,10 +112,10 @@ func (f *fakeBao) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// newTestStore builds an *openbao.Client against bao, served from a real
-// loopback httptest.Server, and a TokenStore on top of it with a fake
-// refresher and the fixed test clock.
-func newTestStore(t *testing.T, bao *fakeBao, refresher Refresher, logs io.Writer) *TokenStore {
+// newTestClient builds an *openbao.Client against bao, served from a real
+// loopback httptest.Server, so every test here exercises *openbao.Client
+// through its exported surface only, never its unexported fields.
+func newTestClient(t *testing.T, bao *fakeBao, logs io.Writer) *openbao.Client {
 	t.Helper()
 	server := httptest.NewServer(bao)
 	t.Cleanup(server.Close)
@@ -124,20 +124,31 @@ func newTestStore(t *testing.T, bao *fakeBao, refresher Refresher, logs io.Write
 	if err := os.WriteFile(jwtPath, []byte("test-service-account-jwt\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	return openbao.New(server.URL, testAuthPath, testRole, jwtPath, slog.New(slog.NewTextHandler(logs, nil)))
+}
+
+// newTestStore builds a TokenStore on top of newTestClient, with a fake
+// refresher and the fixed test clock.
+func newTestStore(t *testing.T, bao *fakeBao, refresher Refresher, logs io.Writer) *TokenStore {
+	t.Helper()
+	return newTestStoreWithClock(t, bao, refresher, logs, func() time.Time { return testNow })
+}
+
+// newTestStoreWithClock is newTestStore with an injectable clock, for a
+// test that needs to move time forward between two calls to Token.
+func newTestStoreWithClock(t *testing.T, bao *fakeBao, refresher Refresher, logs io.Writer, now func() time.Time) *TokenStore {
+	t.Helper()
 	if logs == nil {
 		logs = io.Discard
 	}
-	client := openbao.New(server.URL, testAuthPath, testRole, jwtPath, slog.New(slog.NewTextHandler(logs, nil)))
-
-	store := &TokenStore{
-		Store:      client,
+	return &TokenStore{
+		Store:      newTestClient(t, bao, logs),
 		Refresher:  refresher,
 		Path:       testPath,
 		RefreshAge: 24 * time.Hour,
 		Logger:     slog.New(slog.NewTextHandler(logs, nil)),
-		Now:        func() time.Time { return testNow },
+		Now:        now,
 	}
-	return store
 }
 
 // fakeRefresher is a hand written stand in for Meta's refresh endpoint.
@@ -332,6 +343,115 @@ func TestTokenStore_Token_writeFailureAfterRefreshUsesTheFreshTokenThisCycle(t *
 	}
 	if bao.secrets[testPath]["access_token"] != "stale-token" {
 		t.Errorf("stored access_token = %v, want the stale value left untouched by the failed write", bao.secrets[testPath]["access_token"])
+	}
+}
+
+// TestTokenStore_Token_writeFailureEscalatesToErrorOncePersistent drives two
+// write failures separated by writeFailureEscalateAfter and checks the
+// second is reported at Error, not Warn: a write that keeps failing must
+// read differently in the log than a single hiccup, since every restart
+// until it is fixed falls back to the hand-written token, and the operator
+// needs to notice before Meta's 60-day expiry does the noticing instead.
+func TestTokenStore_Token_writeFailureEscalatesToErrorOncePersistent(t *testing.T) {
+	t.Parallel()
+
+	bao := newFakeBao()
+	bao.exists[testPath] = true
+	bao.secrets[testPath] = map[string]any{
+		"access_token": "stale-token",
+		"refreshed_at": testNow.Add(-100 * time.Hour).Format(time.RFC3339),
+	}
+	bao.versions[testPath] = 1
+	bao.failWriteOnce = true
+	refresher := &fakeRefresher{fresh: "fresh-token"}
+
+	now := testNow
+	var logs bytes.Buffer
+	store := newTestStoreWithClock(t, bao, refresher, &logs, func() time.Time { return now })
+
+	if _, err := store.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if strings.Contains(logs.String(), "level=ERROR") {
+		t.Errorf("a single write failure logged at Error, want only Warn:\n%s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "level=WARN") {
+		t.Errorf("a single write failure did not log at Warn:\n%s", logs.String())
+	}
+
+	// The write never succeeded, so refreshed_at in storage is still
+	// stale: the next call attempts another refresh and another write,
+	// writeFailureEscalateAfter later.
+	logs.Reset()
+	now = testNow.Add(writeFailureEscalateAfter)
+	bao.failWriteOnce = true
+	if _, err := store.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if !strings.Contains(logs.String(), "level=ERROR") {
+		t.Errorf("a write failure persisting %s did not escalate to Error:\n%s", writeFailureEscalateAfter, logs.String())
+	}
+}
+
+// TestTokenStore_Token_successfulWriteResetsTheEscalationClock proves a
+// write failure followed by a successful write clears unstoredSince, so a
+// later, unrelated failure starts its own escalation window instead of
+// inheriting the first one's: without the reset, the third call below
+// would wrongly log at Error, more than writeFailureEscalateAfter after
+// the first (unrelated) failure even though its own failure just started.
+func TestTokenStore_Token_successfulWriteResetsTheEscalationClock(t *testing.T) {
+	t.Parallel()
+
+	bao := newFakeBao()
+	bao.exists[testPath] = true
+	bao.secrets[testPath] = map[string]any{
+		"access_token": "stale-token",
+		"refreshed_at": testNow.Add(-100 * time.Hour).Format(time.RFC3339),
+	}
+	bao.versions[testPath] = 1
+	bao.failWriteOnce = true
+	refresher := &fakeRefresher{fresh: "fresh-token"}
+
+	now := testNow
+	var logs bytes.Buffer
+	store := &TokenStore{
+		Store:      newTestClient(t, bao, &logs),
+		Refresher:  refresher,
+		Path:       testPath,
+		RefreshAge: time.Hour,
+		Logger:     slog.New(slog.NewTextHandler(&logs, nil)),
+		Now:        func() time.Time { return now },
+	}
+
+	// First call: write fails, unstoredSince is set to now.
+	if _, err := store.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+
+	// Second call, 30 hours later (comfortably past writeFailureEscalateAfter
+	// if the clock were not reset): the token is still stale (the earlier
+	// write never succeeded), and this write succeeds, which must clear
+	// unstoredSince.
+	now = testNow.Add(30 * time.Hour)
+	if _, err := store.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+
+	// Third call, 2 hours after the second (stale again against the 1 hour
+	// RefreshAge, but nowhere near writeFailureEscalateAfter on its own):
+	// this write fails too. If unstoredSince carried over from the first
+	// failure, 32 hours would already be past writeFailureEscalateAfter.
+	now = now.Add(2 * time.Hour)
+	bao.failWriteOnce = true
+	logs.Reset()
+	if _, err := store.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if strings.Contains(logs.String(), "level=ERROR") {
+		t.Errorf("write failure logged at Error right after the escalation clock was reset, want Warn:\n%s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "level=WARN") {
+		t.Errorf("write failure did not log at Warn:\n%s", logs.String())
 	}
 }
 
