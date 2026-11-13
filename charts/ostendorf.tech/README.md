@@ -117,8 +117,10 @@ chart) can scrape `service.adminPort` directly, in-cluster.
 
 The feed service has a different, deliberate probe contract, served on its one port
 (`feed.service.port`): `/healthz` always passes while the process is up, and `/readyz` fails
-until the feed service has actually obtained a usable OpenBao token and a non-empty feed from
-Meta. A feed pod that cannot reach OpenBao or Meta therefore sits at `0/1` ready, never
+until the feed service has actually obtained a usable OpenBao token and completed one sync
+cycle against Meta. A cycle that reaches Meta and comes back with zero posts still counts: an
+Instagram account with nothing posted is a real, permanently empty feed, not a readiness
+failure. A feed pod that cannot reach OpenBao or Meta therefore sits at `0/1` ready, never
 answering readiness traffic, rather than crash-looping: `templates/deployment-feed.yaml`'s
 `livenessProbe` points at `/healthz` and its `readinessProbe` at `/readyz`, never the reverse.
 This is a deliberate design choice, not a bug: putting the readiness check on the liveness
@@ -185,9 +187,30 @@ the login credential; the website's `ServiceAccount` has no use for that identit
 could ever point at an OpenBao installation, or name a role in it, that actually exists on your
 cluster. Leaving either empty fails `helm install`, `helm upgrade` and `helm template` at render
 time, with a message naming the missing value and why it is needed, the same pattern
-`existingSecret.name` already uses above. The role and its OpenBao policy, granting read access
-to `feed.config.tokenPath`, are created once, by hand, in OpenBao itself; this chart only
-references the role by name.
+`existingSecret.name` already uses above. The role and its OpenBao policy are created once, by
+hand, in OpenBao itself; this chart only references the role by name.
+
+The policy must grant `read`, `create` and `update` on `feed.config.tokenPath` itself, the KV v2
+data path, and nothing else:
+
+```hcl
+path "<feed.config.tokenPath>" {
+  capabilities = ["read", "create", "update"]
+}
+```
+
+`read` is what `internal/openbao.Client.Read` calls at the start of every cycle to get the
+current token and the version `Write` guards its check-and-set on. `create` and `update` are
+what `Client.Write` calls to persist a refreshed token (`internal/instagram/token.go`): KV v2
+draws its own line between the two at whether a version already exists at the path, and this
+chart has no way to know in advance whether the by-hand secret an operator writes in once will
+still be the only version by the time this policy is attached, so both are granted rather than
+guessed at. No `delete`, `list`, `sudo` or `patch`, and nothing granted on the path's own
+`metadata/` sibling: the service never deletes a version, never enumerates the mount, and talks
+to nothing but this one `data/` path's `Read` and `Write`. A read-only policy fails the write
+silently, not loudly: the refreshed token is then never persisted, so every restart falls back
+to the token written in by hand, and the site dies at Meta's 60-day expiry, the exact failure
+this service exists to remove.
 
 The feed service's container image, `feed.image.repository` (default
 `ghcr.io/ostendorf-cloud/ostendorf.tech-feed`), is built from the same root `Dockerfile` as the
@@ -216,10 +239,11 @@ The one ingress rule admits traffic only from the website's own pods (matched by
 `ostendorf-tech.selectorLabels`, in the same namespace), on `feed.service.port`. It admits no
 rule for kubelet probe traffic, and needs none: per the
 [Kubernetes documentation](https://kubernetes.io/docs/concepts/services-networking/network-policies/),
-"traffic to and from the node where a Pod is running is always allowed, regardless of the IP
-address of the Pod or the node". Every `NetworkPolicy`-conformant CNI must honour this, so a
-kubelet liveness or readiness probe, which originates from the node, is never subject to this
-policy at all.
+the exception under `ipBlock` states "traffic to and from the node where a Pod is running is
+always allowed, regardless of the IP address of the Pod or the node". No conformance suite
+enforces this for a `podSelector`-based default-deny policy such as this one, but it holds in
+practice on the common CNIs this organisation runs, so a kubelet liveness or readiness probe,
+which originates from the node, needs no ingress rule of its own here.
 
 Three egress rules allow what the feed service actually needs to reach, none scoped by
 destination:

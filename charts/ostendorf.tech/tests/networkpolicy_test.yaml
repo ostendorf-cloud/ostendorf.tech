@@ -42,6 +42,14 @@ tests:
           path: spec.ingress[0].ports[0].port
           value: 8081
 
+  - it: follows a non-default nameOverride for the ingress rule's website selector, proving it comes from the shared selectorLabels helper rather than a hardcoded label
+    set:
+      nameOverride: custom-site
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
+          value: custom-site
+
   - it: follows a non-default feed.service.port for the ingress rule, proving it is not hardcoded
     set:
       feed:
