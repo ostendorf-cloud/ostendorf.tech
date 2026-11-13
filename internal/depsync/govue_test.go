@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -18,6 +19,13 @@ const (
 	packageJSONName = "@ostendorf-cloud/govue"
 	// packageJSONPath is where that pin lives, relative to this package.
 	packageJSONPath = "../../web/package.json"
+	// pnpmLockPath is where pnpm's own resolution of packageJSONName lives, relative to
+	// this package.
+	pnpmLockPath = "../../web/pnpm-lock.yaml"
+	// wantGovueLockfilePath is the subdirectory govue's Vue package lives in, pinned
+	// through web/package.json's "&path:/web" specifier suffix and expected back out of
+	// web/pnpm-lock.yaml's resolution object; see TestLockfilePinsGovueSubdirectory.
+	wantGovueLockfilePath = "/web"
 )
 
 // pnpmGitSpec matches the pnpm git dependency specifier web/package.json uses to pin
@@ -81,10 +89,11 @@ func TestGovueTag(t *testing.T) {
 // Both sides are read from the files themselves rather than from a third, restated
 // expectation: go.mod's side comes from "go list -m", the same resolution "go build"
 // itself uses, not a re-parse of go.mod's text; web/package.json's side comes from its
-// own dependencies map. web/pnpm-lock.yaml is deliberately not checked here: its
-// specifier field already has to match web/package.json's for "pnpm install
-// --frozen-lockfile" to pass, and its resolved entry pins a commit hash, not a tag, so it
-// cannot be compared to a version directly.
+// own dependencies map. web/pnpm-lock.yaml's own specifier field already has to match
+// web/package.json's for "pnpm install --frozen-lockfile" to pass, and its resolved
+// entry pins a commit hash, not a tag, so it cannot be compared to a version directly
+// here either; TestLockfilePinsGovueSubdirectory checks the one thing about the
+// lockfile that this comparison cannot: that pnpm actually wrote a usable resolution.
 func TestGovueVersionsMatch(t *testing.T) {
 	t.Parallel()
 
@@ -151,4 +160,70 @@ func packageJSONGovueTag(t *testing.T) (string, error) {
 	}
 
 	return govueTag(spec)
+}
+
+// govueLockfileEntryPattern finds packageJSONName's package entry in web/pnpm-lock.yaml
+// and captures its resolution object. The entry's own key still carries the specifier's
+// "#path:/web" suffix regardless of this check's outcome, because pnpm writes that
+// suffix from the specifier text itself; it is resolution itself, a sibling field pnpm
+// computes separately when it downloads the tarball, that this check is really after.
+var govueLockfileEntryPattern = regexp.MustCompile(
+	`(?m)^  '` + regexp.QuoteMeta(packageJSONName) + `@[^'\n]*':\n    resolution: \{([^}]*)\}`,
+)
+
+// govueLockfileResolutionPathPattern pulls the "path" field out of a resolution object
+// matched by govueLockfileEntryPattern, when present.
+var govueLockfileResolutionPathPattern = regexp.MustCompile(`path:\s*([^,}]+)`)
+
+// govueLockfileResolutionPath reads web/pnpm-lock.yaml and returns the "path" field pnpm
+// wrote into packageJSONName's resolution object, or an error when the package has no
+// entry at all or that entry's resolution carries no path field.
+func govueLockfileResolutionPath(t *testing.T) (string, error) {
+	t.Helper()
+
+	raw, err := os.ReadFile(pnpmLockPath)
+	if err != nil {
+		return "", fmt.Errorf("read web/pnpm-lock.yaml: %w", err)
+	}
+
+	entry := govueLockfileEntryPattern.FindSubmatch(raw)
+	if entry == nil {
+		return "", fmt.Errorf("web/pnpm-lock.yaml has no %s resolution entry", packageJSONName)
+	}
+
+	path := govueLockfileResolutionPathPattern.FindSubmatch(entry[1])
+	if path == nil {
+		return "", fmt.Errorf("web/pnpm-lock.yaml's %s resolution carries no path field: {%s}", packageJSONName, entry[1])
+	}
+
+	return strings.TrimSpace(string(path[1])), nil
+}
+
+// TestLockfilePinsGovueSubdirectory fails when web/pnpm-lock.yaml's own resolution of
+// packageJSONName loses its "path: /web" field. pnpm's git resolver has dropped that
+// field from a freshly computed resolution object before, on an ordinary clean install
+// against a cold store and not only on an upgrade (pnpm/pnpm#12304, fixed by
+// pnpm/pnpm#12344, never backported to the pnpm 10 release line as far as this
+// repository could establish; see mise.toml's own pnpm comment). The dependency key
+// pnpm writes alongside that resolution still carries a "#path:/web" suffix either way,
+// which is why a plain text search for "path:/web" in this file is a false reassurance:
+// that suffix is cosmetic, copied from the specifier, while "pnpm install
+// --frozen-lockfile" reads resolution.path, not the key, to decide what to extract from
+// the downloaded tarball. TestGovueVersionsMatch cannot catch this regression at all,
+// because it never reads the lockfile.
+func TestLockfilePinsGovueSubdirectory(t *testing.T) {
+	t.Parallel()
+
+	got, err := govueLockfileResolutionPath(t)
+	if err != nil {
+		t.Fatalf("read %s's resolution from web/pnpm-lock.yaml: %v", packageJSONName, err)
+	}
+
+	if got != wantGovueLockfilePath {
+		t.Fatalf(
+			"web/pnpm-lock.yaml resolves %s to subdirectory %q, want %q; "+
+				"\"pnpm install --frozen-lockfile\" would install the wrong tree",
+			packageJSONName, got, wantGovueLockfilePath,
+		)
+	}
 }
