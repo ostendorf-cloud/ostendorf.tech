@@ -149,6 +149,24 @@ that the public listener itself no longer answers `/metrics`. The `docker-build`
 has started and served a real request at least once before anyone ever runs it in the
 cluster.
 
+The same `Dockerfile` also builds the feed service (`cmd/feed`) as a second, separate
+image, `docker build --target feed`, rather than a second Dockerfile: the two binaries
+share `go.mod`/`go.sum` and the pinned base image digests, and BuildKit never evaluates a
+stage that the requested target does not depend on, so building `--target feed` never
+runs the frontend stage above at all. `docker build` with no `--target` still resolves to
+the website image, the last stage in the file.
+
+`scripts/smoke-test-feed-image.sh <image-ref>` starts that image the same way, with
+`OPENBAO_ADDR` pointed at a host that does not resolve, and asserts what is honestly
+provable without a real OpenBao and a real Meta access token: the process stays up,
+`/healthz` answers 200 throughout, `/readyz` stays 503 throughout (this service never
+reports ready without a usable token and a synced feed, see "Configuration" above), and
+the posts and image routes already answer correctly off an empty, unsynced feed. It does
+not and cannot prove that this service ever reaches `/readyz` 200, or that OpenBao's
+Kubernetes auth actually admits its role; both need a real cluster. The `docker-build-feed`
+job in `.github/workflows/checks.yaml` runs it the same way `docker-build` runs the
+website's own script.
+
 ## Development
 
 ```sh

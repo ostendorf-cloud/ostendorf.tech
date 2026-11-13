@@ -190,11 +190,11 @@ to `feed.config.tokenPath`, are created once, by hand, in OpenBao itself; this c
 references the role by name.
 
 The feed service's container image, `feed.image.repository` (default
-`ghcr.io/ostendorf-cloud/ostendorf.tech-feed`), is not published yet: the Dockerfile and CI job
-that build and push it are a later step of the same piece of work this chart's feed support
-belongs to. Set `feed.image.repository` and/or `feed.image.tag` once that image exists in the
-registry; until then, a release of this chart with the default value installs a feed `Deployment`
-whose pods cannot pull an image.
+`ghcr.io/ostendorf-cloud/ostendorf.tech-feed`), is built from the same root `Dockerfile` as the
+website's own image, as a separate final stage (`docker build --target feed`) rather than a
+second Dockerfile, and published by the `feed-image` job in `.github/workflows/publish.yaml`
+alongside the website's own `image` job, both tagged from the same release so the two images and
+this chart's `Chart.yaml` `appVersion` stay in lock-step.
 
 The website reaches the feed service over `FEED_SERVICE_URL`, computed by
 `templates/deployment.yaml` from the feed `Service`'s own name and `feed.service.port`
