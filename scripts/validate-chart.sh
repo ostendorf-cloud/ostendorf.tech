@@ -5,9 +5,13 @@
 # fail/required guard actually rejects the values it is meant to reject. Shared by
 # task lint:helm and task validate:kubeconform so CI and a local run check the exact same
 # succeed combinations. Every combination, succeed and fail alike, also carries the
-# baseline below: existingSecret.name, feed.config.openBaoAddr and feed.config.openBaoRole
-# have no usable default and are enforced by a required() guard, so even "default values"
-# fails to render without them.
+# baseline below: existingSecret.name has no usable default and is enforced by a
+# required() guard, so even "default values" fails to render without it.
+#
+# feed.config.openBaoAddr and feed.config.openBaoRole have no usable default either, but
+# their own required() guards only fire once feed.enabled is true (feed.enabled itself
+# defaults to false), so they are added on top of the baseline only for the "feed enabled"
+# combination and the two must-fail cases that exercise them, not for every combination.
 #
 # Takes exactly one mode argument:
 #   lint        - helm lint over the must-succeed set, then helm template over the
@@ -45,10 +49,10 @@ esac
 
 chart="charts/ostendorf.tech"
 
-# existingSecret.name, feed.config.openBaoAddr and feed.config.openBaoRole have no usable
-# default (see values.yaml) and are enforced by templates/_helpers.tpl's required() calls,
-# so every combination below needs them set, the default values combination included.
-baseline="existingSecret.name=ostendorf-tech-secrets,feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200,feed.config.openBaoRole=ostendorf-tech-feed"
+# existingSecret.name has no usable default (see values.yaml) and is enforced by
+# templates/_helpers.tpl's required() call, so every combination below needs it set, the
+# default values combination included.
+baseline="existingSecret.name=ostendorf-tech-secrets"
 
 # The two external routing combinations, each valid on its own: ingress enabled with its
 # own required trustedProxyCidrs guard satisfied, httpRoute enabled with both of its own
@@ -59,10 +63,16 @@ ingress_valid="${ingress_valid},ingress.hosts[0].paths[0].path=/,ingress.hosts[0
 httproute_valid="httpRoute.enabled=true,httpRoute.hostnames[0]=ostendorf.tech"
 httproute_valid="${httproute_valid},httpRoute.parentRefs.name=shared-gateway,httpRoute.parentRefs.namespace=gateway-system"
 
+# feed.enabled defaults to false; feed.config.openBaoAddr and feed.config.openBaoRole have
+# no usable default and are enforced by templates/_helpers.tpl's required() calls, but only
+# once feed.enabled is true, so this combination sets all three together.
+feed_valid="feed.enabled=true,feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200,feed.config.openBaoRole=ostendorf-tech-feed"
+
 names=(
   "default values"
   "ingress enabled"
   "httpRoute enabled"
+  "feed enabled"
 )
 
 # Each entry is one combination's --set arguments, matching the corresponding
@@ -72,6 +82,7 @@ sets=(
   "${baseline}"
   "${baseline},${ingress_valid}"
   "${baseline},${httproute_valid}"
+  "${baseline},${feed_valid}"
 )
 
 # kubeconform's default schema location carries no Gateway API schemas. This second
@@ -118,8 +129,8 @@ if [ "$mode" = "lint" ]; then
     "httpRoute.enabled true with parentRefs.name left empty"
     "httpRoute.enabled true with parentRefs.namespace left empty"
     "existingSecret.name left empty"
-    "feed.config.openBaoAddr left empty"
-    "feed.config.openBaoRole left empty"
+    "feed.enabled true with feed.config.openBaoAddr left empty"
+    "feed.enabled true with feed.config.openBaoRole left empty"
   )
 
   fail_sets=(
@@ -128,9 +139,9 @@ if [ "$mode" = "lint" ]; then
     "${baseline},ingress.enabled=true,ingress.className=nginx,ingress.hosts[0].host=ostendorf.tech,ingress.hosts[0].paths[0].path=/,ingress.hosts[0].paths[0].pathType=Prefix"
     "${baseline},httpRoute.enabled=true,httpRoute.parentRefs.namespace=gateway-system"
     "${baseline},httpRoute.enabled=true,httpRoute.parentRefs.name=shared-gateway"
-    "feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200,feed.config.openBaoRole=ostendorf-tech-feed"
-    "existingSecret.name=ostendorf-tech-secrets,feed.config.openBaoRole=ostendorf-tech-feed"
-    "existingSecret.name=ostendorf-tech-secrets,feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200"
+    "replicaCount=1"
+    "${baseline},feed.enabled=true,feed.config.openBaoRole=ostendorf-tech-feed"
+    "${baseline},feed.enabled=true,feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200"
   )
 
   fail_messages=(

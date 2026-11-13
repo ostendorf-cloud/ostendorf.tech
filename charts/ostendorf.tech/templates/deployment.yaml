@@ -120,8 +120,14 @@ spec:
             # values-driven: this value must always resolve to this exact
             # release's own feed Service, in the same namespace, so there is
             # no legitimate reason for an installer to point it elsewhere.
+            # Omitted entirely while feed.enabled is false: internal/config
+            # already treats an unset FEED_SERVICE_URL as "render no
+            # Impressionen section", so there is nothing else to wire for a
+            # disabled feed.
+            {{- if .Values.feed.enabled }}
             - name: FEED_SERVICE_URL
               value: {{ printf "http://%s:%v" (include "ostendorf-tech.feed.fullname" .) .Values.feed.service.port | quote }}
+            {{- end }}
             {{- if .Values.config.umamiUrl }}
             - name: UMAMI_URL
               value: {{ .Values.config.umamiUrl | quote }}

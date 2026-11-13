@@ -1,4 +1,4 @@
-{{- if .Values.feed.networkPolicy.enabled -}}
+{{- if and .Values.feed.enabled .Values.feed.networkPolicy.enabled -}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -36,29 +36,71 @@ spec:
         - protocol: TCP
           port: {{ .Values.feed.service.port }}
   egress:
-    # DNS. No "to": the cluster's DNS Service's own namespace and pod labels
-    # are not something this chart can know in advance across every cluster it
-    # might be installed on, and guessing wrong would fail silently at
-    # runtime, indistinguishable from a Meta outage, rather than at render
-    # time. Restricting only the port, not the destination, is the standard,
-    # widely used exception for exactly this reason.
+    # Of the three rules below, DNS and OpenBao are scoped by destination as
+    # well as by port, through feed.networkPolicy.dns and
+    # feed.networkPolicy.openBao. Meta's own rule is scoped by port only,
+    # deliberately: said here once rather than left for a reader to assume
+    # from the shape of the other two. A policy that scopes two rules while
+    # reading as if it scopes all three is worse than one that says plainly
+    # which rule still admits any destination.
+    #
+    # DNS. feed.networkPolicy.dns scopes this rule's destination, on top of
+    # the port restriction below. Restricting only the port used to be the
+    # whole rule, because the cluster's DNS Service's own namespace and pod
+    # labels are not something this chart can know in advance across every
+    # cluster it might be installed on, and guessing wrong would fail
+    # silently at runtime, indistinguishable from a Meta outage, rather than
+    # at render time. feed.networkPolicy.dns's own default narrows this to
+    # the common case instead of leaving it open; see README.md for what
+    # breaks if that default does not match your cluster, and that value's
+    # own comment for the port-only fallback.
     - ports:
         - protocol: UDP
           port: 53
         - protocol: TCP
           port: 53
-    # OpenBao. No "to": feed.networkPolicy.openBaoPort is kept as its own
-    # explicit value, rather than parsed out of feed.config.openBaoAddr's URL,
-    # because Helm's templating has no clean way to read a URL's port
-    # (sprig's urlParse returns host and hostname, not a separate port field),
-    # and a value that must be kept in sync by the installer, with a
-    # documented, named default, is clearer and more easily copied into the
-    # organisation's other two NetworkPolicies than URL-parsing logic would be.
+      {{- $dnsPeer := dict }}
+      {{- with .Values.feed.networkPolicy.dns.namespaceSelector }}
+      {{- $_ := set $dnsPeer "namespaceSelector" (dict "matchLabels" .) }}
+      {{- end }}
+      {{- with .Values.feed.networkPolicy.dns.podSelector }}
+      {{- $_ := set $dnsPeer "podSelector" (dict "matchLabels" .) }}
+      {{- end }}
+      {{- if $dnsPeer }}
+      to:
+        {{- list $dnsPeer | toYaml | nindent 8 }}
+      {{- end }}
+    # OpenBao. feed.networkPolicy.openBao scopes this rule's destination, on
+    # top of the port restriction below. feed.networkPolicy.openBaoPort is
+    # kept as its own explicit value, rather than parsed out of
+    # feed.config.openBaoAddr's URL, because Helm's templating has no clean
+    # way to read a URL's port (sprig's urlParse returns host and hostname,
+    # not a separate port field); the destination scope below is kept
+    # explicit for a related but distinct reason: feed.config.openBaoAddr may
+    # name an OpenBao installation outside this cluster entirely, which no
+    # namespace or pod selector could ever describe, so deriving one from
+    # that URL would only replace one guess with another. A value that must
+    # be kept in sync by hand, with a documented, named default, is clearer
+    # here than URL-parsing logic would be either way.
     - ports:
         - protocol: TCP
           port: {{ .Values.feed.networkPolicy.openBaoPort }}
-    # Meta's Graph API over HTTPS. No "to": not scoped by destination because
-    # Meta serves this from a CDN with no fixed, documentable IP range.
+      {{- $openBaoPeer := dict }}
+      {{- with .Values.feed.networkPolicy.openBao.namespaceSelector }}
+      {{- $_ := set $openBaoPeer "namespaceSelector" (dict "matchLabels" .) }}
+      {{- end }}
+      {{- with .Values.feed.networkPolicy.openBao.podSelector }}
+      {{- $_ := set $openBaoPeer "podSelector" (dict "matchLabels" .) }}
+      {{- end }}
+      {{- if $openBaoPeer }}
+      to:
+        {{- list $openBaoPeer | toYaml | nindent 8 }}
+      {{- end }}
+    # Meta's Graph API over HTTPS. No "to", deliberately and not merely
+    # unfinished: Meta serves this from a CDN with no fixed, documentable IP
+    # range, so there is no destination this rule could name that would not
+    # go stale. This is the one rule of the three that admits any
+    # destination on its port; see README.md.
     - ports:
         - protocol: TCP
           port: 443

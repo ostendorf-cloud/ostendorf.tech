@@ -5,13 +5,13 @@ templates:
   - templates/serviceaccount.yaml
   - templates/ingress.yaml
   - templates/httproute.yaml
+  - templates/deployment-feed.yaml
+  - templates/service-feed.yaml
+  - templates/serviceaccount-feed.yaml
+  - templates/networkpolicy.yaml
 set:
   existingSecret:
     name: ostendorf-tech-secrets
-  feed:
-    config:
-      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
-      openBaoRole: ostendorf-tech-feed
 tests:
   - it: renders exactly one replica
     template: templates/deployment.yaml
@@ -80,13 +80,16 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
-            name: FEED_SERVICE_URL
-            value: "http://RELEASE-NAME-ostendorf-tech-feed:8081"
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
             name: FEED_REFRESH_INTERVAL
             value: "5m"
+
+  - it: omits FEED_SERVICE_URL when the feed service is disabled, the default
+    template: templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FEED_SERVICE_URL
 
   - it: omits every optional secret-backed env var when its key is not configured
     template: templates/deployment.yaml
@@ -296,3 +299,18 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: renders none of the feed service's four objects while feed.enabled is false, the default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/deployment-feed.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/service-feed.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/serviceaccount-feed.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/networkpolicy.yaml

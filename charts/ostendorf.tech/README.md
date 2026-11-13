@@ -12,6 +12,8 @@ cluster.
 - Only if `httpRoute.enabled` is set: the Gateway API CRDs and a running `Gateway` with a
   listener that allows this release's namespace. See "External routing" below; this chart
   ships neither.
+- Only if `feed.enabled` is set: a reachable OpenBao installation and a Meta access token
+  already written into it. See "Feed service" below; a default install needs neither.
 
 ## Installing
 
@@ -177,18 +179,36 @@ front to one hostname in practice, not resolved per request.
 
 The home page's Impressionen section is loaded from a second, independent workload: the feed
 service (`cmd/feed`), with its own `Deployment` (`templates/deployment-feed.yaml`), `Service`
-(`templates/service-feed.yaml`) and `ServiceAccount` (`templates/serviceaccount-feed.yaml`),
-separate from the website's own. It needs its own `ServiceAccount` because it authenticates to
-OpenBao through the Kubernetes auth method, using that `ServiceAccount`'s own projected token as
-the login credential; the website's `ServiceAccount` has no use for that identity and keeps
-`automountServiceAccountToken: false` either way.
+(`templates/service-feed.yaml`), `ServiceAccount` (`templates/serviceaccount-feed.yaml`) and
+`NetworkPolicy` (`templates/networkpolicy.yaml`), separate from the website's own. It needs its
+own `ServiceAccount` because it authenticates to OpenBao through the Kubernetes auth method,
+using that `ServiceAccount`'s own projected token as the login credential; the website's
+`ServiceAccount` has no use for that identity and keeps `automountServiceAccountToken: false`
+either way.
 
-`feed.config.openBaoAddr` and `feed.config.openBaoRole` are required, with no default: no value
-could ever point at an OpenBao installation, or name a role in it, that actually exists on your
-cluster. Leaving either empty fails `helm install`, `helm upgrade` and `helm template` at render
-time, with a message naming the missing value and why it is needed, the same pattern
-`existingSecret.name` already uses above. The role and its OpenBao policy are created once, by
-hand, in OpenBao itself; this chart only references the role by name.
+`feed.enabled` guards all four of those objects and defaults to `false`. A feed pod needs a
+reachable OpenBao installation and a Meta access token already written into it by hand before it
+becomes ready at all; without either, it sits at `0/1` ready forever, which is otherwise the only
+thing a default install of this chart would produce. With `feed.enabled: false`, the website
+works fully and simply renders no Impressionen section, exactly its existing behaviour for an
+unreachable or empty feed service. Turn it on only once OpenBao and that token are actually in
+place:
+
+```sh
+helm install ostendorf-tech charts/ostendorf.tech \
+  --set existingSecret.name=ostendorf-tech-secrets \
+  --set feed.enabled=true \
+  --set feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200 \
+  --set feed.config.openBaoRole=ostendorf-tech-feed
+```
+
+`feed.config.openBaoAddr` and `feed.config.openBaoRole` are required once `feed.enabled` is
+true, with no default: no value could ever point at an OpenBao installation, or name a role in
+it, that actually exists on your cluster. Leaving either empty while `feed.enabled` is true fails
+`helm install`, `helm upgrade` and `helm template` at render time, with a message naming the
+missing value and why it is needed, the same pattern `existingSecret.name` already uses above.
+The role and its OpenBao policy are created once, by hand, in OpenBao itself; this chart only
+references the role by name.
 
 The policy must grant `read`, `create` and `update` on `feed.config.tokenPath` itself, the KV v2
 data path, and nothing else:
@@ -227,8 +247,9 @@ namespace, so there is no legitimate reason for an installer to point it elsewhe
 
 ## NetworkPolicy
 
-`feed.networkPolicy.enabled` defaults to `true`: this organisation's clusters enforce
-`NetworkPolicy`, and the goal is enforcement by the chart itself rather than by convention alone.
+`feed.networkPolicy.enabled` defaults to `true`, but only takes effect once `feed.enabled` is
+also `true`: this organisation's clusters enforce `NetworkPolicy`, and the goal is enforcement by
+the chart itself rather than by convention alone.
 
 This is a correctness warning, not a hedge: a `NetworkPolicy` object does nothing at all on a
 cluster whose CNI does not enforce `NetworkPolicy`. Such a cluster accepts and stores the object
@@ -245,20 +266,38 @@ enforces this for a `podSelector`-based default-deny policy such as this one, bu
 practice on the common CNIs this organisation runs, so a kubelet liveness or readiness probe,
 which originates from the node, needs no ingress rule of its own here.
 
-Three egress rules allow what the feed service actually needs to reach, none scoped by
-destination:
+Three egress rules allow what the feed service actually needs to reach. Said plainly, since a
+policy that scopes some rules while reading as if it scopes all of them is worse than one that
+says which rule still admits any destination: **DNS and OpenBao are now scoped by destination as
+well as by port below; Meta is scoped by port only, and stays that way.**
 
-- DNS, UDP and TCP port 53. The cluster's DNS `Service`'s own namespace and pod labels are not
-  something this chart can know in advance across every cluster it might be installed on, and
-  guessing wrong would fail silently at runtime, indistinguishable from a Meta outage, rather
-  than at render time. Restricting only the port, not the destination, is the standard, widely
-  used exception for exactly this reason.
-- OpenBao, on `feed.networkPolicy.openBaoPort` (default `8200`, OpenBao's conventional API port).
-  Kept as its own explicit value rather than parsed out of `feed.config.openBaoAddr`'s URL,
-  because Helm's templating has no clean way to read a URL's port. Keep this in sync by hand with
-  whatever port `feed.config.openBaoAddr` actually names, if it ever differs from the default.
-- Meta's Graph API, TCP port 443. Not scoped by destination because Meta serves this from a CDN
-  with no fixed, documentable IP range.
+- DNS, UDP and TCP port 53, scoped by `feed.networkPolicy.dns.namespaceSelector` and
+  `.podSelector`. Both default to kube-dns's own conventional namespace and pod label
+  (`kube-system` / `k8s-app: kube-dns`), which CoreDNS also carries on most clusters for
+  compatibility, kubeadm's default install included. **If your cluster's DNS `Service` does not
+  carry these labels, the feed pod cannot resolve any name at all, Meta's included, which looks
+  identical to a Meta outage from the outside rather than a policy error.** Verify your cluster's
+  actual DNS `Service` labels before relying on the default. Set both selectors to `null` (not
+  `{}`: Helm merges a map default with an empty override instead of clearing it, so `{}` here
+  would silently keep the default) to fall back to the port-only rule this chart shipped before,
+  with no destination scoping at all.
+- OpenBao, on `feed.networkPolicy.openBaoPort` (default `8200`, OpenBao's conventional API port)
+  and `feed.networkPolicy.openBao.namespaceSelector`/`.podSelector`. The port is kept as its own
+  explicit value rather than parsed out of `feed.config.openBaoAddr`'s URL, because Helm's
+  templating has no clean way to read a URL's port; the destination scope is kept explicit for a
+  related but distinct reason: `feed.config.openBaoAddr` may name an OpenBao installation outside
+  this cluster entirely, which no namespace or pod selector could ever describe, so deriving one
+  from that URL would only replace one guess with another. The default namespace selector matches
+  this organisation's own namespace-per-topic convention (see `kubernetes-conventions`): OpenBao's
+  own namespace is named `openbao`. No default pod selector: namespace scoping alone is already a
+  significant tightening over the previous, fully open rule, and OpenBao deployments vary too much
+  in their own pod labels for one default to fit everywhere. Keep the port in sync by hand with
+  whatever port `feed.config.openBaoAddr` actually names, if it ever differs from the default; set
+  `namespaceSelector` to `null` for the same port-only fallback as DNS above, for the same reason.
+- Meta's Graph API, TCP port 443. **Left open, not merely unscoped by omission**: Meta serves this
+  from a CDN with no fixed, documentable IP range, so there is no destination this rule could name
+  that would not go stale. Of the three egress rules, this is the one that still admits any
+  destination on its port.
 
 ## Values
 
@@ -289,16 +328,15 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `config.umamiUrl` | Base URL of the Umami that page views are reported to, empty counts nothing | `""` |
 | `config.umamiWebsiteId` | Lowercase UUID of the website in Umami, set together with `config.umamiUrl` | `""` |
 | `existingSecret.name` | Name of the existing `Secret` | `""` (required) |
+| `feed.enabled` | Create the feed service's `Deployment`, `Service`, `ServiceAccount` and `NetworkPolicy`; see "Feed service" above | `false` |
 | `feed.image.repository` | Feed service container image; not published yet, see "Feed service" above | `ghcr.io/ostendorf-cloud/ostendorf.tech-feed` |
 | `feed.service.port` | Feed service's one container and Service port | `8081` |
-| `feed.config.openBaoAddr` | OpenBao address the feed service authenticates against. Required; see "Feed service" above | `""` (required) |
-| `feed.config.openBaoRole` | OpenBao Kubernetes auth role the feed service logs in as. Required; see "Feed service" above | `""` (required) |
-| `feed.networkPolicy.enabled` | Create a `NetworkPolicy` restricting the feed service's traffic; see "NetworkPolicy" above | `true` |
+| `feed.config.openBaoAddr` | OpenBao address the feed service authenticates against. Required when `feed.enabled` is true; see "Feed service" above | `""` (required) |
+| `feed.config.openBaoRole` | OpenBao Kubernetes auth role the feed service logs in as. Required when `feed.enabled` is true; see "Feed service" above | `""` (required) |
+| `feed.networkPolicy.enabled` | Create a `NetworkPolicy` restricting the feed service's traffic, once `feed.enabled` is also true; see "NetworkPolicy" above | `true` |
 | `feed.networkPolicy.openBaoPort` | Port OpenBao egress is allowed on; keep in sync with `feed.config.openBaoAddr` | `8200` |
-
-## Upgrading
-
-No breaking change has shipped yet; `Chart.yaml`'s `version` tracks that going forward.
+| `feed.networkPolicy.dns.namespaceSelector` / `.podSelector` | Destination scope for the DNS egress rule; see "NetworkPolicy" above | `kube-system` / `k8s-app: kube-dns` |
+| `feed.networkPolicy.openBao.namespaceSelector` / `.podSelector` | Destination scope for the OpenBao egress rule; see "NetworkPolicy" above | `openbao` / none |
 
 ## Uninstalling
 
@@ -308,7 +346,7 @@ helm uninstall ostendorf-tech
 
 Removes the website's `Deployment`, `Service`, `ServiceAccount`, and the `Ingress` or
 `HTTPRoute`, whichever was enabled; the feed service's own `Deployment`, `Service`,
-`ServiceAccount` and `NetworkPolicy`, all created by this same chart, are removed the same way.
+`ServiceAccount` and `NetworkPolicy`, if `feed.enabled` was set, are removed the same way.
 Neither OpenBao nor anything stored in it is touched: this chart never created it, so it is never
 removed by it either, the same reasoning as the existing `Secret` `existingSecret.name` points
 at.
@@ -317,10 +355,10 @@ at.
 
 This chart is verified with:
 
-- `helm lint`, over the default values and the documented ingress-enabled and httpRoute-enabled
-  combinations. `helm lint` never propagates a template's `fail` or `required` call; it logs
-  either at INFO and still exits zero, so it covers a values mistake schema validation would
-  catch, not one of this chart's own render-time guards.
+- `helm lint`, over the default values and the documented ingress-enabled, httpRoute-enabled and
+  feed-enabled combinations. `helm lint` never propagates a template's `fail` or `required` call;
+  it logs either at INFO and still exits zero, so it covers a values mistake schema validation
+  would catch, not one of this chart's own render-time guards.
 - `helm template`, for the same combinations as `helm lint` above, and for a must-fail set: one
   combination per render-time guard in `templates/deployment.yaml`, `templates/deployment-feed.yaml`
   and `templates/httproute.yaml`, each asserted to fail with that guard's own message rather than

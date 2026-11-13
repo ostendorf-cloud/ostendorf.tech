@@ -244,11 +244,22 @@ existingSecret:
 
 # The feed service: a second, independent workload that reads the Instagram
 # Impressionen feed from Meta and serves it to the website, with its own
-# Deployment, Service and ServiceAccount. There is no feed.enabled toggle:
-# this workload is now a required part of the chart, the same way the
-# website's own Deployment is not optional, since the website's
-# FEED_SERVICE_URL always points at it (see templates/deployment.yaml).
+# Deployment, Service and ServiceAccount.
 feed:
+  # Guards every object this workload renders: the Deployment, the Service,
+  # the ServiceAccount and the NetworkPolicy. Disabled by default: without
+  # OpenBao and a hand-written token already in place, an enabled feed pod
+  # sits at 0/1 ready forever, which is otherwise the only thing a default
+  # install of this chart would produce. The website works fully with the
+  # feed disabled; it renders no Impressionen section, exactly its existing
+  # behaviour for an unreachable or empty feed (see internal/feedclient in
+  # AGENTS.md). The website's own FEED_SERVICE_URL follows this flag too
+  # (see templates/deployment.yaml): unset while this is false. Enable this
+  # only once feed.config.openBaoAddr and feed.config.openBaoRole actually
+  # point at a real OpenBao installation and role; see README.md's "Feed
+  # service" section.
+  enabled: false
+
   # No upper bound here, unlike the website's own replicaCount: the feed
   # service keeps no per-pod session state, it only caches a read-only copy
   # of the feed resynced from Meta and OpenBao independently per pod, so more
@@ -323,6 +334,49 @@ feed:
     # by hand with whatever port feed.config.openBaoAddr actually names, if
     # it ever differs from this default.
     openBaoPort: 8200
+    # Scopes the DNS egress rule's destination, on top of the port
+    # restriction alone. Both default to kube-dns's own conventional
+    # namespace and pod label, which CoreDNS also carries on most clusters
+    # for compatibility (kubeadm's default install included). Wrong on a
+    # cluster whose DNS Service does not carry these labels: the feed pod
+    # then cannot resolve any name at all, Meta's included, which looks
+    # identical to a Meta outage from the outside rather than a policy
+    # error. Verify your cluster's actual DNS Service labels before relying
+    # on the default; see README.md. Set both namespaceSelector and
+    # podSelector to null (not {}: Helm merges a map default with an empty
+    # override instead of clearing it, so {} here would silently keep
+    # kube-system/kube-dns) to fall back to the port-only rule this chart
+    # shipped before, with no destination scoping at all.
+    dns:
+      namespaceSelector:
+        kubernetes.io/metadata.name: kube-system
+      podSelector:
+        k8s-app: kube-dns
+    # Scopes the OpenBao egress rule's destination, on top of the port
+    # restriction alone. Unlike dns above, OpenBao's address is always
+    # explicitly configured (feed.config.openBaoAddr), but this chart does
+    # not parse that URL to derive the scope: feed.config.openBaoAddr may
+    # name an OpenBao installation outside the cluster entirely, which no
+    # namespace or pod selector could ever describe, so the operator who
+    # already set that address sets this too. The default below matches
+    # this organisation's own namespace-per-topic convention (see
+    # kubernetes-conventions): OpenBao's own namespace is named "openbao".
+    # Set namespaceSelector to null for the same port-only fallback as dns
+    # above, for the same reason: null, not {}.
+    openBao:
+      namespaceSelector:
+        kubernetes.io/metadata.name: openbao
+      # Left as an empty object, not null: values.schema.json types this as
+      # an object, and a literal null default (as opposed to a user's own
+      # override to null, which Helm's own coalescing deletes outright
+      # before schema validation ever sees it) fails that check. An empty
+      # map is falsy in the template the same way null is, so this still
+      # renders no podSelector on the OpenBao egress rule. Namespace scoping
+      # alone is already a significant tightening over the previous, fully
+      # open rule, and OpenBao deployments vary too much in their own pod
+      # labels for one default to fit; add matchLabels here to scope
+      # further.
+      podSelector: {}
 
   # The projected ServiceAccount token used as the OpenBao login credential;
   # see feed.config.openBaoJwtFile and templates/deployment-feed.yaml.

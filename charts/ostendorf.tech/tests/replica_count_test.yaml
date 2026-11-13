@@ -4,10 +4,6 @@ templates:
 set:
   existingSecret:
     name: ostendorf-tech-secrets
-  feed:
-    config:
-      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
-      openBaoRole: ostendorf-tech-feed
   replicaCount: 3
 tests:
   - it: fails the render with the single-replica session store explanation

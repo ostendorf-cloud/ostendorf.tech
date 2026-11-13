@@ -1,4 +1,4 @@
-suite: feed Service with default values
+suite: feed Service with feed.enabled true and default values
 templates:
   - templates/service.yaml
   - templates/service-feed.yaml
@@ -6,10 +6,20 @@ set:
   existingSecret:
     name: ostendorf-tech-secrets
   feed:
+    enabled: true
     config:
       openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
       openBaoRole: ostendorf-tech-feed
 tests:
+  - it: renders no feed Service when feed.enabled is false, the default
+    template: templates/service-feed.yaml
+    set:
+      feed:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
   - it: renders a ClusterIP Service with one port named http on 8081, targeting the http container port
     template: templates/service-feed.yaml
     asserts:

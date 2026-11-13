@@ -121,6 +121,7 @@
       "type": "object",
       "required": ["image", "service"],
       "properties": {
+        "enabled": { "type": "boolean" },
         "replicaCount": { "type": "integer", "minimum": 0 },
         "image": {
           "type": "object",
@@ -155,7 +156,23 @@
           "type": "object",
           "properties": {
             "enabled": { "type": "boolean" },
-            "openBaoPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+            "openBaoPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "dns": {
+              "type": "object",
+              "description": "Destination scope for the DNS egress rule, in addition to its port restriction. namespaceSelector and podSelector are each a map of labels (a matchLabels block), not the full Kubernetes LabelSelector shape: this chart has no use for matchExpressions here. Both default to a non-empty value; override either with an explicit null (not {}: Helm merges a map default with an empty override instead of clearing it) to omit that selector from the rule, or both to fall back to a port-only, unscoped rule.",
+              "properties": {
+                "namespaceSelector": { "type": "object" },
+                "podSelector": { "type": "object" }
+              }
+            },
+            "openBao": {
+              "type": "object",
+              "description": "Destination scope for the OpenBao egress rule, in addition to its port restriction. Same shape as dns above.",
+              "properties": {
+                "namespaceSelector": { "type": "object" },
+                "podSelector": { "type": "object" }
+              }
+            }
           }
         },
         "serviceAccountToken": {
