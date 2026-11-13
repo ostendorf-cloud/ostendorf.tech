@@ -396,12 +396,23 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP, metricsHandler http.Handle
 	mux.Handle("GET /sitemap.xml", route(a.sitemapHandler()))
 
 	mux.Handle("GET /api/v1/challenge", middleware.Chain(api.Handle(a.handleChallenge), a.challengeRateLim.Middleware, a.ensureSession, a.protector.Middleware))
-	// The contact rate limit is not wired in here: it runs inside
-	// handleContact itself, right after the honeypot check, so a bot that
-	// fills the honeypot never spends the shared budget other visitors
-	// rely on. requireSession refuses a request with no session before the
-	// CSRF protector's own check would ever apply to this route.
-	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.requireSession, a.protector.Middleware))
+	// a.rateLimit.Middleware sits outermost here, the same position route()
+	// gives it on every other route: it bounds raw request volume per
+	// client, the general 120-per-minute-per-client budget every page,
+	// asset and other API route already spends from. That is a different
+	// limiter, with a different bucket, from contactLimiter: the per-client
+	// contact submission budget (5 per 10 minutes by default), which
+	// handleContact still checks on its own, right after the honeypot, so a
+	// bot that fills the honeypot never spends the budget real visitors
+	// behind the same address rely on. mailLimiter is a third, separate
+	// limiter again, one bucket shared by every client: it bounds mail this
+	// service actually attempts to send, checked only once a submission has
+	// cleared validation and proof of work. All three now apply to this
+	// route, each closing a gap the other two leave open; none substitutes
+	// for either of the others. requireSession refuses a request with no
+	// session before the CSRF protector's own check would ever apply to
+	// this route.
+	mux.Handle("POST /api/v1/contact", middleware.Chain(api.Handle(a.handleContact), a.rateLimit.Middleware, a.requireSession, a.protector.Middleware))
 
 	// The Impressionen section's two reads. Both are plain public GETs:
 	// no session, no CSRF token, nothing written. They answer from the
