@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -237,6 +238,79 @@ func TestLoadChallengeKeyOptional(t *testing.T) {
 	}
 	if len(cfg.ChallengeKey) != minKeyBytes {
 		t.Errorf("ChallengeKey = %d bytes, want %d", len(cfg.ChallengeKey), minKeyBytes)
+	}
+	if cfg.ChallengeKeyPrevious != nil {
+		t.Errorf("ChallengeKeyPrevious = %v, want nil when CHALLENGE_KEY_PREVIOUS is unset", cfg.ChallengeKeyPrevious)
+	}
+}
+
+// TestLoadChallengeKeyPreviousOptional proves the rotation key loads the
+// same way the current one does, and independently of it: a deployment can
+// carry both at once while a rotation is in flight, see AGENTS.md.
+func TestLoadChallengeKeyPreviousOptional(t *testing.T) {
+	currentKey := strings.Repeat("cd", minKeyBytes)
+	previousKey := strings.Repeat("ef", minKeyBytes)
+	cfg, err := Load(env(withCSRFKey(map[string]string{
+		"CHALLENGE_KEY":          currentKey,
+		"CHALLENGE_KEY_PREVIOUS": previousKey,
+	})))
+	if err != nil {
+		t.Fatalf("Load() returned an unexpected error: %v", err)
+	}
+	if len(cfg.ChallengeKey) != minKeyBytes {
+		t.Errorf("ChallengeKey = %d bytes, want %d", len(cfg.ChallengeKey), minKeyBytes)
+	}
+	if len(cfg.ChallengeKeyPrevious) != minKeyBytes {
+		t.Errorf("ChallengeKeyPrevious = %d bytes, want %d", len(cfg.ChallengeKeyPrevious), minKeyBytes)
+	}
+	if bytes.Equal(cfg.ChallengeKey, cfg.ChallengeKeyPrevious) {
+		t.Error("ChallengeKey and ChallengeKeyPrevious decoded to the same bytes, want the two distinct keys given")
+	}
+}
+
+func TestLoadRejectsShortOrNonHexChallengeKeyPrevious(t *testing.T) {
+	_, err := Load(env(withCSRFKey(map[string]string{"CHALLENGE_KEY_PREVIOUS": "not-hex-at-all"})))
+	if err == nil || !strings.Contains(err.Error(), "CHALLENGE_KEY_PREVIOUS") {
+		t.Fatalf("Load() error = %v, want a problem naming CHALLENGE_KEY_PREVIOUS", err)
+	}
+}
+
+// TestDecodeKeyErrorNeverQuotesTheInvalidInput is nit 15 from the go-live
+// review: hex.DecodeString's own error text names the offending byte, for
+// example `encoding/hex: invalid byte: U+0058 'X'`, which would put one
+// character of a misconfigured key on stderr and into the pod log if
+// Load's error wrapped it with %w. A non-hex CHALLENGE_KEY exercises
+// decodeKey directly through the public Load surface.
+func TestDecodeKeyErrorNeverQuotesTheInvalidInput(t *testing.T) {
+	const invalid = "not-hex-at-all-XYZ"
+	_, err := Load(env(withCSRFKey(map[string]string{"CHALLENGE_KEY": invalid})))
+	if err == nil {
+		t.Fatal("Load() = nil error, want one naming CHALLENGE_KEY")
+	}
+	if strings.Contains(err.Error(), invalid) {
+		t.Errorf("Load() error = %q, must not contain the invalid key value %q", err.Error(), invalid)
+	}
+}
+
+func TestLoadMailRateLimitDefaultsAndOverrides(t *testing.T) {
+	cfg, err := Load(env(withCSRFKey(nil)))
+	if err != nil {
+		t.Fatalf("Load() returned an unexpected error: %v", err)
+	}
+	if cfg.MailRateLimitBurst != DefaultMailRateLimitBurst || cfg.MailRateLimitPer != DefaultMailRateLimitPer {
+		t.Errorf("mail rate limit = %d/%v, want %d/%v",
+			cfg.MailRateLimitBurst, cfg.MailRateLimitPer, DefaultMailRateLimitBurst, DefaultMailRateLimitPer)
+	}
+
+	cfg, err = Load(env(withCSRFKey(map[string]string{
+		"MAIL_RATE_LIMIT_BURST": "10",
+		"MAIL_RATE_LIMIT_PER":   "30m",
+	})))
+	if err != nil {
+		t.Fatalf("Load() returned an unexpected error: %v", err)
+	}
+	if cfg.MailRateLimitBurst != 10 || cfg.MailRateLimitPer != 30*time.Minute {
+		t.Errorf("mail rate limit = %d/%v, want 10/30m", cfg.MailRateLimitBurst, cfg.MailRateLimitPer)
 	}
 }
 
