@@ -2,6 +2,7 @@ package webapp
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -134,6 +135,23 @@ func TestAppServesMetrics(t *testing.T) {
 	app.Handler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+// TestAppSecurityPolicyAllowsTheProofOfWorkWorker proves worker-src 'self'
+// is actually on the response: the contact form's Worker loads from a
+// same-origin module URL (see webapp.go's own comment on why this is set
+// explicitly rather than left to CSP's script-src fallback), and the
+// consequence of this header being wrong is that the form never submits.
+func TestAppSecurityPolicyAllowsTheProofOfWorkWorker(t *testing.T) {
+	app := testApp(t)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
+	rec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(rec, req)
+
+	csp := rec.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "worker-src 'self'") {
+		t.Errorf("Content-Security-Policy = %q, want it to contain worker-src 'self'", csp)
 	}
 }
 
@@ -588,6 +606,320 @@ func TestAppContactFullPipelineReachesTheMailer(t *testing.T) {
 		if strings.Contains(full, leaked) {
 			t.Errorf("response body leaked %q from the mailer's own error, body = %s", leaked, full)
 		}
+	}
+}
+
+// TestAppContactCrossOriginPostWithValidSessionAndTokenStillRefused proves
+// the CSRF protector's origin check runs independently of the token check,
+// on a request that would otherwise pass every other gate: a real session
+// and its matching token, same as a genuine visitor's browser would send.
+// Per the go-live review's finding 8, the origin half is this form's real
+// defence once a session exists (the token half only ever fails open, by
+// design, when there is nothing to forge); this test is what would fail if
+// that defence were ever dropped from the chain or reordered behind
+// something that short-circuits first.
+func TestAppContactCrossOriginPostWithValidSessionAndTokenStillRefused(t *testing.T) {
+	app := contactTestApp(t)
+
+	getReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge", nil)
+	getRec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(getRec, getReq)
+	cookies := getRec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("no session cookie set by the challenge request")
+	}
+	var challenge struct {
+		CSRFToken string `json:"csrfToken"`
+	}
+	if err := json.Unmarshal(getRec.Body.Bytes(), &challenge); err != nil {
+		t.Fatalf("decode challenge: %v", err)
+	}
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact",
+		strings.NewReader(`{"name":"Erika","email":"erika@example.test","message":"hi","consent":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(csrf.HeaderName, challenge.CSRFToken)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	// The one header this test adds on top of an otherwise fully valid
+	// request: a browser reports this whenever the request's initiator
+	// is a different site, cross subdomains included.
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+
+	rec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusForbidden, rec.Body)
+	}
+}
+
+// TestAppClientIPWiringHonoursTrustedProxy proves TRUSTED_PROXY_CIDRS
+// actually changes what the rate limiter keys on, not only that config.Load
+// parses it (internal/config's own tests already cover that): a request
+// relayed through a trusted proxy is attributed to the address it names in
+// X-Forwarded-For, not the proxy's own TCP peer, so two distinct visitors
+// behind the same proxy get two distinct buckets.
+func TestAppClientIPWiringHonoursTrustedProxy(t *testing.T) {
+	cfg := testConfig(t, map[string]string{
+		"TRUSTED_PROXY_CIDRS": "203.0.113.0/24",
+		"RATE_LIMIT_BURST":    "1",
+		"RATE_LIMIT_PER":      "1m",
+	})
+	dist, prerendered := testFS()
+	app, err := New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	get := func(remoteAddr, forwardedFor string) *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
+		req.RemoteAddr = remoteAddr
+		if forwardedFor != "" {
+			req.Header.Set("X-Forwarded-For", forwardedFor)
+		}
+		rec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	const trustedProxy = "203.0.113.1:1234"
+	if rec := get(trustedProxy, "198.51.100.1"); rec.Code != http.StatusOK {
+		t.Fatalf("first forwarded client status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
+	}
+	if rec := get(trustedProxy, "198.51.100.2"); rec.Code != http.StatusOK {
+		t.Fatalf("second, distinct forwarded client status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
+	}
+	if rec := get(trustedProxy, "198.51.100.1"); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("repeat of the first forwarded client status = %d, want %d (its own burst spent), body = %s",
+			rec.Code, http.StatusTooManyRequests, rec.Body)
+	}
+
+	// An untrusted peer's X-Forwarded-For must never be honoured: both
+	// requests collapse into the one bucket the TCP peer itself gets.
+	const untrustedPeer = "192.0.2.1:1234"
+	if rec := get(untrustedPeer, "198.51.100.3"); rec.Code != http.StatusOK {
+		t.Fatalf("first request from the untrusted peer status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
+	}
+	if rec := get(untrustedPeer, "198.51.100.4"); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request from the same untrusted peer with a different spoofed X-Forwarded-For status = %d, want %d "+
+			"(the spoofed header must be ignored), body = %s", rec.Code, http.StatusTooManyRequests, rec.Body)
+	}
+}
+
+// TestAppPageRateLimitAnswersHTMLInTheVisitorsLocale proves
+// pageRateLimitRespond is wired into the page route's rate limiter: a 429 on
+// a page GET has to read as the locale's own page, not govue's JSON error
+// envelope a browser navigating to a page never expects.
+func TestAppPageRateLimitAnswersHTMLInTheVisitorsLocale(t *testing.T) {
+	cfg := testConfig(t, map[string]string{
+		"RATE_LIMIT_BURST": "1",
+		"RATE_LIMIT_PER":   "1m",
+	})
+	dist, prerendered := testFS()
+	app, err := New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	get := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
+		req.RemoteAddr = "203.0.113.42:1234"
+		rec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	if first := get(); first.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want %d, body = %s", first.Code, http.StatusOK, first.Body)
+	}
+	second := get()
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request status = %d, want %d, body = %s", second.Code, http.StatusTooManyRequests, second.Body)
+	}
+	if ct := second.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("Content-Type = %q, want text/html, not govue's JSON error envelope", ct)
+	}
+	if !strings.Contains(second.Body.String(), contactMessagesDE.tooMany) {
+		t.Errorf("body = %q, want it to contain the localized tooMany message %q", second.Body.String(), contactMessagesDE.tooMany)
+	}
+}
+
+// TestAppAssetRateLimitStaysJSON proves pageRateLimitRespond's fallback: a
+// path that resolves to no locale, an asset in this case, keeps govue's
+// default JSON error shape rather than the page branch's HTML.
+func TestAppAssetRateLimitStaysJSON(t *testing.T) {
+	cfg := testConfig(t, map[string]string{
+		"RATE_LIMIT_BURST": "1",
+		"RATE_LIMIT_PER":   "1m",
+	})
+	dist := fstest.MapFS{"assets/app.js": &fstest.MapFile{Data: []byte("x")}}
+	prerendered := fstest.MapFS{
+		"de/index.html": &fstest.MapFile{Data: []byte("<html></html>")},
+		"de/404.html":   &fstest.MapFile{Data: []byte("<html></html>")},
+	}
+	app, err := New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	get := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/assets/app.js", nil)
+		req.RemoteAddr = "203.0.113.43:1234"
+		rec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	if first := get(); first.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want %d, body = %s", first.Code, http.StatusOK, first.Body)
+	}
+	second := get()
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request status = %d, want %d, body = %s", second.Code, http.StatusTooManyRequests, second.Body)
+	}
+	if ct := second.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
+		t.Errorf("Content-Type = %q, want govue's JSON shape, not HTML, for a non-page path", ct)
+	}
+}
+
+// TestAppContactMailCeilingAppliesAcrossClientAddresses proves the mail
+// ceiling (finding 6) bounds the mail account itself, not one client
+// address: with the per-client contact limit wide open, two submissions
+// from two entirely distinct client addresses still collide on the one
+// shared mailLimiter bucket.
+func TestAppContactMailCeilingAppliesAcrossClientAddresses(t *testing.T) {
+	cfg := testConfig(t, map[string]string{
+		"CHALLENGE_KEY":            validHexKey,
+		"SMTP_USERNAME":            "no-reply@example.test",
+		"SMTP_PASSWORD":            "s3cret",
+		"CONTACT_RATE_LIMIT_BURST": "100",
+		"CONTACT_RATE_LIMIT_PER":   "1m",
+		"MAIL_RATE_LIMIT_BURST":    "1",
+		"MAIL_RATE_LIMIT_PER":      "1m",
+	})
+	dist, prerendered := testFS()
+	app, err := New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	submit := func(remoteAddr string) *httptest.ResponseRecorder {
+		getReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge", nil)
+		getReq.RemoteAddr = remoteAddr
+		getRec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(getRec, getReq)
+		cookies := getRec.Result().Cookies()
+		var challenge struct {
+			CSRFToken string `json:"csrfToken"`
+		}
+		if err := json.Unmarshal(getRec.Body.Bytes(), &challenge); err != nil {
+			t.Fatalf("decode challenge: %v", err)
+		}
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact",
+			strings.NewReader(`{"name":"Erika","email":"erika@example.test","message":"hi","consent":true}`))
+		req.RemoteAddr = remoteAddr
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(csrf.HeaderName, challenge.CSRFToken)
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+		rec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	first := submit("203.0.113.51:1111")
+	if first.Code == http.StatusTooManyRequests {
+		t.Fatalf("first submission already rate limited, body = %s", first.Body)
+	}
+	second := submit("203.0.113.52:2222")
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("second submission from a different client address status = %d, want %d (the shared mail ceiling), body = %s",
+			second.Code, http.StatusTooManyRequests, second.Body)
+	}
+}
+
+// mustDecodeHex is validHexKey's own encoding, decoded for a test that needs
+// the raw key bytes pow.Service.Create takes rather than the hex string
+// config.Load reads.
+func mustDecodeHex(t *testing.T, raw string) []byte {
+	t.Helper()
+	key, err := hex.DecodeString(raw)
+	if err != nil {
+		t.Fatalf("decode hex key: %v", err)
+	}
+	return key
+}
+
+// TestAppContactAcceptsSolutionSignedWithThePreviousChallengeKey proves
+// CHALLENGE_KEY rotation (AGENTS.md's deferred item): a solution signed
+// with CHALLENGE_KEY_PREVIOUS, exactly what a visitor's browser is holding
+// the moment CHALLENGE_KEY is rotated out from under them mid-visit, still
+// verifies, while a fresh challenge is still issued under the new,
+// current key.
+func TestAppContactAcceptsSolutionSignedWithThePreviousChallengeKey(t *testing.T) {
+	previousKeyHex := strings.Repeat("cd", 32)
+	cfg := testConfig(t, map[string]string{
+		"CHALLENGE_KEY":          validHexKey,
+		"CHALLENGE_KEY_PREVIOUS": previousKeyHex,
+		"SMTP_USERNAME":          "no-reply@example.test",
+		"SMTP_PASSWORD":          "s3cret",
+	})
+	dist, prerendered := testFS()
+	app, err := New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	app.challenges.Now = func() time.Time { return now }
+
+	// A challenge signed with the previous key directly: a.handleChallenge
+	// always signs with the current key, so this stands in for one issued
+	// before the rotation happened.
+	oldChallenge, err := app.challenges.Create(mustDecodeHex(t, previousKeyHex))
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	solution := solveChallenge(t, oldChallenge)
+	now = now.Add(5 * time.Second)
+
+	// A session and its CSRF token still come from the live endpoint; only
+	// the proof of work solution above is deliberately stale.
+	getReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge", nil)
+	getRec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(getRec, getReq)
+	cookies := getRec.Result().Cookies()
+	var challenge struct {
+		CSRFToken string `json:"csrfToken"`
+	}
+	if err := json.Unmarshal(getRec.Body.Bytes(), &challenge); err != nil {
+		t.Fatalf("decode challenge: %v", err)
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"name": "Erika", "email": "erika@example.test", "message": "hi", "consent": true, "pow": solution,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact", strings.NewReader(string(body)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(csrf.HeaderName, challenge.CSRFToken)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	rec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(rec, req)
+	// The mailer itself is not wired up to a real server in this test, so
+	// success here means the real SMTP dial failing, not a submission
+	// that was ever rejected for its proof of work: anything other than a
+	// poWFailed/poWExpired/poWTooFast 400 proves the old key verified.
+	if rec.Code == http.StatusBadRequest {
+		t.Fatalf("status = %d, want anything but a validation rejection (the old-key solution must verify), body = %s",
+			rec.Code, rec.Body)
 	}
 }
 

@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/ostendorf-cloud/govue/api"
@@ -85,6 +87,41 @@ func (a *App) challengeRateLimitRespond(w http.ResponseWriter, r *http.Request, 
 	api.WriteError(w, r, err)
 }
 
+// pageRateLimitRespond answers a denied page, asset, robots.txt or
+// sitemap.xml request. A page request resolves to a known locale through
+// splitLocale, the same way pageHandler itself does, and gets back a small
+// HTML document carrying the localized tooMany message: a browser loading
+// a page expects HTML, not govue's JSON error envelope, which is what it
+// would otherwise see on a 429 here. A request that resolves to no locale,
+// meaning an asset, robots.txt, sitemap.xml or an unknown path, keeps
+// govue's default JSON shape, the same thing every other error on those
+// paths already answers with.
+func (a *App) pageRateLimitRespond(w http.ResponseWriter, r *http.Request, wait time.Duration) {
+	locale, _, ok := splitLocale(r.URL.Path)
+	if !ok && r.URL.Path == "/" {
+		locale, ok = preferredLocale(r.Header.Get("Accept-Language")), true
+	}
+	if !ok {
+		api.WriteError(w, r, api.TooManyRequests(wait))
+		return
+	}
+
+	messages := messagesFor(locale)
+	// The same floor api.WriteError applies to a RetryAfter: a wait under
+	// one second would otherwise round down to Retry-After: 0, which asks
+	// the browser to retry immediately.
+	seconds := int(wait.Seconds())
+	if seconds < 1 {
+		seconds = 1
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Retry-After", strconv.Itoa(seconds))
+	w.WriteHeader(http.StatusTooManyRequests)
+	fmt.Fprintf(w, "<!doctype html><html lang=%q><meta charset=\"utf-8\"><title>%s</title><p>%s</p>",
+		locale, messages.tooMany, messages.tooMany)
+}
+
 // handleChallenge issues a proof of work challenge for the session
 // ensureSession resolved. The rate limit and the session both come from
 // the route chain; this handler only has to mind the challenge key.
@@ -143,7 +180,25 @@ func (a *App) handleContact(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Only after the honeypot: bots filling it must not use up the budget of
-	// people behind the same address.
+	// people behind the same address, nor the site-wide mail ceiling below.
+	//
+	// mailLimiter is checked first: it is the hard ceiling on the mail
+	// account itself, independent of how many client addresses an attacker
+	// spreads their requests across (see mailLimiter's own comment in
+	// webapp.go), so it is what actually protects the account. Unlike the
+	// per-client limiter below, tripping it is logged: a single address
+	// hitting its own limit is ordinary and expected, but every contact
+	// mail this service can ever send running out in one window means
+	// either an attack or a real surge in genuine enquiries, either of
+	// which the operator needs to know about rather than read as a string
+	// of ordinary 429s in the access log.
+	if allowed, wait := a.mailLimiter.Take(mailLimiterKey); !allowed {
+		a.logger.WarnContext(r.Context(), "contact form: mail ceiling reached, refusing submissions",
+			"retry_after", wait.String())
+		err := api.New(http.StatusTooManyRequests, api.CodeTooManyRequests, messages.tooMany)
+		err.RetryAfter = wait
+		return err
+	}
 	if allowed, wait := a.contactLimiter.Take(clientip.Key(a.clientIPs.Resolve(r))); !allowed {
 		err := api.New(http.StatusTooManyRequests, api.CodeTooManyRequests, messages.tooMany)
 		err.RetryAfter = wait

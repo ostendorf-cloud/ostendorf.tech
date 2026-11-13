@@ -36,6 +36,12 @@ import (
 // the ratelimit package for why that bound matters.
 const maxRateLimitKeys = 100_000
 
+// mailLimiterKey is the one bucket mailLimiter ever tracks: every contact
+// mail this service sends counts against it, regardless of who asked. See
+// mailLimiter's own comment for why a per-client limiter cannot do this
+// job, and handleContact for where it is checked.
+const mailLimiterKey = "mail"
+
 // maxSessions bounds how many anonymous sessions session.MemoryStore keeps
 // at once, deliberately far below govue's own 10000 default.
 //
@@ -75,6 +81,7 @@ type App struct {
 	rateLimit        *middleware.RateLimit
 	challengeRateLim *middleware.RateLimit
 	contactLimiter   *ratelimit.Limiter
+	mailLimiter      *ratelimit.Limiter
 	clientIPs        *clientip.Resolver
 	protector        *csrf.Protector
 
@@ -138,7 +145,14 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	metricsHandler := metrics.Handler(registry)
 
 	a.limiter = ratelimit.New(cfg.RateLimitBurst, cfg.RateLimitPer, maxRateLimitKeys)
-	rateLimit, err := middleware.NewRateLimit(middleware.RateLimitConfig{Limiter: a.limiter, ClientIP: clientIPs})
+	rateLimit, err := middleware.NewRateLimit(middleware.RateLimitConfig{
+		Limiter:  a.limiter,
+		ClientIP: clientIPs,
+		// This limiter guards every page, asset, robots.txt and sitemap.xml
+		// request, so a browser denied here is asking for HTML, not govue's
+		// JSON error envelope; see pageRateLimitRespond.
+		Respond: a.pageRateLimitRespond,
+	})
 	fail(err)
 	a.rateLimit = rateLimit
 
@@ -155,6 +169,17 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.challengeRateLim = challengeRateLim
 
 	a.contactLimiter = ratelimit.New(cfg.ContactRateLimitBurst, cfg.ContactRateLimitPer, maxRateLimitKeys)
+
+	// mailLimiter has exactly one key (mailLimiterKey), so maxKeys is 1,
+	// not maxRateLimitKeys: clientip.Key groups IPv6 clients by /64, which
+	// is the right shape for a per-client bucket but means a single
+	// routed /48 is 65,536 independent buckets through contactLimiter
+	// above. That leaves no ceiling on the mail account itself, only on
+	// each slice an attacker could split their traffic into. mailLimiter
+	// is checked in handleContact, after the honeypot and independent of
+	// contactLimiter, so it bounds every mail this service ever sends in
+	// the same window, no matter how many addresses asked.
+	a.mailLimiter = ratelimit.New(cfg.MailRateLimitBurst, cfg.MailRateLimitPer, 1)
 
 	a.sessions, err = session.New(session.Config{
 		Store:          session.NewMemoryStore(nil, maxSessions),
@@ -187,9 +212,17 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.protector = protector
 
 	a.challenges = pow.NewService(challengeMaxNumber, challengeTTL, challengeMinAge)
+	// a.challengeKeys[0], the current key, is what Create signs a fresh
+	// challenge with; Verify accepts a solution signed with any key in
+	// the slice, current first. That is what lets a challenge issued just
+	// before CHALLENGE_KEY was rotated still verify, for as long as
+	// CHALLENGE_KEY_PREVIOUS still names the key it was issued under.
 	a.challengeKeys = nil
 	if len(cfg.ChallengeKey) > 0 {
-		a.challengeKeys = [][]byte{cfg.ChallengeKey}
+		a.challengeKeys = append(a.challengeKeys, cfg.ChallengeKey)
+	}
+	if len(cfg.ChallengeKeyPrevious) > 0 {
+		a.challengeKeys = append(a.challengeKeys, cfg.ChallengeKeyPrevious)
 	}
 
 	heloName := cfg.SiteURL.Hostname()
@@ -221,6 +254,21 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	}
 
 	a.security = middleware.DefaultSecurity()
+	// DefaultSecurity's policy sets no worker-src, so a browser falls back
+	// to script-src 'self' for the contact form's proof of work Worker:
+	// web/src/lib/contactChallenge.ts instantiates it from a same-origin
+	// module URL (new Worker(new URL('../workers/pow.worker.ts',
+	// import.meta.url), {type: 'module'})), compiled by Vite into a
+	// same-origin chunk under /assets/, never a blob: URL, and CSP Level 3
+	// (https://www.w3.org/TR/CSP3/#directive-worker-src) specifies exactly
+	// that fallback when worker-src is absent and script-src is present,
+	// supported by every browser this site targets. The fallback alone
+	// would already be enough to let the form submit. worker-src 'self' is
+	// set explicitly anyway: the cost is one directive, and it removes any
+	// future dependence on fallback behaviour if the bundler ever changes
+	// how this Worker is built, on a path where being wrong means the
+	// contact form never submits at all.
+	a.security.Policy.Add("worker-src", "'self'")
 	if cfg.AllowPlainHTTP {
 		// A browser that reached this service over plain HTTP must never
 		// be told to upgrade every future visit to HTTPS.

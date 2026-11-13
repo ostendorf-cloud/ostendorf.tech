@@ -224,7 +224,11 @@ func (p *pageServer) pageHandler() http.Handler {
 			return
 		}
 		if !strings.HasSuffix(path, "/") {
-			http.Redirect(w, r, path+"/", http.StatusMovedPermanently)
+			target := path + "/"
+			if r.URL.RawQuery != "" {
+				target += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
 			return
 		}
 
