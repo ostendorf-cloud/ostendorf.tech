@@ -72,6 +72,13 @@ locale, answers `/healthz`, `/readyz` and `/metrics`, and serves `/robots.txt` a
 contact form answers "unavailable" instead of failing to start; every other page keeps
 working. `CSRF_KEY` has no such fallback: the server refuses to start without it.
 
+Behind any reverse proxy or ingress, leaving `TRUSTED_PROXY_CIDRS` unset means every
+request is attributed to the proxy's own address, not the visitor's. Every rate limit
+then collapses into one shared bucket for the whole site: about 20 page loads a minute
+site-wide at the documented default, and the contact form blocked for every visitor for
+10 minutes after 5 submissions from anyone. Set it to the proxy's or ingress
+controller's own address range.
+
 ## Container
 
 ```sh

@@ -31,12 +31,20 @@ The global baseline already applies here and is not repeated below.
   `/sitemap.xml` from `pages.go`'s own `routeFiles`/`locales` route table, so the three
   can never drift apart. `contact.go` and `session.go` are the contact form's two
   endpoints and the anonymous, cookie-backed session they share with the CSRF
-  protector. `session.go` keeps that session in govue's in-process `session.MemoryStore`,
-  so the Deployment stays at one replica: a second replica can answer a visitor's GET and
-  their contact form POST on two different pods, each with its own session, and the CSRF
-  check then fails unpredictably. `charts/ostendorf.tech` enforces this at render time.
-  Lifts once `internal/webapp` moves to a shared session store instead of the in-memory
-  one.
+  protector. A session is minted in exactly one place: `GET /api/v1/challenge`, which
+  already returns the resulting CSRF token in the same response body the frontend reads.
+  No page route mints or reads a session any more. `POST /api/v1/contact` requires that
+  session through `requireSession` instead, refusing a request with none outright.
+  `session.go` keeps that session in govue's in-process `session.MemoryStore`, so the
+  Deployment stays at one replica: a second replica, or two pods briefly coexisting
+  during an ordinary rolling update, can answer a visitor's GET on one pod and their
+  contact form POST on another pod that never saw that session. `requireSession` then
+  refuses that POST with 403 — correctly from that pod's point of view, wrongly from the
+  visitor's, since their session is real, just on the other pod. This is an availability
+  problem for real visitors, not a security hole. `charts/ostendorf.tech` enforces the
+  single replica at render time and runs the Deployment with `strategy.type: Recreate`,
+  so a rollout never lets two pods coexist either. Lifts once `internal/webapp` moves to
+  a shared session store instead of the in-memory one.
 - `web/` is the Vue SPA, consuming govue's Vue package as a pnpm git dependency. `web/src`
   holds the app; `web/src/lib/contactChallenge.ts` and `web/src/workers/pow.worker.ts`
   are the contact form's proof of work client, a Web Worker kept cookie-free and
@@ -119,3 +127,6 @@ the Helm chart are implemented. Left out, tracked as later milestones:
   but its `Chart.yaml` `name` and every rendered object name use `ostendorf-tech`
   instead: a literal dot is invalid in a `Service`'s `metadata.name` (RFC 1035 label),
   which a chart named `ostendorf.tech` would otherwise produce by default.
+- `helm-unittest` is pinned in `mise.toml` through mise's generic `github:` backend with
+  a `postinstall` hook, not a plain registry entry: it is not in the mise registry, and
+  `helm plugin install <url>` is forbidden by the baseline regardless of Helm version.
