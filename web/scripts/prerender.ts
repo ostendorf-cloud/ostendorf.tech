@@ -32,17 +32,50 @@ import {
 const here = dirname(fileURLToPath(import.meta.url))
 const distDir = join(here, '../../cmd/website/dist')
 const outDir = join(here, '../../cmd/website/prerendered')
+const routeTablePath = join(here, '../../internal/routes/routes.json')
 
-/** pages pairs the router's route name with the SEO route it maps to and
- *  the output filename relative to one locale's own directory under
- *  cmd/website/prerendered. */
-const pages: Array<{ routerName: string; seoRoute: PageRoute; file: string }> = [
-  { routerName: 'home', seoRoute: 'home', file: 'index.html' },
-  { routerName: 'imprint', seoRoute: 'imprint', file: 'imprint/index.html' },
-  { routerName: 'privacy', seoRoute: 'privacy', file: 'privacy/index.html' },
-  { routerName: 'agb', seoRoute: 'agb', file: 'agb/index.html' },
-  { routerName: 'not-found', seoRoute: 'notFound', file: '404.html' },
-]
+/** RouteEntry is one row of internal/routes/routes.json, the site's one
+ *  route table. internal/webapp reads the same file, through
+ *  internal/routes, to decide which mux pattern, sitemap entry and
+ *  prerendered file a slug gets; this script reads it to decide what to
+ *  render, so the two can no longer list different pages. */
+interface RouteEntry {
+  name: string
+  slug: string
+  file: string
+}
+
+/** isKnownPageRoute narrows a route table entry's name to one this script
+ *  actually knows how to render. A name routes.json carries that this
+ *  script has no view or SEO metadata for fails loudly here instead of
+ *  prerendering a blank page. */
+function isKnownPageRoute(name: string): name is Exclude<PageRoute, 'notFound'> {
+  return name === 'home' || name === 'imprint' || name === 'privacy' || name === 'agb'
+}
+
+/** loadPages reads the route table and turns it into this script's own
+ *  page list, pairing each entry's name with the router route and the SEO
+ *  route it names (the same string serves both), plus the one page the
+ *  table itself does not carry: the 404 page, which answers no route and
+ *  so is not part of the table internal/webapp's sitemap and mux
+ *  registration read either. */
+async function loadPages(): Promise<
+  Array<{ routerName: string; seoRoute: PageRoute; file: string }>
+> {
+  const raw = await readFile(routeTablePath, 'utf-8')
+  const table = JSON.parse(raw) as RouteEntry[]
+
+  const pages: Array<{ routerName: string; seoRoute: PageRoute; file: string }> = table.map(
+    (entry) => {
+      if (!isKnownPageRoute(entry.name)) {
+        throw new Error(`prerender: routes.json names an unknown route "${entry.name}"`)
+      }
+      return { routerName: entry.name, seoRoute: entry.name, file: entry.file }
+    },
+  )
+  pages.push({ routerName: 'not-found', seoRoute: 'notFound', file: '404.html' })
+  return pages
+}
 
 interface ManifestEntry {
   file: string
@@ -141,6 +174,7 @@ function escapeHtml(value: string): string {
 
 async function main(): Promise<void> {
   const assets = await loadManifest()
+  const pages = await loadPages()
 
   for (const locale of SUPPORTED_LOCALES) {
     for (const page of pages) {
