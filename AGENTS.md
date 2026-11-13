@@ -16,6 +16,12 @@ The global baseline already applies here and is not repeated below.
   error. Every secret-shaped variable also accepts a `_FILE` twin; see the root
   `README.md`'s Configuration table. There is no secret manager client anywhere in this
   repository: `internal/openbao` from old_simon-ostendorf.de is deliberately not ported.
+- `internal/routes` is the website's one route table: `routes.json`, checked in and
+  embedded through `//go:embed`, lists every page as a name, a slug and the prerendered
+  file that answers it. `internal/webapp` and `web/scripts/prerender.ts` each read this
+  one file to build their own list instead of restating it, so a page added to one side
+  and not the other can no longer happen; see `internal/webapp`'s own bullet below for
+  what proves that in practice.
 - `internal/pow` issues and verifies the contact form's proof of work challenge, ported
   from old_simon-ostendorf.de's `internal/pow` unchanged: the algorithm is a contract
   with the browser worker that solves it.
@@ -27,9 +33,16 @@ The global baseline already applies here and is not repeated below.
   the security and access log middleware, the client IP resolver, the rate limiter, a
   session manager and the CSRF protector. `pages.go` is the catch-all document handler:
   the locale redirect at `/`, trailing slash canonicalisation, and serving the matching
-  prerendered file or a locale's own 404 page. `sitemap.go` serves `/robots.txt` and
-  `/sitemap.xml` from `pages.go`'s own `routeFiles`/`locales` route table, so the three
-  can never drift apart. `contact.go` and `session.go` are the contact form's two
+  prerendered file or a locale's own 404 page. `pages.go`'s own `routeFiles` is built
+  from `internal/routes`' embedded table, not hand written, so the page handler, the
+  per-page mux registration and `sitemap.go`'s `/robots.txt`/`/sitemap.xml` (which reads
+  that same `routeFiles`/`locales`) all answer from one list. That a page added to
+  `routes.json` actually gets prerendered, rather than merely agreeing with Go's own
+  copy of a list that no longer exists, is what `cmd/website`'s
+  `TestPrerenderedOutputMatchesRouteTable` checks: it walks the real output `task
+  prerender` wrote and compares it against `internal/routes`, catching both a route with
+  no prerendered file and a prerendered file that answers no route. `task test:routes`
+  runs it, with its own CI job. `contact.go` and `session.go` are the contact form's two
   endpoints and the anonymous, cookie-backed session they share with the CSRF
   protector. A session is minted in exactly one place: `GET /api/v1/challenge`, which
   already returns the resulting CSRF token in the same response body the frontend reads.
@@ -49,7 +62,8 @@ The global baseline already applies here and is not repeated below.
   holds the app; `web/src/lib/contactChallenge.ts` and `web/src/workers/pow.worker.ts`
   are the contact form's proof of work client, a Web Worker kept cookie-free and
   third-party-free; `web/scripts/prerender.ts` is the static site generation step `task
-  prerender` runs.
+  prerender` runs, reading its own page list from `internal/routes/routes.json` rather
+  than restating it.
 - `charts/ostendorf.tech/` is the Helm chart, `Dockerfile` the multi-stage container
   build, `docker-compose.yaml` a local development stack for the one.
 
