@@ -13,11 +13,15 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/ostendorf-cloud/govue/clientip"
 	"github.com/ostendorf-cloud/govue/envconf"
 	"github.com/ostendorf-cloud/govue/logging"
+
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/instagram"
 )
 
 // minKeyBytes is the shortest decoded key this package accepts for a signing
@@ -52,7 +56,37 @@ const (
 	// limit because every one of these actually tries to send a mail.
 	DefaultContactRateLimitBurst = 5
 	DefaultContactRateLimitPer   = 10 * time.Minute
+
+	// DefaultInstagramAPIVersion reads internal/instagram's own pinned
+	// version rather than repeating it, so the two can never drift.
+	DefaultInstagramAPIVersion = instagram.DefaultVersion
+	// DefaultInstagramPostCount is how many posts the Impressionen
+	// section asks Meta for; the old site asked for the same 20.
+	DefaultInstagramPostCount = 20
+	// DefaultInstagramRefreshInterval is how often the feed is reloaded.
+	DefaultInstagramRefreshInterval = time.Hour
+	// DefaultInstagramTokenRefreshAge is how old the access token may get
+	// before a refresh is attempted. Meta refreshes only tokens older than
+	// 24 hours, and a long lived token expires after 60 days, which is
+	// what bounds this setting at both ends.
+	DefaultInstagramTokenRefreshAge = 7 * 24 * time.Hour
 )
+
+// Instagram refresh bounds, the range INSTAGRAM_TOKEN_REFRESH_AGE and
+// INSTAGRAM_REFRESH_INTERVAL are checked against; see the defaults above.
+const (
+	minInstagramRefreshInterval = time.Minute
+	maxInstagramRefreshInterval = 24 * time.Hour
+	minInstagramTokenRefreshAge = 24 * time.Hour
+	maxInstagramTokenRefreshAge = 50 * 24 * time.Hour
+	minInstagramPostCount       = 1
+	maxInstagramPostCount       = 100
+)
+
+// umamiWebsiteID is the lowercase UUID Umami names a website by. Anything
+// else is a copied-wrong value, not an id, and is refused at startup rather
+// than silently counting nothing.
+var umamiWebsiteID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Config is the website's whole configuration, read once in main.
 type Config struct {
@@ -110,6 +144,38 @@ type Config struct {
 	// DefaultContactRateLimitBurst.
 	ContactRateLimitBurst int
 	ContactRateLimitPer   time.Duration
+
+	// InstagramToken is the access token the home page's Impressionen
+	// section is loaded with, server side. Empty switches the section off
+	// entirely: no syncer runs, the feed stays empty, and the frontend
+	// renders no section at all. It is a secret like every other one here,
+	// so INSTAGRAM_TOKEN_FILE works in its place.
+	//
+	// A refreshed token lives in memory only: this repository has no
+	// secret manager client, so a restart falls back to whatever value
+	// this variable carries. Meta expires a long lived token after 60
+	// days, so the configured value still needs rotating by whoever owns
+	// the deployment; see internal/instagram's Syncer.
+	InstagramToken string
+	// InstagramAPIVersion pins the Graph API version calls are made
+	// against; see internal/instagram.DefaultVersion.
+	InstagramAPIVersion string
+	// InstagramPostCount is how many posts are asked for per sync.
+	InstagramPostCount int
+	// InstagramRefreshInterval is how often the feed is reloaded.
+	InstagramRefreshInterval time.Duration
+	// InstagramTokenRefreshAge is how old the token may get before a
+	// refresh is attempted; see DefaultInstagramTokenRefreshAge.
+	InstagramTokenRefreshAge time.Duration
+
+	// UmamiURL and UmamiWebsiteID reach the self-hosted Umami every page
+	// view is reported to, server to server. Both empty count nothing, and
+	// setting exactly one of them is a configuration mistake rather than a
+	// half-enabled feature. No script, cookie or beacon ever reaches the
+	// visitor's browser either way; the privacy policy says so, and
+	// internal/analytics is what keeps that true.
+	UmamiURL       string
+	UmamiWebsiteID string
 }
 
 // Load reads every setting from the environment through getenv and
@@ -131,6 +197,12 @@ func Load(getenv func(string) string) (Config, error) {
 		ChallengeRateLimitPer:   loader.Duration("CHALLENGE_RATE_LIMIT_PER", DefaultChallengeRateLimitPer, time.Second, time.Hour),
 		ContactRateLimitBurst:   loader.Int("CONTACT_RATE_LIMIT_BURST", DefaultContactRateLimitBurst, 1, 100_000),
 		ContactRateLimitPer:     loader.Duration("CONTACT_RATE_LIMIT_PER", DefaultContactRateLimitPer, time.Second, 24*time.Hour),
+		InstagramAPIVersion:     loader.String("INSTAGRAM_API_VERSION", DefaultInstagramAPIVersion),
+		InstagramPostCount:      loader.Int("INSTAGRAM_POST_COUNT", DefaultInstagramPostCount, minInstagramPostCount, maxInstagramPostCount),
+		InstagramRefreshInterval: loader.Duration("INSTAGRAM_REFRESH_INTERVAL", DefaultInstagramRefreshInterval,
+			minInstagramRefreshInterval, maxInstagramRefreshInterval),
+		InstagramTokenRefreshAge: loader.Duration("INSTAGRAM_TOKEN_REFRESH_AGE", DefaultInstagramTokenRefreshAge,
+			minInstagramTokenRefreshAge, maxInstagramTokenRefreshAge),
 	}
 
 	var problems []error
@@ -165,10 +237,52 @@ func Load(getenv func(string) string) (Config, error) {
 	fail(wrap("CSRF_KEY", err))
 	cfg.CSRFKey = csrfKey
 
+	cfg.InstagramToken = loader.SecretOrFile("INSTAGRAM_TOKEN")
+
+	// Read raw rather than through loader.URL: that helper treats an empty
+	// value as a missing required one, and an empty UMAMI_URL is this
+	// feature switched off, not a mistake.
+	cfg.UmamiURL = strings.TrimRight(loader.String("UMAMI_URL", ""), "/")
+	cfg.UmamiWebsiteID = loader.String("UMAMI_WEBSITE_ID", "")
+	fail(wrap("UMAMI_URL", validateUmami(cfg.UmamiURL, cfg.UmamiWebsiteID)))
+
 	if err := errors.Join(append(problems, loader.Err())...); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// validateUmami checks the pair UMAMI_URL and UMAMI_WEBSITE_ID form. Both
+// empty is the feature switched off and no problem at all. Exactly one set
+// is refused rather than half-enabled: a deployment that meant to count
+// page views and typed only one of the two would otherwise count nothing
+// and say nothing about it. The error names UMAMI_WEBSITE_ID itself where
+// that is the half at fault, since the caller only wraps it with
+// UMAMI_URL's name.
+func validateUmami(rawURL, websiteID string) error {
+	if (rawURL == "") != (websiteID == "") {
+		return errors.New("and UMAMI_WEBSITE_ID are set together or not at all")
+	}
+	if rawURL == "" {
+		return nil
+	}
+	parsed, err := url.Parse(rawURL)
+	switch {
+	case err != nil:
+		return fmt.Errorf("must be a URL: %w", err)
+	case parsed.Scheme != "http" && parsed.Scheme != "https":
+		return errors.New("must start with http:// or https://")
+	case parsed.Host == "":
+		return errors.New("must contain a host")
+	case parsed.User != nil:
+		return errors.New("must not contain credentials")
+	case parsed.RawQuery != "" || parsed.Fragment != "":
+		return errors.New("must not contain a query or a fragment")
+	}
+	if !umamiWebsiteID.MatchString(websiteID) {
+		return errors.New("UMAMI_WEBSITE_ID must be the lowercase UUID of the website in Umami")
+	}
+	return nil
 }
 
 // wrap names the variable a problem came from, or returns nil for no

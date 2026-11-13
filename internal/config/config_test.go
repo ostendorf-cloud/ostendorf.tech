@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // env builds a getenv function from a map, so a test can set exactly the
@@ -81,6 +82,24 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.ContactRateLimitBurst != DefaultContactRateLimitBurst || cfg.ContactRateLimitPer != DefaultContactRateLimitPer {
 		t.Errorf("contact rate limit = %d/%v, want %d/%v",
 			cfg.ContactRateLimitBurst, cfg.ContactRateLimitPer, DefaultContactRateLimitBurst, DefaultContactRateLimitPer)
+	}
+	if cfg.InstagramToken != "" {
+		t.Error("InstagramToken is set by default, want the feed switched off")
+	}
+	if cfg.InstagramAPIVersion != DefaultInstagramAPIVersion {
+		t.Errorf("InstagramAPIVersion = %q, want %q", cfg.InstagramAPIVersion, DefaultInstagramAPIVersion)
+	}
+	if cfg.InstagramPostCount != DefaultInstagramPostCount {
+		t.Errorf("InstagramPostCount = %d, want %d", cfg.InstagramPostCount, DefaultInstagramPostCount)
+	}
+	if cfg.InstagramRefreshInterval != DefaultInstagramRefreshInterval {
+		t.Errorf("InstagramRefreshInterval = %v, want %v", cfg.InstagramRefreshInterval, DefaultInstagramRefreshInterval)
+	}
+	if cfg.InstagramTokenRefreshAge != DefaultInstagramTokenRefreshAge {
+		t.Errorf("InstagramTokenRefreshAge = %v, want %v", cfg.InstagramTokenRefreshAge, DefaultInstagramTokenRefreshAge)
+	}
+	if cfg.UmamiURL != "" || cfg.UmamiWebsiteID != "" {
+		t.Errorf("umami = %q/%q, want both empty by default", cfg.UmamiURL, cfg.UmamiWebsiteID)
 	}
 }
 
@@ -246,6 +265,32 @@ func TestLoadRejectsEachInvalidField(t *testing.T) {
 			env:  map[string]string{"RATE_LIMIT_PER": "soon"},
 			want: "RATE_LIMIT_PER",
 		},
+		"instagram post count of zero": {
+			env:  map[string]string{"INSTAGRAM_POST_COUNT": "0"},
+			want: "INSTAGRAM_POST_COUNT",
+		},
+		"instagram post count above the API maximum": {
+			env:  map[string]string{"INSTAGRAM_POST_COUNT": "500"},
+			want: "INSTAGRAM_POST_COUNT",
+		},
+		"instagram refresh interval too short": {
+			env:  map[string]string{"INSTAGRAM_REFRESH_INTERVAL": "10s"},
+			want: "INSTAGRAM_REFRESH_INTERVAL",
+		},
+		"instagram refresh interval not a duration": {
+			env:  map[string]string{"INSTAGRAM_REFRESH_INTERVAL": "often"},
+			want: "INSTAGRAM_REFRESH_INTERVAL",
+		},
+		// Meta refuses to refresh a token younger than 24 hours.
+		"instagram token refresh age below one day": {
+			env:  map[string]string{"INSTAGRAM_TOKEN_REFRESH_AGE": "12h"},
+			want: "INSTAGRAM_TOKEN_REFRESH_AGE",
+		},
+		// A long lived token expires after 60 days.
+		"instagram token refresh age past expiry": {
+			env:  map[string]string{"INSTAGRAM_TOKEN_REFRESH_AGE": "60d"},
+			want: "INSTAGRAM_TOKEN_REFRESH_AGE",
+		},
 	}
 
 	for name, tc := range tests {
@@ -258,6 +303,99 @@ func TestLoadRejectsEachInvalidField(t *testing.T) {
 				t.Errorf("Load() error = %q, want it to mention %q", err.Error(), tc.want)
 			}
 		})
+	}
+}
+
+// validUmamiWebsiteID is the lowercase UUID shape Umami names a website
+// by, the only shape Load accepts.
+const validUmamiWebsiteID = "0f1e2d3c-4b5a-4968-8776-655443322110"
+
+func TestLoadInstagramAndUmamiOverrides(t *testing.T) {
+	cfg, err := Load(env(withCSRFKey(map[string]string{
+		"INSTAGRAM_TOKEN":             "IGAA-token",
+		"INSTAGRAM_API_VERSION":       "v24.0",
+		"INSTAGRAM_POST_COUNT":        "8",
+		"INSTAGRAM_REFRESH_INTERVAL":  "30m",
+		"INSTAGRAM_TOKEN_REFRESH_AGE": "14d",
+		"UMAMI_URL":                   "http://umami.umami.svc.cluster.local/",
+		"UMAMI_WEBSITE_ID":            validUmamiWebsiteID,
+	})))
+	if err != nil {
+		t.Fatalf("Load() returned an unexpected error: %v", err)
+	}
+	if cfg.InstagramToken != "IGAA-token" {
+		t.Errorf("InstagramToken = %q, want IGAA-token", cfg.InstagramToken)
+	}
+	if cfg.InstagramAPIVersion != "v24.0" || cfg.InstagramPostCount != 8 {
+		t.Errorf("instagram = %q/%d, want v24.0/8", cfg.InstagramAPIVersion, cfg.InstagramPostCount)
+	}
+	if cfg.InstagramRefreshInterval != 30*time.Minute {
+		t.Errorf("InstagramRefreshInterval = %v, want 30m", cfg.InstagramRefreshInterval)
+	}
+	if cfg.InstagramTokenRefreshAge != 14*24*time.Hour {
+		t.Errorf("InstagramTokenRefreshAge = %v, want 14d", cfg.InstagramTokenRefreshAge)
+	}
+	// The trailing slash is trimmed, so joining /api/send onto it cannot
+	// produce a double slash.
+	if cfg.UmamiURL != "http://umami.umami.svc.cluster.local" {
+		t.Errorf("UmamiURL = %q, want the trailing slash trimmed", cfg.UmamiURL)
+	}
+	if cfg.UmamiWebsiteID != validUmamiWebsiteID {
+		t.Errorf("UmamiWebsiteID = %q, want %q", cfg.UmamiWebsiteID, validUmamiWebsiteID)
+	}
+}
+
+func TestLoadInstagramTokenFromFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "instagram-token")
+	if err := os.WriteFile(path, []byte("IGAA-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(env(withCSRFKey(map[string]string{"INSTAGRAM_TOKEN_FILE": path})))
+	if err != nil {
+		t.Fatalf("Load() returned an unexpected error: %v", err)
+	}
+	if cfg.InstagramToken != "IGAA-token" {
+		t.Errorf("InstagramToken = %q, want %q (trailing newline trimmed)", cfg.InstagramToken, "IGAA-token")
+	}
+
+	_, err = Load(env(withCSRFKey(map[string]string{
+		"INSTAGRAM_TOKEN":      "also-set",
+		"INSTAGRAM_TOKEN_FILE": path,
+	})))
+	if err == nil || !strings.Contains(err.Error(), "INSTAGRAM_TOKEN") {
+		t.Fatalf("Load() error = %v, want a problem naming INSTAGRAM_TOKEN", err)
+	}
+}
+
+func TestLoadRejectsInvalidUmamiPairs(t *testing.T) {
+	tests := map[string]map[string]string{
+		"URL alone":        {"UMAMI_URL": "http://umami"},
+		"ID alone":         {"UMAMI_WEBSITE_ID": validUmamiWebsiteID},
+		"relative URL":     {"UMAMI_URL": "umami:3000", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
+		"URL with query":   {"UMAMI_URL": "http://umami/?x=1", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
+		"URL with user":    {"UMAMI_URL": "http://a:b@umami", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
+		"ftp URL":          {"UMAMI_URL": "ftp://umami", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
+		"uppercase ID":     {"UMAMI_URL": "http://umami", "UMAMI_WEBSITE_ID": strings.ToUpper(validUmamiWebsiteID)},
+		"ID that is no ID": {"UMAMI_URL": "http://umami", "UMAMI_WEBSITE_ID": "ostendorf.tech"},
+	}
+
+	for name, values := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := Load(env(withCSRFKey(values)))
+			if err == nil {
+				t.Fatal("Load() = nil error, want one naming UMAMI_URL")
+			}
+			if !strings.Contains(err.Error(), "UMAMI_URL") {
+				t.Errorf("Load() error = %q, want it to mention UMAMI_URL", err.Error())
+			}
+		})
+	}
+
+	// Both unset is the feature switched off, not a problem.
+	if _, err := Load(env(withCSRFKey(nil))); err != nil {
+		t.Errorf("Load() with no Umami configuration = %v, want nil", err)
 	}
 }
 
