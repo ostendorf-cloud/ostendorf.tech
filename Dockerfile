@@ -40,7 +40,7 @@ RUN pnpm run build && pnpm run prerender
 #
 # Digest for golang:1.27.3-bookworm (linux/amd64), matching mise.toml's
 # pinned Go patch exactly; resolved against Docker Hub's API.
-FROM golang:1.27.3-bookworm@sha256:025eefc1e8dbe63201734a72aaa0a55d7a077f2d8410432f8ae2f3e939f32871 AS build
+FROM golang:1.27.4-bookworm@sha256:fb7cceb528b47141eccd9b60bf3cbd27d5ef5f8cf5b7d338bec866da495b50dc AS build
 
 WORKDIR /src
 
