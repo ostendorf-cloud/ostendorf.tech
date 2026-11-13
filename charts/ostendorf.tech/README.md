@@ -9,6 +9,9 @@ cluster.
 - A `Secret` already in the target namespace, created by your own secret manager operator,
   carrying at least the CSRF signing key (see "Secrets" below). This chart never creates that
   `Secret` itself.
+- Only if `httpRoute.enabled` is set: the Gateway API CRDs and a running `Gateway` with a
+  listener that allows this release's namespace. See "External routing" below; this chart
+  ships neither.
 
 ## Installing
 
@@ -114,6 +117,52 @@ so it raises no second-pod risk either.
 only ever routes to `service.port`. A `ServiceMonitor` or `PodMonitor` (not part of this
 chart) can scrape `service.adminPort` directly, in-cluster.
 
+## External routing
+
+This chart reaches external traffic to its own `Service` two ways, chosen by
+`ingress.enabled` and `httpRoute.enabled`. Both default to `false`: a default install creates
+neither, reachable only from inside the cluster, until one is deliberately turned on. They are
+mutually exclusive: turning both on fails the install or upgrade with a readable message
+naming which one to turn off, enforced once in `templates/deployment.yaml`, the one template
+that always renders regardless of which routing flag is set.
+
+### Ingress
+
+Set `ingress.enabled: true`. `ingress.hosts` names the host and path rules, and `ingress.tls`
+carries the certificate configuration directly on the `Ingress` object: this chart owns that
+configuration. `ingress.enabled: true` also requires `config.trustedProxyCidrs`; see
+"Installing" above for why.
+
+### Gateway API HTTPRoute
+
+Set `httpRoute.enabled: true`, `httpRoute.parentRefs.name` and `httpRoute.parentRefs.namespace`
+to the `Gateway` this release attaches to. The namespace is required, not optional the way
+`ingress.className` is: a `Gateway` is almost always platform owned and lives in a different
+namespace than this release, and the Gateway API's own default for an unset
+`parentRefs.namespace` is the `HTTPRoute`'s own namespace, normally wrong here.
+
+This chart never creates the `Gateway` and never ships the Gateway API CRDs (`Gateway`,
+`HTTPRoute` and the rest): both are cluster-level prerequisites, installed and operated once
+per cluster by the cluster operator, same as any other CRD (see `kubernetes-conventions`'s
+`install-crds` convention), outside this chart. The `Gateway`'s own `allowedRoutes` decides
+whether it actually accepts this `HTTPRoute`; a `httpRoute.enabled: true` release that the
+`Gateway` does not allow installs without error but never actually receives traffic.
+
+Unlike `Ingress`, an `HTTPRoute` carries no `tls` field of its own. TLS terminates on the
+`Gateway`'s listener instead, which the cluster operator, not this chart, owns and configures;
+`httpRoute.hostnames` only has to match a hostname the listener itself already serves for
+traffic to reach this `HTTPRoute` at all.
+
+Routing itself is fixed to this chart's own `Service`, on `service.port`, never
+`service.adminPort`: no values-driven way to add a second backend or a per-path rule, the same
+single-backend assumption `ingress.hosts` already makes. An `HTTPRoute` rule with no `matches`
+defaults to a `/` prefix match per the Gateway API spec, the same default an `Ingress` with one
+`/` path rule gives, so this chart's `HTTPRoute` sets none explicitly.
+
+`httpRoute.hostnames` is a list because `HTTPRoute` itself accepts more than one hostname for
+the one set of rules above; this chart's own site is a single public domain, so it is set up
+front to one hostname in practice, not resolved per request.
+
 ## Values
 
 See `values.yaml` for the full, commented list. The ones most deployments touch:
@@ -125,7 +174,15 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `replicaCount` | Pod replicas: 0 (stopped) or 1, never above (see "Replicas" above) | `1` |
 | `service.port` | Public Service and container port, the only one the `Ingress` ever routes to | `8080` |
 | `service.adminPort` | govue's admin listener: health, readiness and metrics, in-cluster only | `8081` |
-| `ingress.enabled` | Create an `Ingress` | `false` |
+| `ingress.enabled` | Create an `Ingress`. Requires `config.trustedProxyCidrs` to be set; see that row. Mutually exclusive with `httpRoute.enabled`; see "External routing" above. | `false` |
+| `ingress.annotations` | Annotations for the `Ingress` | `{}` |
+| `ingress.tls` | TLS configuration for the `Ingress` | `[]` |
+| `httpRoute.enabled` | Create a Gateway API `HTTPRoute`. Mutually exclusive with `ingress.enabled`; see "External routing" above. | `false` |
+| `httpRoute.hostnames` | Hostnames the `HTTPRoute` matches | `[]` |
+| `httpRoute.annotations` | Annotations for the `HTTPRoute` | `{}` |
+| `httpRoute.parentRefs.name` | Name of the `Gateway` to attach to. Required when `httpRoute.enabled` is true | `""` |
+| `httpRoute.parentRefs.namespace` | Namespace the `Gateway` lives in. Required when `httpRoute.enabled` is true; see "External routing" above for why this has no same-namespace fallback | `""` |
+| `httpRoute.parentRefs.sectionName` | Specific listener on the `Gateway` to attach to, when it exposes more than one | `""` |
 | `resources` | Pod resource requests/limits | see `values.yaml` |
 | `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
 | `config.smtpAddr` | SMTP submission server | `mail.ostendorf.cloud:587` |
@@ -149,6 +206,31 @@ No breaking change has shipped yet; `Chart.yaml`'s `version` tracks that going f
 helm uninstall ostendorf-tech
 ```
 
-Removes the `Deployment`, `Service`, `ServiceAccount` and `Ingress` (when enabled) this chart
-created. The `Secret` `existingSecret.name` points at is never touched: it was never created by
-this chart, so it is never removed by it either.
+Removes the `Deployment`, `Service`, `ServiceAccount`, and the `Ingress` or `HTTPRoute`,
+whichever was enabled, this chart created. The `Secret` `existingSecret.name` points at is never
+touched: it was never created by this chart, so it is never removed by it either.
+
+## Verification
+
+This chart is verified with:
+
+- `helm lint`
+- `helm template`, for the default values and for the documented ingress-enabled and
+  httpRoute-enabled combinations.
+- `kubeconform`, against the rendered manifests. The default schema set carries no Gateway API
+  schemas, so an httpRoute-enabled render's `HTTPRoute` is validated with a second
+  `-schema-location` added after the default one, pointing at the community
+  [CRDs-catalog](https://github.com/datreeio/CRDs-catalog):
+
+  ```sh
+  kubeconform -strict -summary \
+    -schema-location default \
+    -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+  ```
+
+- [`helm-unittest`](https://github.com/helm-unittest/helm-unittest), run with
+  `helm unittest charts/ostendorf.tech`; see `mise.toml` for how the plugin is pinned.
+
+`task lint:helm`, `task validate:kubeconform` and `task test:helm` run each of these, one job
+per check in CI. A live end-to-end install into a real cluster is a separate, tracked follow-up,
+not part of this chart's static verification.
