@@ -125,6 +125,7 @@ func newSyncer(meta *fakeMeta, logs io.Writer, now func() time.Time) *Syncer {
 	client.BaseURL = "https://graph.test"
 	client.HTTP = &http.Client{Transport: hostTransport{meta}}
 	client.MaxImageBytes = 1000
+	client.AllowedImageHosts = []string{"cdn.test"}
 	return &Syncer{
 		Client: client, Token: "tok-1",
 		RefreshAge: 7 * 24 * time.Hour, Count: 20, Feed: &Feed{},

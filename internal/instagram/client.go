@@ -41,6 +41,14 @@ const (
 // allowedImageTypes are the formats served back to browsers.
 var allowedImageTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true}
 
+// DefaultAllowedImageHosts are Meta's actual CDN domains for Instagram
+// media. This is a domain *suffix* allowlist, not a list of exact
+// hostnames: Meta rotates and adds CDN subdomains (for example
+// "scontent-waw2-1.cdninstagram.com" or "video.xx.fna.fbcdn.net") without
+// notice, so a fixed hostname list would silently start breaking the feed
+// the moment Meta pointed a post at a subdomain not already on it.
+var DefaultAllowedImageHosts = []string{"cdninstagram.com", "fbcdn.net"}
+
 // Media is one post as the API returns it.
 type Media struct {
 	ID           string `json:"id"`
@@ -71,15 +79,20 @@ type Client struct {
 	HTTP *http.Client
 	// MaxImageBytes bounds one image download.
 	MaxImageBytes int64
+	// AllowedImageHosts bounds which hosts Image will ever fetch from, as
+	// domain suffixes checked by hostAllowed. Overridable primarily so
+	// tests can point it at a fake host instead of real Meta domains.
+	AllowedImageHosts []string
 }
 
 // NewClient returns a client for the real API with a 15 second timeout.
 func NewClient(version string) *Client {
 	return &Client{
-		BaseURL:       DefaultBaseURL,
-		Version:       version,
-		HTTP:          &http.Client{Timeout: 15 * time.Second},
-		MaxImageBytes: DefaultMaxImageBytes,
+		BaseURL:           DefaultBaseURL,
+		Version:           version,
+		HTTP:              &http.Client{Timeout: 15 * time.Second},
+		MaxImageBytes:     DefaultMaxImageBytes,
+		AllowedImageHosts: DefaultAllowedImageHosts,
 	}
 }
 
@@ -180,11 +193,30 @@ func (c *Client) RefreshToken(ctx context.Context, token string) (string, error)
 	return resp.AccessToken, nil
 }
 
+// hostAllowed reports whether host exactly matches one of allowed, or is
+// a subdomain of one, bounded on a label boundary. A bare
+// strings.HasSuffix on the domain string alone would be a classic
+// bypass: "evil-cdninstagram.com" has "cdninstagram.com" as a string
+// suffix without being a subdomain of it at all. Matching only on
+// host == domain or host ending in "."+domain closes that.
+func hostAllowed(host string, allowed []string) bool {
+	host = strings.ToLower(host)
+	for _, domain := range allowed {
+		if host == domain || strings.HasSuffix(host, "."+domain) {
+			return true
+		}
+	}
+	return false
+}
+
 // Image downloads one picture and returns it with its sniffed content type.
 func (c *Client) Image(ctx context.Context, rawURL string) ([]byte, string, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Scheme != "https" || u.Host == "" {
 		return nil, "", errors.New("instagram image: not an https URL")
+	}
+	if !hostAllowed(u.Hostname(), c.AllowedImageHosts) {
+		return nil, "", fmt.Errorf("instagram image: host %q is not an allowed Meta CDN host", u.Hostname())
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
