@@ -66,6 +66,20 @@ through Task always populates the frontend first. A bare `go build ./cmd/website
 `task build` or `task test:go` instead, or `task web:build && task prerender` once by
 hand before reaching for the Go toolchain directly.
 
+## govue's two halves move together
+
+govue releases a Go module and a Vue package under one tag. `go.mod`'s
+`require github.com/ostendorf-cloud/govue` and `web/package.json`'s
+`@ostendorf-cloud/govue` pnpm git dependency must always name the same tag: a mismatch
+means the repository takes half of a govue release and not the other half, silently.
+`task check:govue-version` (`internal/depsync`) enforces this: it asks `go list -m` for
+the version go.mod actually resolves to, the same resolution `go build` itself uses, and
+pulls the tag out of package.json's `ostendorf-cloud/govue#<tag>&path:/web` specifier,
+then fails naming both versions and both files when they differ. `web/pnpm-lock.yaml` is
+not checked separately: its own specifier field already has to match package.json's for
+`pnpm install --frozen-lockfile` to pass, and its resolved entry pins a commit hash, not
+a tag, so it cannot be compared to a version directly.
+
 ## Verify before committing
 
 ```sh
