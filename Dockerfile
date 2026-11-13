@@ -26,6 +26,13 @@ COPY web/package.json web/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY web/ ./
+
+# The frontend reads the one route table out of internal/routes, through
+# web/src/lib/routeTable.ts, so this stage needs that file as well as web/
+# itself. It lives outside web/ because Go embeds the same file; see
+# AGENTS.md on why there is only one of it.
+COPY internal/routes/routes.json /src/internal/routes/routes.json
+
 RUN pnpm run build && pnpm run prerender
 
 # Build stage: compiles a fully static binary (CGO_ENABLED=0), so the
