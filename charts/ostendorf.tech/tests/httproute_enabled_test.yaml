@@ -5,6 +5,10 @@ templates:
 set:
   existingSecret:
     name: ostendorf-tech-secrets
+  feed:
+    config:
+      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+      openBaoRole: ostendorf-tech-feed
   httpRoute:
     enabled: true
     hostnames:
@@ -73,6 +77,13 @@ tests:
       - equal:
           path: spec.rules[0].backendRefs[0].name
           value: RELEASE-NAME-ostendorf-tech
+
+  - it: never routes to the feed service's own Service
+    template: templates/httproute.yaml
+    asserts:
+      - notEqual:
+          path: spec.rules[0].backendRefs[0].name
+          value: RELEASE-NAME-ostendorf-tech-feed
 
   - it: routes only the public port, never govue's admin listener, even when the two differ from their defaults
     template: templates/httproute.yaml

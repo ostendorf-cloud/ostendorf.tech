@@ -1,0 +1,76 @@
+---
+suite: deployment with the feed service URL and Umami configured
+templates:
+  - templates/deployment.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+  feed:
+    config:
+      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+      openBaoRole: ostendorf-tech-feed
+tests:
+  - it: always carries FEED_SERVICE_URL, resolving to the chart's own feed Service, with no values override possible
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FEED_SERVICE_URL
+            value: "http://RELEASE-NAME-ostendorf-tech-feed:8081"
+
+  - it: follows a non-default feed service port in the computed FEED_SERVICE_URL
+    set:
+      feed:
+        service:
+          port: 9090
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FEED_SERVICE_URL
+            value: "http://RELEASE-NAME-ostendorf-tech-feed:9090"
+
+  - it: defaults FEED_REFRESH_INTERVAL to 5 minutes
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FEED_REFRESH_INTERVAL
+            value: "5m"
+
+  - it: follows config.feedRefreshInterval when overridden
+    set:
+      config:
+        feedRefreshInterval: "1m"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FEED_REFRESH_INTERVAL
+            value: "1m"
+
+  - it: reports page views to the Umami it is pointed at
+    set:
+      config:
+        umamiUrl: http://umami.umami.svc.cluster.local
+        umamiWebsiteId: 0f1e2d3c-4b5a-4968-8776-655443322110
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UMAMI_URL
+            value: "http://umami.umami.svc.cluster.local"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UMAMI_WEBSITE_ID
+            value: "0f1e2d3c-4b5a-4968-8776-655443322110"
+
+  - it: never mounts an Umami script or any other extra volume for it
+    set:
+      config:
+        umamiUrl: http://umami.umami.svc.cluster.local
+        umamiWebsiteId: 0f1e2d3c-4b5a-4968-8776-655443322110
+    asserts:
+      - isNull:
+          path: spec.template.spec.volumes

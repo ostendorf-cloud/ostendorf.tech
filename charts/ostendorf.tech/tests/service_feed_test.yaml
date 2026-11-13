@@ -1,0 +1,41 @@
+suite: feed Service with default values
+templates:
+  - templates/service.yaml
+  - templates/service-feed.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+  feed:
+    config:
+      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+      openBaoRole: ostendorf-tech-feed
+tests:
+  - it: renders a ClusterIP Service with one port named http on 8081, targeting the http container port
+    template: templates/service-feed.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - equal:
+          path: spec.ports
+          value:
+            - name: http
+              port: 8081
+              targetPort: http
+              protocol: TCP
+
+  - it: never selects the website's own pods, and vice versa, since the two Services' selectors differ
+    templates:
+      - templates/service.yaml
+      - templates/service-feed.yaml
+    asserts:
+      - notEqual:
+          path: spec.selector["app.kubernetes.io/name"]
+          value: ostendorf-tech-feed
+        template: templates/service.yaml
+      - equal:
+          path: spec.selector["app.kubernetes.io/name"]
+          value: ostendorf-tech-feed
+        template: templates/service-feed.yaml

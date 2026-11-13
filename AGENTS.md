@@ -12,10 +12,11 @@ The global baseline already applies here and is not repeated below.
   `cmd/` rather than `internal/` because `go:embed` resolves relative to the file
   holding the directive, the same reason old_simon-ostendorf.de gave for its own
   `templates` and `static`.
-- `internal/config` loads and validates the environment once, aggregated into one
-  error. Every secret-shaped variable also accepts a `_FILE` twin; see the root
-  `README.md`'s Configuration table. There is no secret manager client anywhere in this
-  repository: `internal/openbao` from old_simon-ostendorf.de is deliberately not ported.
+- `internal/config` loads and validates the website's own environment once, aggregated
+  into one error. Every secret-shaped variable also accepts a `_FILE` twin; see the root
+  `README.md`'s Configuration table. The website itself has no secret manager client and
+  no Instagram or Meta credential of its own any more: see `internal/instagram`'s own
+  bullet below for where both moved to.
 - `internal/routes` is the website's one route table: `routes.json`, checked in and
   embedded through `//go:embed`, lists every page as a name, a slug and the prerendered
   file that answers it. `internal/webapp`, `web/scripts/prerender.ts`, and the frontend's
@@ -37,17 +38,54 @@ The global baseline already applies here and is not repeated below.
   SMTP, ported from old_simon-ostendorf.de's `internal/contact` with one change: a field
   error carries a stable code instead of a German message, so `internal/webapp` can
   answer in German or English depending on the visitor's own locale.
-- `internal/instagram` loads the home page's Impressionen section server side: the posts
-  and their pictures are fetched from Meta here, kept in memory, and served from this
-  site's own domain, so a visitor's browser never connects to Instagram or Meta. That is
-  not an implementation detail but what `web/src/views/PrivacyView.vue` already promises.
-  Ported from old_simon-ostendorf.de's `internal/instagram` with one change: its `Syncer`
-  read and wrote the access token through OpenBao, so a refreshed token survived a
-  restart. There is no secret manager client here, so the token comes from
-  `INSTAGRAM_TOKEN` (or its `_FILE` twin) and a refresh updates the in-memory copy only.
-  A pod that runs for months keeps working; a restart falls back to the configured value,
-  which therefore still has to be rotated before Meta expires it after 60 days. Without a
-  token no syncer runs at all, the feed stays empty and the section is not rendered.
+- `internal/instagram` is the domain logic behind the home page's Impressionen section:
+  a `Client` against Meta's Graph API, a `Feed` cache of the posts and their picture
+  bytes, a `Syncer` that keeps `Feed` current, and a `TokenStore` that reads and writes
+  the access token through `internal/openbao`'s KV v2 API under optimistic concurrency
+  (CAS), refreshing it against Meta once it passes `TokenRefreshAge` and treating a CAS
+  mismatch as the other side's write winning rather than an error. None of this runs
+  inside the website any more: `cmd/feed` is the only binary that imports this package,
+  the only one with an OpenBao client, and the only one that ever holds the access
+  token, exclusively in memory, never logged and never returned in an error. Because a
+  refreshed token is written back to OpenBao rather than kept only in memory, it survives
+  a restart: the manual rotation this needed before Meta's 60-day expiry is gone, not
+  merely less frequent. Ported from old_simon-ostendorf.de's `internal/instagram`, with
+  the same one change as before this split: where a refreshed token is stored, OpenBao
+  rather than nowhere.
+- `internal/openbao` is a small, standard library only HTTP client against OpenBao's
+  Kubernetes auth method and its KV v2 API, ported unchanged from
+  old_simon-ostendorf.de's own `internal/openbao`. It reads the projected service account
+  token fresh on every login rather than caching it, because the kubelet rotates that
+  file; it re-logs in at two thirds of the lease instead of waiting for `renew-self` to
+  fail, and retries a login once on a 403. `Write` is a full-document overwrite guarded
+  by the version `Read` last saw, so two replicas writing at once cannot silently clobber
+  each other. `cmd/feed` is the only binary that constructs one of these: the website has
+  no OpenBao client at all.
+- `cmd/feed` wires the feed service: a second binary alongside `cmd/website`, with its
+  own configuration (`internal/feedconfig`) and its own chart entry
+  (`charts/ostendorf.tech/templates/deployment-feed.yaml` and friends). `internal/feed`
+  builds it: the background loop that keeps `internal/instagram`'s `Feed` current from
+  Meta using the OpenBao-backed token above, and the internal-only HTTP surface the
+  website reads from, `GET /api/v1/posts` and `GET /api/v1/posts/{id}/image`, alongside
+  `/healthz` and `/readyz` on the one listener. `/healthz` always answers 200 while the
+  process is up; `/readyz` answers 503 until one full sync cycle has obtained a usable
+  token and completed a call to Meta, and then stays 200 even through a later transient
+  failure, since the last good feed keeps being served regardless. A cycle that reaches
+  Meta and finds zero posts still counts: an Instagram account with nothing posted is a
+  real, permanently empty feed, not a readiness failure. A feed pod that cannot reach
+  OpenBao or Meta therefore sits at `0/1` ready, retrying, rather than crash-looping or
+  serving stale or absent data as if nothing were wrong. Its HTTP surface authenticates
+  no caller of its own; it relies on the chart's `NetworkPolicy` admitting only the
+  website's pods instead, see `charts/ostendorf.tech/README.md`.
+- `internal/feedclient` is the website's own client against the feed service above: a
+  `Client` for its two routes, a `Cache` of the posts and picture bytes it last got back,
+  and a `Syncer` that polls the feed service on an interval (`FEED_REFRESH_INTERVAL`) and
+  keeps that `Cache` current, the same caching `internal/instagram` itself used to do
+  before this split. Every call is bounded by a timeout, so an unreachable or slow feed
+  service can never hang a page; an empty `Cache`, whether from an unreachable feed
+  service, an unset `FEED_SERVICE_URL`, or a feed service with nothing to show, renders no
+  Impressionen section at all, exactly as an absent token did before this split.
+  `internal/webapp/feed.go` is the one place this package is read from.
 - `internal/analytics` reports page views to Umami from the server, ported from
   old_simon-ostendorf.de's `internal/analytics` unchanged: no script, no cookie, nothing
   read from the visitor's device, which again is what the privacy policy states. It
@@ -97,8 +135,14 @@ The global baseline already applies here and is not repeated below.
   `internal/routes/routes.json` from; `web/scripts/prerender.ts`, `web/src/router/index.ts`
   (the Vue Router table) and `web/src/lib/seo.ts` (the `PageRoute` list and its slugs) all
   import it instead of restating the page list themselves.
-- `charts/ostendorf.tech/` is the Helm chart, `Dockerfile` the multi-stage container
-  build, `docker-compose.yaml` a local development stack for the one.
+- `charts/ostendorf.tech/` is the Helm chart, for both the website's and the feed
+  service's own workloads. `Dockerfile` is the multi-stage build for both of their
+  container images, as two separate final stages, `website` and `feed`
+  (`docker build --target website` or `--target feed`) rather than two Dockerfiles, since
+  the two binaries share `go.mod`/`go.sum` and the pinned base image digests; see the
+  comment at the top of `Dockerfile` itself for why a build of one target never triggers
+  the other's own stages. `docker-compose.yaml` is a local development stack for the
+  website alone.
 
 ## A build needs the frontend first
 
@@ -112,6 +156,10 @@ through Task always populates the frontend first. A bare `go build ./cmd/website
 `go test ./cmd/website/...` outside Task fails on a fresh checkout for that reason; run
 `task build` or `task test:go` instead, or `task web:build && task prerender` once by
 hand before reaching for the Go toolchain directly.
+
+`cmd/feed` has no `go:embed` directive anywhere in its own tree and needs none of this:
+`task build:feed` declares no frontend dependency, on purpose, and `go build ./cmd/feed`
+compiles on a fresh checkout with no prior step at all.
 
 ## govue's two halves move together
 
@@ -169,8 +217,9 @@ when the theme changes.
 
 The home page's hero, Leistungen, Impressionen, Bands, Über mich and Kontakt sections,
 the imprint, privacy and AGB pages, crawling (`robots.txt`, `sitemap.xml`), the Instagram
-feed, the Umami hookup, the container image and the Helm chart are implemented. Left out,
-tracked as later milestones:
+feed (split across the website and the feed service, see `internal/instagram`'s own
+bullet above), the Umami hookup, both container images and the Helm chart are
+implemented. Left out, tracked as later milestones:
 
 - The Impressionen section is rendered by the browser after the page loads, from
   `GET /api/v1/instagram`, not baked into the prerendered HTML: the feed changes while

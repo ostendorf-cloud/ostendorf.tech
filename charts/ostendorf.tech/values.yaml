@@ -198,19 +198,12 @@ config:
   smtpAddr: "mail.ostendorf.cloud:587"
   contactTo: "simon@ostendorf.tech"
   contactFrom: "ostendorf.tech <no-reply@ostendorf.cloud>"
-  # The home page's Impressionen section. It renders only while the server
-  # actually holds posts, which needs existingSecret.instagramTokenKey
-  # below; the settings here only shape how that feed is loaded and are
-  # inert without a token.
-  instagramApiVersion: "v23.0"
-  instagramPostCount: 20
-  instagramRefreshInterval: "1h"
-  # Meta refuses to refresh a token younger than 24 hours, and a long
-  # lived token expires after 60 days, which bounds this at both ends. A
-  # refreshed token lives in the pod's memory only: this application has
-  # no secret manager client, so a restart falls back to the Secret's own
-  # value, which still has to be rotated before it expires.
-  instagramTokenRefreshAge: "7d"
+  # How often the website asks the feed service for the current post list;
+  # see internal/config.DefaultFeedRefreshInterval and FEED_REFRESH_INTERVAL.
+  # The feed service's own, independent sync interval against Meta is
+  # feed.config.syncInterval below; this is only how often the website
+  # re-reads the feed service's already-cached result.
+  feedRefreshInterval: "5m"
   # Page views are reported to Umami by the server itself, never by a
   # script in the visitor's browser. Both empty count nothing; setting
   # only one of the two is refused at startup rather than half-enabling
@@ -248,7 +241,167 @@ existingSecret:
   challengeKeyPreviousKey: ""
   smtpUsernameKey: ""
   smtpPasswordKey: ""
-  # The Instagram access token. Left empty, the Impressionen section is
-  # switched off entirely: no feed is loaded and the page renders no
-  # section at all, with every other part of the site unaffected.
-  instagramTokenKey: ""
+
+# The feed service: a second, independent workload that reads the Instagram
+# Impressionen feed from Meta and serves it to the website, with its own
+# Deployment, Service and ServiceAccount. There is no feed.enabled toggle:
+# this workload is now a required part of the chart, the same way the
+# website's own Deployment is not optional, since the website's
+# FEED_SERVICE_URL always points at it (see templates/deployment.yaml).
+feed:
+  # No upper bound here, unlike the website's own replicaCount: the feed
+  # service keeps no per-pod session state, it only caches a read-only copy
+  # of the feed resynced from Meta and OpenBao independently per pod, so more
+  # than one replica, or two pods briefly coexisting during an ordinary
+  # rolling update, is harmless. 0 pauses the workload the same way it does
+  # for the website.
+  replicaCount: 1
+
+  image:
+    # Different image name than the website's own (ghcr.io/ostendorf-cloud/
+    # ostendorf.tech): this is a separate binary (cmd/feed), built from the
+    # same root Dockerfile as a separate final stage ("docker build --target
+    # feed") and published by its own job in .github/workflows/publish.yaml,
+    # tagged from the same release as the website's own image.
+    repository: ghcr.io/ostendorf-cloud/ostendorf.tech-feed
+    # Defaults to .Chart.AppVersion when left empty.
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    # Created so the feed service has its own identity to log in to OpenBao
+    # with, through the Kubernetes auth method; see feed.config.openBaoRole
+    # and templates/deployment-feed.yaml's projected volume. No RBAC is
+    # created: this workload makes no Kubernetes API calls of its own.
+    create: true
+    annotations: {}
+    name: ""
+
+  podAnnotations: {}
+  podLabels: {}
+
+  # Matches the Dockerfile's distroless "nonroot" base image, uid/gid 65532,
+  # the same as the website's own podSecurityContext.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Same shape as the website's own securityContext.
+  securityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  service:
+    type: ClusterIP
+    # Also used as the container port and for the probes: must match the
+    # port encoded in feed.config.listenAddr (default ":8081" for both),
+    # matching internal/feedconfig.DefaultListenAddr. Unlike the website,
+    # there is only one listener here: internal/feed.App.buildHandler serves
+    # health, readiness and the API routes on this one port, so there is no
+    # second, admin port to configure.
+    port: 8081
+
+  # Restricts this workload's own ingress and egress traffic at the cluster
+  # level; see templates/networkpolicy.yaml. Defaults to true, since this
+  # organisation's clusters enforce NetworkPolicy and issue #24's own plan
+  # calls for enforcement by the chart rather than by convention. This
+  # object does nothing at all on a cluster whose CNI does not enforce
+  # NetworkPolicy, with no error or warning either way; confirm your CNI
+  # actually enforces NetworkPolicy before relying on it. See README.md.
+  networkPolicy:
+    enabled: true
+    # OpenBao/Vault's conventional API port. Kept as its own value rather
+    # than parsed out of feed.config.openBaoAddr's URL; see
+    # templates/networkpolicy.yaml's own comment for why. Keep this in sync
+    # by hand with whatever port feed.config.openBaoAddr actually names, if
+    # it ever differs from this default.
+    openBaoPort: 8200
+
+  # The projected ServiceAccount token used as the OpenBao login credential;
+  # see feed.config.openBaoJwtFile and templates/deployment-feed.yaml.
+  serviceAccountToken:
+    # Optional: the audience the projected token is issued for. Left empty,
+    # the Kubernetes API server's own default audience is used, which is
+    # also what OpenBao's Kubernetes auth method expects when configured
+    # with no explicit audience of its own.
+    audience: ""
+    # Kubernetes refreshes a projected token automatically once it is past
+    # 80% of its own lifetime, well before this expires; internal/openbao
+    # reads the file fresh on every login, so this only bounds how long a
+    # single cached token can be used for, never how long the pod can run.
+    expirationSeconds: 3600
+
+  resources:
+    requests:
+      # Lower than the website's own defaults: this pod caches around 20
+      # posts' worth of image bytes, nothing else.
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      # No CPU limit: syncing with Meta and OpenBao is bursty on a sync
+      # cycle, not broken for being briefly busy; same reasoning as the
+      # website's own resources comment. A memory limit stays in place as a
+      # safety net against a genuine leak.
+      memory: 64Mi
+
+  startupProbe:
+    # Disabled by default: startup only logs in to OpenBao and runs one sync
+    # cycle, neither of which is expected to be slow enough to need one.
+    enabled: false
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    failureThreshold: 30
+
+  livenessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  # Plain, non-secret configuration; see internal/feedconfig's own comment
+  # for why none of these ten is secret-shaped. The one actual secret, the
+  # Meta access token, lives in OpenBao, never in a value here or in a
+  # Kubernetes Secret.
+  config:
+    listenAddr: ":8081"
+    logLevel: "info"
+    # Required: the OpenBao address the feed service authenticates against.
+    # Left empty here because no default could ever point at an OpenBao
+    # installation that actually exists; templates/_helpers.tpl's
+    # ostendorf-tech.feed.openBaoAddr rejects an install or template render
+    # that leaves this empty, the same reasoning as existingSecret.name's
+    # own comment above.
+    openBaoAddr: ""
+    openBaoAuthPath: "kubernetes"
+    # Required: the OpenBao Kubernetes auth role the feed service logs in
+    # as. Left empty for the same reason as openBaoAddr above: the role and
+    # its policy are created once, by hand, in OpenBao itself, and no
+    # default here could ever name one that actually exists.
+    openBaoRole: ""
+    # Path to the projected ServiceAccount token file used as the OpenBao
+    # login credential. templates/deployment-feed.yaml mounts the projected
+    # volume from feed.serviceAccountToken at exactly this path (its
+    # directory becomes the volume mount, its filename the projected
+    # source's own path), so this one value can never drift out of sync
+    # with what is actually mounted.
+    openBaoJwtFile: "/var/run/secrets/openbao/token"
+    tokenPath: "instagram.com/api-tokens/data/simonostendorf.vtech"
+    syncInterval: "1h"
+    tokenRefreshAge: "7d"
+    apiVersion: "v23.0"
+    postCount: 20

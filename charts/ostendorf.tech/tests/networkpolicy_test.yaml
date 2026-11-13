@@ -1,0 +1,116 @@
+suite: feed NetworkPolicy
+templates:
+  - templates/networkpolicy.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+  feed:
+    config:
+      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+      openBaoRole: ostendorf-tech-feed
+tests:
+  - it: renders by default, since feed.networkPolicy.enabled defaults to true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: NetworkPolicy
+
+  - it: selects only the feed service's own pods
+    asserts:
+      - equal:
+          path: spec.podSelector.matchLabels["app.kubernetes.io/name"]
+          value: ostendorf-tech-feed
+
+  - it: governs both ingress and egress
+    asserts:
+      - equal:
+          path: spec.policyTypes
+          value:
+            - Ingress
+            - Egress
+
+  - it: allows exactly one ingress rule, from the website's own pods only, on feed.service.port
+    asserts:
+      - lengthEqual:
+          path: spec.ingress
+          count: 1
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
+          value: ostendorf-tech
+      - equal:
+          path: spec.ingress[0].ports[0].port
+          value: 8081
+
+  # A hardcoded label would still match the default name, so the override is
+  # what proves the selector comes from the shared selectorLabels helper.
+  - it: follows a non-default nameOverride for the ingress rule's website selector
+    set:
+      nameOverride: custom-site
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
+          value: custom-site
+
+  - it: follows a non-default feed.service.port for the ingress rule, proving it is not hardcoded
+    set:
+      feed:
+        service:
+          port: 9090
+    asserts:
+      - equal:
+          path: spec.ingress[0].ports[0].port
+          value: 9090
+
+  - it: allows exactly three egress rules
+    asserts:
+      - lengthEqual:
+          path: spec.egress
+          count: 3
+
+  - it: allows DNS egress on UDP and TCP 53 with no destination restriction
+    asserts:
+      - equal:
+          path: spec.egress[0].ports
+          value:
+            - protocol: UDP
+              port: 53
+            - protocol: TCP
+              port: 53
+      - isNull:
+          path: spec.egress[0].to
+
+  - it: allows OpenBao egress on the documented default port with no destination restriction
+    asserts:
+      - equal:
+          path: spec.egress[1].ports[0].port
+          value: 8200
+      - isNull:
+          path: spec.egress[1].to
+
+  - it: follows a non-default feed.networkPolicy.openBaoPort for the OpenBao egress rule, proving it is value-driven
+    set:
+      feed:
+        networkPolicy:
+          openBaoPort: 8300
+    asserts:
+      - equal:
+          path: spec.egress[1].ports[0].port
+          value: 8300
+
+  - it: allows Meta's Graph API egress on HTTPS with no destination restriction
+    asserts:
+      - equal:
+          path: spec.egress[2].ports[0].port
+          value: 443
+      - isNull:
+          path: spec.egress[2].to
+
+  - it: renders nothing when feed.networkPolicy.enabled is false
+    set:
+      feed:
+        networkPolicy:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

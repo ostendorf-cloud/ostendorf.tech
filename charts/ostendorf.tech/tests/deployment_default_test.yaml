@@ -8,6 +8,10 @@ templates:
 set:
   existingSecret:
     name: ostendorf-tech-secrets
+  feed:
+    config:
+      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+      openBaoRole: ostendorf-tech-feed
 tests:
   - it: renders exactly one replica
     template: templates/deployment.yaml
@@ -73,6 +77,16 @@ tests:
           content:
             name: MAIL_RATE_LIMIT_PER
             value: "1h"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FEED_SERVICE_URL
+            value: "http://RELEASE-NAME-ostendorf-tech-feed:8081"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FEED_REFRESH_INTERVAL
+            value: "5m"
 
   - it: omits every optional secret-backed env var when its key is not configured
     template: templates/deployment.yaml
@@ -93,34 +107,6 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: SMTP_PASSWORD
-      - notContains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: INSTAGRAM_TOKEN
-
-  - it: wires the Instagram feed settings, which stay inert without a token
-    template: templates/deployment.yaml
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: INSTAGRAM_API_VERSION
-            value: "v23.0"
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: INSTAGRAM_POST_COUNT
-            value: "20"
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: INSTAGRAM_REFRESH_INTERVAL
-            value: "1h"
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: INSTAGRAM_TOKEN_REFRESH_AGE
-            value: "7d"
 
   - it: counts no page views until Umami is configured
     template: templates/deployment.yaml

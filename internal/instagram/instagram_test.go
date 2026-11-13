@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -118,24 +117,21 @@ func (f *fakeMeta) refreshes() int {
 }
 
 // newSyncer builds a Syncer whose every dependency is in process: the fake
-// Meta behind a transport, a fixed clock, and the token the environment
-// would have supplied.
-func newSyncer(meta *fakeMeta, logs io.Writer, now func() time.Time) *Syncer {
+// Meta behind a transport, and a TokenSource answering with the token the
+// environment would have supplied. Token refresh itself is TokenStore's
+// job now (token.go, token_test.go), not Syncer's, so this fixed source is
+// all Syncer ever needs from one.
+func newSyncer(meta *fakeMeta, logs io.Writer) *Syncer {
 	client := NewClient("v23.0")
 	client.BaseURL = "https://graph.test"
 	client.HTTP = &http.Client{Transport: hostTransport{meta}}
 	client.MaxImageBytes = 1000
 	client.AllowedImageHosts = []string{"cdn.test"}
 	return &Syncer{
-		Client: client, Token: "tok-1",
-		RefreshAge: 7 * 24 * time.Hour, Count: 20, Feed: &Feed{},
+		Client: client, Tokens: &fakeTokenSource{token: "tok-1"},
+		Count: 20, Feed: &Feed{},
 		Logger: slog.New(slog.NewJSONHandler(logs, nil)),
-		Now:    now,
 	}
-}
-
-func fixedClock() func() time.Time {
-	return func() time.Time { return testNow }
 }
 
 func TestSyncFeed(t *testing.T) {
@@ -154,7 +150,7 @@ func TestSyncFeed(t *testing.T) {
 		{ID: "9", MediaType: "IMAGE", MediaURL: "https://cdn.test/a.jpg", Permalink: "javascript:alert(1)"},
 	}
 	var logs bytes.Buffer
-	s := newSyncer(meta, &logs, fixedClock())
+	s := newSyncer(meta, &logs)
 	if err := s.Sync(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +198,7 @@ func TestKeepLastFeedOnError(t *testing.T) {
 	meta := newFakeMeta()
 	meta.media = []Media{{ID: "1", MediaType: "IMAGE", MediaURL: "https://cdn.test/a.jpg", Permalink: "https://www.instagram.com/p/A/"}}
 	var logs bytes.Buffer
-	s := newSyncer(meta, &logs, fixedClock())
+	s := newSyncer(meta, &logs)
 	if err := s.Sync(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +244,7 @@ func TestEmptyFeedStaysEmpty(t *testing.T) {
 	t.Parallel()
 
 	// Without posts to protect, an empty answer is simply the current state.
-	s := newSyncer(newFakeMeta(), io.Discard, fixedClock())
+	s := newSyncer(newFakeMeta(), io.Discard)
 	if err := s.Sync(t.Context()); err != nil {
 		t.Fatalf("empty account: %v", err)
 	}
@@ -257,109 +253,19 @@ func TestEmptyFeedStaysEmpty(t *testing.T) {
 	}
 }
 
-func TestTokenRefreshedOnFirstSync(t *testing.T) {
+// TestSyncNoTokenSourceConfiguredFails is the belt to cmd/feed's own
+// braces: Syncer refuses to call Meta at all when it was built without a
+// TokenSource, rather than panicking on a nil Tokens. Token refresh
+// itself (age bounds, failure tolerance, CAS handling) is TokenStore's
+// own contract now; see token_test.go.
+func TestSyncNoTokenSourceConfiguredFails(t *testing.T) {
 	t.Parallel()
 
-	// A process that just started cannot know how old the configured token
-	// is, so it refreshes once and then calls the API with the fresh one.
-	meta := newFakeMeta()
-	var logs bytes.Buffer
-	s := newSyncer(meta, &logs, fixedClock())
-	if err := s.Sync(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if meta.refreshes() != 1 {
-		t.Errorf("refresh calls = %d, want 1", meta.refreshes())
-	}
-	if got := meta.token(); got != "tok-2" {
-		t.Errorf("media called with %q, want the refreshed tok-2", got)
-	}
-	for _, secret := range []string{"tok-1", "tok-2"} {
-		if strings.Contains(logs.String(), secret) {
-			t.Errorf("log contains %s", secret)
-		}
-	}
-}
-
-func TestTokenNotRefreshedWithinRefreshAge(t *testing.T) {
-	t.Parallel()
-
-	meta := newFakeMeta()
-	now := testNow
-	s := newSyncer(meta, io.Discard, func() time.Time { return now })
-	if err := s.Sync(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-
-	// Well inside RefreshAge: no second refresh.
-	now = testNow.Add(6 * 24 * time.Hour)
-	if err := s.Sync(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if meta.refreshes() != 1 {
-		t.Errorf("refresh calls = %d, want 1: refreshed again inside the refresh age", meta.refreshes())
-	}
-
-	// Past RefreshAge: refreshed again, and the newest token is the one used.
-	now = testNow.Add(8 * 24 * time.Hour)
-	if err := s.Sync(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if meta.refreshes() != 2 {
-		t.Errorf("refresh calls = %d, want 2", meta.refreshes())
-	}
-	if got := meta.token(); got != "tok-3" {
-		t.Errorf("media called with %q, want tok-3", got)
-	}
-}
-
-func TestRefreshFailureKeepsToken(t *testing.T) {
-	t.Parallel()
-
-	// Meta refuses to refresh a token younger than 24 hours. That refusal
-	// must cost nothing: the configured token is still valid, so the sync
-	// goes on using it and the next cycle tries again.
-	meta := newFakeMeta()
-	var logs bytes.Buffer
-	s := newSyncer(meta, &logs, fixedClock())
-	var refreshCalls atomic.Int32
-	s.Client.HTTP.Transport = hostTransport{http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/refresh_access_token" {
-			refreshCalls.Add(1)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		meta.ServeHTTP(w, r)
-	})}
-
-	if err := s.Sync(t.Context()); err != nil {
-		t.Fatalf("sync after a failed refresh: %v", err)
-	}
-	if refreshCalls.Load() != 1 {
-		t.Errorf("refresh calls = %d, want 1", refreshCalls.Load())
-	}
-	if got := meta.token(); got != "tok-1" {
-		t.Errorf("media called with %q, want the configured tok-1", got)
-	}
-	if !strings.Contains(logs.String(), `"level":"WARN"`) || !strings.Contains(logs.String(), "token refresh failed") {
-		t.Errorf("no warning logged: %s", logs.String())
-	}
-	if strings.Contains(logs.String(), "tok-1") {
-		t.Error("log contains the access token")
-	}
-}
-
-func TestSyncWithoutTokenFails(t *testing.T) {
-	t.Parallel()
-
-	// An empty token is a deployment that configured none. internal/webapp
-	// never builds a Syncer in that case, so this is the belt to that
-	// braces: it reports rather than calling Meta with an empty token.
-	s := newSyncer(newFakeMeta(), io.Discard, fixedClock())
-	s.Token = ""
+	s := newSyncer(newFakeMeta(), io.Discard)
+	s.Tokens = nil
 	err := s.Sync(t.Context())
-	if err == nil || !strings.Contains(err.Error(), "no access token") {
-		t.Errorf("err = %v, want one naming the missing token", err)
+	if err == nil || !strings.Contains(err.Error(), "no token source") {
+		t.Errorf("err = %v, want one naming the missing token source", err)
 	}
 }
 
@@ -367,7 +273,7 @@ func TestUnversionedClient(t *testing.T) {
 	t.Parallel()
 
 	meta := newFakeMeta()
-	s := newSyncer(meta, io.Discard, fixedClock())
+	s := newSyncer(meta, io.Discard)
 	s.Client.Version = ""
 	if _, err := s.Client.Media(t.Context(), "tok-1", 5); err != nil {
 		t.Fatal(err)
@@ -380,7 +286,7 @@ func TestUnversionedClient(t *testing.T) {
 func TestRunStopsWithItsContext(t *testing.T) {
 	t.Parallel()
 
-	s := newSyncer(newFakeMeta(), io.Discard, fixedClock())
+	s := newSyncer(newFakeMeta(), io.Discard)
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
 	go func() {

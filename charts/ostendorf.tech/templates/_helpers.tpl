@@ -73,3 +73,62 @@ failure instead of a Pod that crash-loops on a missing CSRF_KEY.
 {{- define "ostendorf-tech.existingSecretName" -}}
 {{- required "existingSecret.name is required: set it to the name of an existing Secret carrying CSRF_KEY, which the application needs to start and has no default." .Values.existingSecret.name -}}
 {{- end -}}
+
+{{/*
+Feed service fullname: the website's own fullname with "-feed" appended, so the two
+workloads' names can never collide.
+*/}}
+{{- define "ostendorf-tech.feed.fullname" -}}
+{{- printf "%s-feed" (include "ostendorf-tech.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Feed selector labels. Deliberately a different app.kubernetes.io/name than
+ostendorf-tech.selectorLabels: reusing the website's own selector labels here would make
+the website's Service and the feed's Service each select both workloads' pods instead of
+just their own.
+*/}}
+{{- define "ostendorf-tech.feed.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "ostendorf-tech.name" . }}-feed
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{/*
+Feed common labels. component is "feed", distinct from the website's own "server".
+*/}}
+{{- define "ostendorf-tech.feed.labels" -}}
+helm.sh/chart: {{ include "ostendorf-tech.chart" . }}
+{{ include "ostendorf-tech.feed.selectorLabels" . }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/component: feed
+app.kubernetes.io/part-of: {{ include "ostendorf-tech.name" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}
+
+{{/*
+Feed ServiceAccount name, same create/name override pattern as the website's own.
+*/}}
+{{- define "ostendorf-tech.feed.serviceAccountName" -}}
+{{- if .Values.feed.serviceAccount.create -}}
+{{- default (include "ostendorf-tech.feed.fullname" .) .Values.feed.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.feed.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+OpenBao address the feed service authenticates against. Required: no default could ever
+point at an OpenBao installation that actually exists.
+*/}}
+{{- define "ostendorf-tech.feed.openBaoAddr" -}}
+{{- required "feed.config.openBaoAddr is required: set it to the OpenBao address the feed service authenticates against. There is no default, since none could ever point at an OpenBao installation that actually exists." .Values.feed.config.openBaoAddr -}}
+{{- end -}}
+
+{{/*
+OpenBao Kubernetes auth role the feed service logs in as. Required for the same reason
+as openBaoAddr: the role and its policy are created once, by hand, in OpenBao itself (see
+issue #24's plan), and no default here could ever name one that actually exists.
+*/}}
+{{- define "ostendorf-tech.feed.openBaoRole" -}}
+{{- required "feed.config.openBaoRole is required: set it to the OpenBao Kubernetes auth role the feed service logs in as. There is no default, since none could ever name a role that actually exists in your OpenBao installation." .Values.feed.config.openBaoRole -}}
+{{- end -}}

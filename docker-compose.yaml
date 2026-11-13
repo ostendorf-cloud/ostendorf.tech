@@ -3,6 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Dockerfile now builds two final stages, "website" and "feed";
+      # without this, a plain "docker build ." would still resolve to
+      # "website" since it is the last stage in the file, but naming it
+      # here keeps that from being implicit.
+      target: website
     restart: unless-stopped
     environment:
       # ALLOW_PLAIN_HTTP: this compose file serves the site over plain

@@ -68,35 +68,29 @@ func (f *Feed) Set(posts []*Post) {
 	f.posts, f.byID = posts, byID
 }
 
-// Syncer refreshes the token when it is due and reloads the feed.
+// TokenSource returns the token to call the Graph API with, handling its
+// own refresh. *TokenStore (token.go) is one, backed by OpenBao.
+type TokenSource interface {
+	Token(ctx context.Context) (string, error)
+}
+
+// Syncer asks Tokens for a usable token and reloads the feed.
 //
-// The token lives in this struct and nowhere else. old_simon-ostendorf.de
-// kept it in OpenBao and wrote every refresh back, so a refreshed token
-// survived a restart and two replicas could not clobber each other's
-// refresh. This repository has no secret manager client, by design, so a
-// refresh here updates the in-memory token only: a pod that runs for
-// months keeps working, but a restart falls back to the token the
-// environment supplies, with whatever age it has. Meta's long lived tokens
-// last 60 days, so that configured value still has to be rotated by
-// whoever owns the deployment; see the root README.md.
+// cmd/feed is this package's only caller now: internal/webapp lost its
+// own direct Meta client and in-memory token when the website moved to
+// internal/feedclient against this binary's own HTTP API instead (see
+// that package and internal/feed). Syncer therefore always defers to a
+// store-backed TokenSource such as *TokenStore (token.go), which reads,
+// refreshes and writes the token back to OpenBao itself; Syncer never
+// runs a refresh against Meta on its own, and carries no token of its
+// own to protect with a mutex.
 type Syncer struct {
 	Client *Client
-	// Token is the access token the environment supplied. Set it before
-	// Run or Sync is ever called; from then on it is read and written only
-	// under mu, because a refresh replaces it in place.
-	Token string
-	// RefreshAge is how old the token may get before a refresh is
-	// attempted. Meta refuses to refresh a token younger than 24 hours;
-	// such a refusal is tolerated, logged and retried next cycle, since
-	// the current token keeps working either way.
-	RefreshAge time.Duration
-	Count      int
-	Feed       *Feed
-	Logger     *slog.Logger
-	Now        func() time.Time
-
-	mu          sync.Mutex
-	refreshedAt time.Time
+	// Tokens is asked for the token every cycle; required.
+	Tokens TokenSource
+	Count  int
+	Feed   *Feed
+	Logger *slog.Logger
 }
 
 // Run syncs at start and then every interval until ctx ends. Errors are
@@ -135,7 +129,10 @@ func sleep(ctx context.Context, d time.Duration) bool {
 
 // Sync runs one cycle: token, then media, then images.
 func (s *Syncer) Sync(ctx context.Context) error {
-	token, err := s.token(ctx)
+	if s.Tokens == nil {
+		return errors.New("instagram: no token source configured")
+	}
+	token, err := s.Tokens.Token(ctx)
 	if err != nil {
 		return err
 	}
@@ -178,38 +175,6 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	s.Feed.Set(posts)
 	s.Logger.Info("instagram feed updated", "posts", len(posts), "failed_images", failures)
 	return nil
-}
-
-// token returns the token to call the API with, refreshing it first when it
-// has not been refreshed within RefreshAge. A refresh that fails is not an
-// error: the token already in hand is valid until Meta expires it, so the
-// failure is logged and the next cycle tries again.
-func (s *Syncer) token(ctx context.Context) (string, error) {
-	s.mu.Lock()
-	token, refreshedAt := s.Token, s.refreshedAt
-	s.mu.Unlock()
-
-	if token == "" {
-		return "", errors.New("instagram: no access token configured")
-	}
-	now := s.Now()
-	// A zero refreshedAt is a process that has not refreshed yet, which
-	// after a restart is every process: the configured token's real age is
-	// unknown here, so it is refreshed once rather than assumed fresh.
-	if !refreshedAt.IsZero() && now.Sub(refreshedAt) < s.RefreshAge {
-		return token, nil
-	}
-
-	fresh, err := s.Client.RefreshToken(ctx, token)
-	if err != nil {
-		s.Logger.Warn("instagram token refresh failed, using the current token", "error", err.Error())
-		return token, nil
-	}
-	s.mu.Lock()
-	s.Token, s.refreshedAt = fresh, now
-	s.mu.Unlock()
-	s.Logger.Info("instagram token refreshed, in memory only until this process ends")
-	return fresh, nil
 }
 
 // altText describes a post by its caption, one line and shortened.

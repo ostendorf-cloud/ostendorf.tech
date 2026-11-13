@@ -67,11 +67,16 @@ tasks:
   # value list is split across several short vars, and the longer commands folded
   # over several lines, so no physical line in this file exceeds yamllint's
   # line-length limit; see charts/ostendorf.tech/README.md's "External routing"
-  # section for the combinations themselves.
+  # section for the combinations themselves. FEED_SET1 and FEED_SET2 carry the feed
+  # workload's own required values, folded into DEFAULT_SET the same way
+  # existingSecret.name already is, since every combination below renders the whole
+  # chart, feed Deployment included.
   lint:helm:
     desc: Helm chart lint
     vars:
-      DEFAULT_SET: existingSecret.name=ostendorf-tech-secrets
+      FEED_SET1: feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200
+      FEED_SET2: feed.config.openBaoRole=ostendorf-tech-feed
+      DEFAULT_SET: existingSecret.name=ostendorf-tech-secrets,{{.FEED_SET1}},{{.FEED_SET2}}
       INGRESS_SET1: config.trustedProxyCidrs=10.0.0.0/8,ingress.enabled=true,ingress.className=nginx
       INGRESS_SET2: ingress.hosts[0].host=ostendorf.tech
       INGRESS_SET3: ingress.hosts[0].paths[0].path=/,ingress.hosts[0].paths[0].pathType=Prefix
@@ -96,7 +101,9 @@ tasks:
   validate:kubeconform:
     desc: Schema validation of the rendered Helm chart
     vars:
-      DEFAULT_SET: existingSecret.name=ostendorf-tech-secrets
+      FEED_SET1: feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200
+      FEED_SET2: feed.config.openBaoRole=ostendorf-tech-feed
+      DEFAULT_SET: existingSecret.name=ostendorf-tech-secrets,{{.FEED_SET1}},{{.FEED_SET2}}
       INGRESS_SET1: config.trustedProxyCidrs=10.0.0.0/8,ingress.enabled=true,ingress.className=nginx
       INGRESS_SET2: ingress.hosts[0].host=ostendorf.tech
       INGRESS_SET3: ingress.hosts[0].paths[0].path=/,ingress.hosts[0].paths[0].pathType=Prefix
@@ -150,6 +157,17 @@ tasks:
     deps: [web:build, prerender]
     cmds:
       - go build -o bin/website ./cmd/website
+
+  # No web:build/prerender dependency, unlike build above: cmd/feed embeds
+  # nothing (see internal/feed and internal/feedconfig, neither of which
+  # has a go:embed directive), so building it never needs the frontend at
+  # all. Kept as its own target rather than folded into build, so this
+  # stays true: building the feed binary would otherwise always pay for
+  # the Vue build it does not need, every time.
+  build:feed:
+    desc: Compile the feed binary
+    cmds:
+      - go build -o bin/feed ./cmd/feed
 
   test:go:
     desc: Go test
@@ -249,6 +267,7 @@ tasks:
       - task: web:build
       - task: prerender
       - task: build
+      - task: build:feed
       - task: test:go
       - task: check:govue-version
       - task: test:routes

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ostendorf-tech.feed.fullname" . }}
+  labels:
+    {{- include "ostendorf-tech.feed.labels" . | nindent 4 }}
+spec:
+  # Always ClusterIP: this pod is never meant to be reached externally, only by
+  # the website's own Deployment, in-cluster.
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.feed.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "ostendorf-tech.feed.selectorLabels" . | nindent 4 }}

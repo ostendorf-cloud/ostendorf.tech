@@ -4,6 +4,10 @@ templates:
 set:
   existingSecret:
     name: ostendorf-tech-secrets
+  feed:
+    config:
+      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+      openBaoRole: ostendorf-tech-feed
 tests:
   - it: fails the render when ingress is enabled and trustedProxyCidrs is left empty
     set:
