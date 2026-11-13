@@ -1,6 +1,7 @@
 suite: ingress enabled
 templates:
   - templates/ingress.yaml
+  - templates/httproute.yaml
 set:
   existingSecret:
     name: ostendorf-tech-secrets
@@ -14,6 +15,7 @@ set:
             pathType: Prefix
 tests:
   - it: renders one Ingress for the configured host
+    template: templates/ingress.yaml
     asserts:
       - hasDocuments:
           count: 1
@@ -33,6 +35,7 @@ tests:
           value: 8080
 
   - it: routes only the public port, never govue's admin listener, even when the two differ from their defaults
+    template: templates/ingress.yaml
     set:
       service:
         port: 9000
@@ -44,3 +47,9 @@ tests:
       - notEqual:
           path: spec.rules[0].http.paths[0].backend.service.port.number
           value: 9001
+
+  - it: renders no HTTPRoute when ingress is the chosen route
+    template: templates/httproute.yaml
+    asserts:
+      - hasDocuments:
+          count: 0

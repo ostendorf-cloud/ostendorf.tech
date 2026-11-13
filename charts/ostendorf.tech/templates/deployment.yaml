@@ -5,6 +5,21 @@ metadata:
   labels:
     {{- include "ostendorf-tech.labels" . | nindent 4 }}
 spec:
+  {{/*
+  Ingress and httpRoute are mutually exclusive: both pick an external route
+  for the same hostname, and only one may be the deployment's actual front
+  door. This guard lives here, not duplicated into templates/ingress.yaml
+  and templates/httproute.yaml, because this Deployment always renders
+  regardless of which routing flag is set (or neither), so a single check
+  here fires exactly once, deterministically, however Helm orders template
+  execution across files - unlike a guard split across the two routing
+  templates themselves, where Helm's own template engine aborts the whole
+  render at the first of the two to fail and never reaches the second,
+  making only one of two duplicated guards ever observable.
+  */}}
+  {{- if and .Values.ingress.enabled .Values.httpRoute.enabled }}
+  {{ fail "ingress.enabled and httpRoute.enabled cannot both be true: pick one external route and turn the other off." }}
+  {{- end }}
   {{- if gt (.Values.replicaCount | int) 1 }}
   {{ fail "replicaCount must stay at 1: internal/webapp/session.go keeps the anonymous session, and the CSRF token derived from it, in govue's in-process session.MemoryStore. A second replica can answer a visitor's GET on one pod and their contact form POST on another pod that never saw that session: requireSession then refuses that POST with 403, correctly from that pod's point of view but wrongly from the visitor's, since their session is real, just on the other pod. This breaks the contact form for real visitors; it is an availability problem, not a security hole. Raise replicaCount only after moving to a shared session store; see AGENTS.md." }}
   {{- end }}
