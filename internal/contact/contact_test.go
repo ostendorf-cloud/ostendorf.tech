@@ -357,8 +357,8 @@ type session struct {
 }
 
 // fakeSMTP speaks just enough SMTP for net/smtp on one side of a pipe.
-func fakeSMTP(conn net.Conn, cert *tls.Certificate, s *session) error {
-	defer conn.Close()
+func fakeSMTP(ctx context.Context, conn net.Conn, cert *tls.Certificate, s *session) error {
+	defer func() { _ = conn.Close() }()
 	tp := textproto.NewConn(conn)
 	if err := tp.PrintfLine("220 mail.test ESMTP"); err != nil {
 		return err
@@ -386,7 +386,7 @@ func fakeSMTP(conn net.Conn, cert *tls.Certificate, s *session) error {
 				return err
 			}
 			tlsConn := tls.Server(conn, &tls.Config{Certificates: []tls.Certificate{*cert}})
-			if err := tlsConn.Handshake(); err != nil {
+			if err := tlsConn.HandshakeContext(ctx); err != nil {
 				return err
 			}
 			conn, tp, secure = tlsConn, textproto.NewConn(tlsConn), true
@@ -424,9 +424,9 @@ func pipeSender(t *testing.T, cert *tls.Certificate, pool *x509.CertPool, s *ses
 		Addr:     "mail.test:587",
 		HeloName: "ostendorf.tech",
 		Timeout:  5 * time.Second,
-		Dial: func(context.Context, string, string) (net.Conn, error) {
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			client, server := net.Pipe()
-			go func() { done <- fakeSMTP(server, cert, s) }()
+			go func() { done <- fakeSMTP(ctx, server, cert, s) }()
 			return client, nil
 		},
 		TLSConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12},
@@ -476,7 +476,11 @@ func TestSendRefusesWithoutSTARTTLS(t *testing.T) {
 	if !errors.Is(err, ErrNoStartTLS) {
 		t.Fatalf("err = %v, want ErrNoStartTLS", err)
 	}
-	<-done
+	// The client bailed before a clean QUIT, so the fake server's own error
+	// is a consequence of that rather than a failure worth asserting on.
+	if serverErr := <-done; serverErr != nil {
+		t.Logf("fake server: %v", serverErr)
+	}
 	if s.auth != "" {
 		t.Error("credentials sent without TLS")
 	}
@@ -500,7 +504,7 @@ func TestSendStopsOnCancel(t *testing.T) {
 			client, server := net.Pipe()
 			go func() {
 				defer close(done)
-				defer server.Close()
+				defer func() { _ = server.Close() }()
 				// Greet, then read EHLO and never answer.
 				tp := textproto.NewConn(server)
 				_ = tp.PrintfLine("220 mail.test ESMTP")
@@ -539,7 +543,11 @@ func TestSendRejectsUntrustedCertificate(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "starttls") {
 		t.Fatalf("err = %v, want a starttls error", err)
 	}
-	<-done
+	// The client bailed before a clean QUIT, so the fake server's own error
+	// is a consequence of that rather than a failure worth asserting on.
+	if serverErr := <-done; serverErr != nil {
+		t.Logf("fake server: %v", serverErr)
+	}
 	if s.auth != "" {
 		t.Error("credentials sent to an untrusted server")
 	}
