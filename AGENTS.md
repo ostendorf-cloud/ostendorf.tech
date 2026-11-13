@@ -136,7 +136,12 @@ The global baseline already applies here and is not repeated below.
   (the Vue Router table) and `web/src/lib/seo.ts` (the `PageRoute` list and its slugs) all
   import it instead of restating the page list themselves.
 - `charts/ostendorf.tech/` is the Helm chart, for both the website's and the feed
-  service's own workloads. `Dockerfile` is the multi-stage build for both of their
+  service's own workloads. `scripts/validate-chart.sh` renders it for its default values
+  and every documented non-default combination, and for a must-fail set proving every
+  render-time `fail` and `required` guard actually rejects the values it is meant to
+  reject, shared by `task lint:helm` and `task validate:kubeconform` so CI and a local
+  run check the exact same combinations; see `charts/ostendorf.tech/README.md`'s own
+  "Verification" section. `Dockerfile` is the multi-stage build for both of their
   container images, as two separate final stages, `website` and `feed`
   (`docker build --target website` or `--target feed`) rather than two Dockerfiles, since
   the two binaries share `go.mod`/`go.sum` and the pinned base image digests; see the
