@@ -6,9 +6,19 @@ metadata:
     {{- include "ostendorf-tech.labels" . | nindent 4 }}
 spec:
   {{- if gt (.Values.replicaCount | int) 1 }}
-  {{ fail "replicaCount must stay at 1: internal/webapp/session.go keeps anonymous sessions, and the CSRF token derived from them, in govue's in-process session.MemoryStore. A second replica would answer a visitor's GET on one pod and their contact form POST on another pod with no such session, so the CSRF check fails unpredictably. Raise replicaCount only after moving to a shared session store; see AGENTS.md." }}
+  {{ fail "replicaCount must stay at 1: internal/webapp/session.go keeps the anonymous session, and the CSRF token derived from it, in govue's in-process session.MemoryStore. A second replica can answer a visitor's GET on one pod and their contact form POST on another pod that never saw that session: requireSession then refuses that POST with 403, correctly from that pod's point of view but wrongly from the visitor's, since their session is real, just on the other pod. This breaks the contact form for real visitors; it is an availability problem, not a security hole. Raise replicaCount only after moving to a shared session store; see AGENTS.md." }}
+  {{- end }}
+  {{- if and .Values.ingress.enabled (not .Values.config.trustedProxyCidrs) }}
+  {{ fail "config.trustedProxyCidrs must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md." }}
   {{- end }}
   replicas: {{ .Values.replicaCount }}
+  # Recreate, not the default RollingUpdate: a rolling update's maxSurge
+  # would otherwise briefly run two pods, which is exactly the "two pods, two
+  # sessions" situation the replicaCount guard above exists to prevent. This
+  # holds the single-pod invariant during a rollout too, not only at a fixed
+  # replicaCount.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "ostendorf-tech.selectorLabels" . | nindent 6 }}

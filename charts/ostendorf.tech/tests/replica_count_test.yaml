@@ -10,9 +10,12 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: >-
-            replicaCount must stay at 1: internal/webapp/session.go keeps anonymous
-            sessions, and the CSRF token derived from them, in govue's in-process
-            session.MemoryStore. A second replica would answer a visitor's GET on one pod
-            and their contact form POST on another pod with no such session, so the CSRF
-            check fails unpredictably. Raise replicaCount only after moving to a shared
-            session store; see AGENTS.md.
+            replicaCount must stay at 1: internal/webapp/session.go keeps the anonymous
+            session, and the CSRF token derived from it, in govue's in-process
+            session.MemoryStore. A second replica can answer a visitor's GET on one pod
+            and their contact form POST on another pod that never saw that session:
+            requireSession then refuses that POST with 403, correctly from that pod's
+            point of view but wrongly from the visitor's, since their session is real,
+            just on the other pod. This breaks the contact form for real visitors; it is
+            an availability problem, not a security hole. Raise replicaCount only after
+            moving to a shared session store; see AGENTS.md.

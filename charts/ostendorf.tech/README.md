@@ -23,6 +23,12 @@ The chart has no usable default for `existingSecret.name`: no name could ever po
 and why it is needed, rather than installing a `Deployment` that crash-loops on a missing
 `CSRF_KEY`.
 
+`config.trustedProxyCidrs` must be set once `ingress.enabled` is true. Left empty behind this
+chart's own `Ingress`, every request is attributed to the ingress controller's pod IP, which
+collapses every rate limiter into one shared bucket for the whole site instead of one per
+visitor. `templates/deployment.yaml` rejects an install or template render that leaves this
+empty while `ingress.enabled` is true, with a message naming the consequence.
+
 This chart is also published as an OCI artifact, at
 `oci://ghcr.io/ostendorf-cloud/charts/ostendorf-tech`, versioned in lock-step with every release:
 
@@ -68,11 +74,15 @@ openssl rand -hex 32
 ## Replicas
 
 `replicaCount` stays at 1. `internal/webapp/session.go` keeps the anonymous session the CSRF
-protector relies on in govue's in-process `session.MemoryStore`. A second replica can answer a
-visitor's GET and their contact form POST on two different pods, each with its own session, so
-the CSRF check fails unpredictably. `templates/deployment.yaml` rejects a higher value at render
-time, with a message naming this reason. Raising it is possible only once the webapp moves to a
-shared session store instead of the in-memory one.
+protector relies on in govue's in-process `session.MemoryStore`. A second replica, or two pods
+briefly coexisting during an ordinary rolling update, can answer a visitor's GET on one pod and
+their contact form POST on another pod that never saw that session: `requireSession` then
+refuses that POST with 403, correctly from that pod's point of view but wrongly from the
+visitor's, since their session is real, just on the other pod. This breaks the contact form for
+real visitors; it is an availability problem, not a security hole. `templates/deployment.yaml`
+rejects a higher value at render time and runs the Deployment with `strategy.type: Recreate`, so
+a rollout never lets two pods coexist either. Raising `replicaCount` is possible only once the
+webapp moves to a shared session store instead of the in-memory one.
 
 ## Values
 
@@ -88,6 +98,7 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `resources` | Pod resource requests/limits | see `values.yaml` |
 | `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
 | `config.smtpAddr` | SMTP submission server | `mail.ostendorf.cloud:587` |
+| `config.trustedProxyCidrs` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |
 | `existingSecret.name` | Name of the existing `Secret` | `""` (required) |
 
 ## Upgrading

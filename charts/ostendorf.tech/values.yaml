@@ -4,11 +4,16 @@
 
 # Must stay at 1: internal/webapp/session.go keeps the anonymous session the
 # CSRF protector relies on in govue's in-process session.MemoryStore. A
-# second replica can answer a visitor's GET and their contact form POST on
-# two different pods, each with its own session, so the CSRF check fails
-# unpredictably. templates/deployment.yaml rejects any higher value at
-# render time. Raise this only once the webapp moves to a shared session
-# store; see AGENTS.md.
+# second replica, or two pods briefly coexisting during an ordinary rolling
+# update, can answer a visitor's GET on one pod and their contact form POST
+# on another pod that never saw that session: requireSession then refuses
+# that POST with 403, correctly from that pod's point of view but wrongly
+# from the visitor's, since their session is real, just on the other pod.
+# This breaks the contact form for real visitors; it is an availability
+# problem, not a security hole. templates/deployment.yaml rejects any higher
+# value at render time and runs the Deployment with strategy.type: Recreate,
+# so a rollout never lets two pods coexist either. Raise this only once the
+# webapp moves to a shared session store; see AGENTS.md.
 replicaCount: 1
 
 image:
@@ -103,6 +108,13 @@ config:
   listenAddr: ":8080"
   siteUrl: "https://ostendorf.tech"
   logLevel: "info"
+  # Required once ingress.enabled is true: left empty behind this chart's
+  # own Ingress, clientip.NewResolver attributes every request to the
+  # ingress controller's pod IP, collapsing every rate limiter into one
+  # shared bucket for the whole site instead of one per visitor.
+  # templates/deployment.yaml rejects an install or template render that
+  # leaves this empty while ingress.enabled is true. Set it to the ingress
+  # controller's pod or Service CIDR; see README.md.
   trustedProxyCidrs: ""
   allowPlainHttp: false
   rateLimitBurst: 120

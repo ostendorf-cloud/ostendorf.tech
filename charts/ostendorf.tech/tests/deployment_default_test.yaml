@@ -15,6 +15,13 @@ tests:
           path: spec.replicas
           value: 1
 
+  - it: recreates instead of rolling, so a rollout never briefly runs two pods
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
   - it: wires the required secret-backed CSRF key with no fallback
     template: templates/deployment.yaml
     asserts:
