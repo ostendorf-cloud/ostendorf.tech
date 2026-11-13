@@ -110,6 +110,12 @@ tasks:
     cmds:
       - go test -race -count=1 ./internal/depsync/...
 
+  test:routes:
+    desc: Route table conformance, the prerendered output against internal/routes' embedded table
+    deps: [web:build, prerender]
+    cmds:
+      - go test -race -count=1 -run TestPrerenderedOutputMatchesRouteTable ./cmd/website/...
+
   # The web/ half. Every target below runs inside web/ and depends on web:deps,
   # so one of them on its own is enough in a fresh checkout and in CI.
   web:deps:
@@ -192,6 +198,7 @@ tasks:
       - task: build
       - task: test:go
       - task: check:govue-version
+      - task: test:routes
 
   fmt:
     desc: Format Go code
