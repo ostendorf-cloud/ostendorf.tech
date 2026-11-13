@@ -66,10 +66,25 @@ func (s *Sender) Send(ctx context.Context, creds Credentials, from, to string, m
 
 	c, err := smtp.NewClient(conn, host)
 	if err != nil {
-		conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			return fmt.Errorf("smtp: greeting: %w (close: %w)", err, closeErr)
+		}
 		return fmt.Errorf("smtp: greeting: %w", err)
 	}
-	defer c.Close()
+	defer func() {
+		closeErr := c.Close()
+		// A successful Quit below already closed the connection; this
+		// second Close then only reports that it is already closed, which
+		// carries no information about the send itself.
+		if closeErr == nil || errors.Is(closeErr, net.ErrClosed) {
+			return
+		}
+		if err != nil {
+			err = fmt.Errorf("%w (close: %w)", err, closeErr)
+		} else {
+			err = fmt.Errorf("smtp: close: %w", closeErr)
+		}
+	}()
 
 	if err := c.Hello(s.HeloName); err != nil {
 		return fmt.Errorf("smtp: ehlo: %w", err)
