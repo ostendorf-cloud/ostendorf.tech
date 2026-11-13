@@ -147,6 +147,14 @@ jobs:
       - uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
       - run: task lint:docker
 
+  shell:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
+      - run: task lint:shell
+
   docker-build:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
@@ -157,6 +165,9 @@ jobs:
         with:
           context: .
           push: false
+          load: true
+          tags: ostendorf-tech:smoke
+      - run: scripts/smoke-test-image.sh ostendorf-tech:smoke
 
   helm-lint:
     runs-on: blacksmith-2vcpu-ubuntu-2404
