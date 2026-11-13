@@ -115,6 +115,14 @@ jobs:
       - uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
       - run: task build
 
+  build-feed:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
+      - run: task build:feed
+
   test:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
@@ -164,10 +172,26 @@ jobs:
       - uses: useblacksmith/build-push-action@9b0579bbec7a6cad2f171596c57e7ac1e7658850  # v2
         with:
           context: .
+          target: website
           push: false
           load: true
           tags: ostendorf-tech:smoke
       - run: scripts/smoke-test-image.sh ostendorf-tech:smoke
+
+  docker-build-feed:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: useblacksmith/setup-docker-builder@8fbda8108100092be0ef3320da0a93fbb8f47d7f  # v1
+      - uses: useblacksmith/build-push-action@9b0579bbec7a6cad2f171596c57e7ac1e7658850  # v2
+        with:
+          context: .
+          target: feed
+          push: false
+          load: true
+          tags: ostendorf-tech-feed:smoke
+      - run: scripts/smoke-test-feed-image.sh ostendorf-tech-feed:smoke
 
   helm-lint:
     runs-on: blacksmith-2vcpu-ubuntu-2404

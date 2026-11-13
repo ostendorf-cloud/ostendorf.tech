@@ -158,6 +158,17 @@ tasks:
     cmds:
       - go build -o bin/website ./cmd/website
 
+  # No web:build/prerender dependency, unlike build above: cmd/feed embeds
+  # nothing (see internal/feed and internal/feedconfig, neither of which
+  # has a go:embed directive), so building it never needs the frontend at
+  # all. Kept as its own target rather than folded into build, so this
+  # stays true: building the feed binary would otherwise always pay for
+  # the Vue build it does not need, every time.
+  build:feed:
+    desc: Compile the feed binary
+    cmds:
+      - go build -o bin/feed ./cmd/feed
+
   test:go:
     desc: Go test
     deps: [web:build, prerender]
@@ -256,6 +267,7 @@ tasks:
       - task: web:build
       - task: prerender
       - task: build
+      - task: build:feed
       - task: test:go
       - task: check:govue-version
       - task: test:routes
