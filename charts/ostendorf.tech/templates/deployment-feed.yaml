@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ostendorf-tech.feed.fullname" . }}
+  labels:
+    {{- include "ostendorf-tech.feed.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.feed.replicaCount }}
+  # No strategy.type: Recreate, and no upper bound on replicaCount, unlike the
+  # website's own templates/deployment.yaml. The feed service keeps no per-pod
+  # session state: it is a read-only cache resynced from Meta and OpenBao
+  # independently per pod, so more than one replica, or two pods briefly
+  # coexisting during an ordinary rolling update, is harmless. Do not copy the
+  # website's single-replica guard here.
+  selector:
+    matchLabels:
+      {{- include "ostendorf-tech.feed.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ostendorf-tech.feed.labels" . | nindent 8 }}
+        {{- with .Values.feed.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.feed.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ostendorf-tech.feed.serviceAccountName" . }}
+      # The feed service makes no Kubernetes API calls of its own: it only uses a
+      # ServiceAccount token as an OpenBao login credential, through the explicit
+      # projected volume below, never the default auto-mounted one. Set on the pod
+      # too, not only the ServiceAccount, since the pod spec's own value would
+      # otherwise win if it were ever left unset here.
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.feed.podSecurityContext | nindent 8 }}
+      containers:
+        - name: feed
+          securityContext:
+            {{- toYaml .Values.feed.securityContext | nindent 12 }}
+          image: "{{ .Values.feed.image.repository }}:{{ .Values.feed.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.feed.image.pullPolicy }}
+          # Unlike the website, the feed service has no separate admin listener:
+          # internal/feed.App.buildHandler serves /healthz, /readyz and the API
+          # routes on this one port, so there is only one container port and only
+          # one Service port to define.
+          ports:
+            - name: http
+              containerPort: {{ .Values.feed.service.port }}
+              protocol: TCP
+          env:
+            - name: LISTEN_ADDR
+              value: {{ .Values.feed.config.listenAddr | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.feed.config.logLevel | quote }}
+            - name: OPENBAO_ADDR
+              value: {{ include "ostendorf-tech.feed.openBaoAddr" . | quote }}
+            - name: OPENBAO_AUTH_PATH
+              value: {{ .Values.feed.config.openBaoAuthPath | quote }}
+            - name: OPENBAO_ROLE
+              value: {{ include "ostendorf-tech.feed.openBaoRole" . | quote }}
+            - name: OPENBAO_JWT_FILE
+              value: {{ .Values.feed.config.openBaoJwtFile | quote }}
+            - name: TOKEN_PATH
+              value: {{ .Values.feed.config.tokenPath | quote }}
+            - name: SYNC_INTERVAL
+              value: {{ .Values.feed.config.syncInterval | quote }}
+            - name: TOKEN_REFRESH_AGE
+              value: {{ .Values.feed.config.tokenRefreshAge | quote }}
+            - name: API_VERSION
+              value: {{ .Values.feed.config.apiVersion | quote }}
+            - name: POST_COUNT
+              value: {{ .Values.feed.config.postCount | quote }}
+          volumeMounts:
+            - name: openbao-token
+              mountPath: {{ dir .Values.feed.config.openBaoJwtFile }}
+              readOnly: true
+          {{- if .Values.feed.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ .Values.feed.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.feed.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.feed.startupProbe.failureThreshold }}
+          {{- end }}
+          # Liveness is /healthz, readiness is /readyz, never the reverse.
+          # internal/feed.App.checkReady only passes once one full sync cycle
+          # obtained a usable OpenBao token and a non-empty feed from Meta, so
+          # /readyz legitimately stays 503 for a while after startup, and again
+          # whenever OpenBao or Meta are unreachable; putting that check on the
+          # liveness probe would crash-loop the pod for being merely unready.
+          # /healthz, govue's plain liveness check, always returns 200 while the
+          # process is up, so putting it on the readiness probe would report
+          # ready immediately and defeat the whole point of the readiness gate.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ .Values.feed.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.feed.livenessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.feed.livenessProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: {{ .Values.feed.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.feed.readinessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.feed.readinessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.feed.resources | nindent 12 }}
+      volumes:
+        # dir/base of the same feed.config.openBaoJwtFile value drive both the
+        # mount path above and the projected source's path below, so
+        # OPENBAO_JWT_FILE always names exactly what is actually mounted: there
+        # is no separate value that could drift out of sync.
+        - name: openbao-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: {{ base .Values.feed.config.openBaoJwtFile }}
+                  expirationSeconds: {{ .Values.feed.serviceAccountToken.expirationSeconds }}
+                  {{- with .Values.feed.serviceAccountToken.audience }}
+                  audience: {{ . }}
+                  {{- end }}
+      {{- with .Values.feed.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.feed.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.feed.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

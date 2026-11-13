@@ -9,13 +9,16 @@ spec:
   Ingress and httpRoute are mutually exclusive: both pick an external route
   for the same hostname, and only one may be the deployment's actual front
   door. This guard lives here, not duplicated into templates/ingress.yaml
-  and templates/httproute.yaml, because this Deployment always renders
-  regardless of which routing flag is set (or neither), so a single check
-  here fires exactly once, deterministically, however Helm orders template
-  execution across files - unlike a guard split across the two routing
-  templates themselves, where Helm's own template engine aborts the whole
-  render at the first of the two to fail and never reaches the second,
-  making only one of two duplicated guards ever observable.
+  and templates/httproute.yaml, because templates/deployment.yaml always
+  renders regardless of which routing flag is set (or neither), so a single
+  check here fires exactly once, deterministically, however Helm orders
+  template execution across files - unlike a guard split across the two
+  routing templates themselves, where Helm's own template engine aborts the
+  whole render at the first of the two to fail and never reaches the second,
+  making only one of two duplicated guards ever observable. This is about
+  the website's own ingress/httpRoute/replicaCount only: the second,
+  independent Deployment in templates/deployment-feed.yaml must not
+  duplicate these guards, since they are unrelated to the feed workload.
   */}}
   {{- if and .Values.ingress.enabled .Values.httpRoute.enabled }}
   {{ fail "ingress.enabled and httpRoute.enabled cannot both be true: pick one external route and turn the other off." }}
@@ -111,14 +114,14 @@ spec:
               value: {{ .Values.config.contactTo | quote }}
             - name: CONTACT_FROM
               value: {{ .Values.config.contactFrom | quote }}
-            - name: INSTAGRAM_API_VERSION
-              value: {{ .Values.config.instagramApiVersion | quote }}
-            - name: INSTAGRAM_POST_COUNT
-              value: {{ .Values.config.instagramPostCount | quote }}
-            - name: INSTAGRAM_REFRESH_INTERVAL
-              value: {{ .Values.config.instagramRefreshInterval | quote }}
-            - name: INSTAGRAM_TOKEN_REFRESH_AGE
-              value: {{ .Values.config.instagramTokenRefreshAge | quote }}
+            - name: FEED_REFRESH_INTERVAL
+              value: {{ .Values.config.feedRefreshInterval | quote }}
+            # Always computed from the feed Service's own name and port, never
+            # values-driven: this value must always resolve to this exact
+            # release's own feed Service, in the same namespace, so there is
+            # no legitimate reason for an installer to point it elsewhere.
+            - name: FEED_SERVICE_URL
+              value: {{ printf "http://%s:%v" (include "ostendorf-tech.feed.fullname" .) .Values.feed.service.port | quote }}
             {{- if .Values.config.umamiUrl }}
             - name: UMAMI_URL
               value: {{ .Values.config.umamiUrl | quote }}
@@ -159,13 +162,6 @@ spec:
                 secretKeyRef:
                   name: {{ include "ostendorf-tech.existingSecretName" . }}
                   key: {{ .Values.existingSecret.smtpPasswordKey }}
-            {{- end }}
-            {{- if .Values.existingSecret.instagramTokenKey }}
-            - name: INSTAGRAM_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.instagramTokenKey }}
             {{- end }}
           {{- if .Values.startupProbe.enabled }}
           startupProbe:
