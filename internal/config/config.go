@@ -20,8 +20,6 @@ import (
 	"github.com/ostendorf-cloud/govue/clientip"
 	"github.com/ostendorf-cloud/govue/envconf"
 	"github.com/ostendorf-cloud/govue/logging"
-
-	"github.com/ostendorf-cloud/ostendorf.tech/internal/instagram"
 )
 
 // minKeyBytes is the shortest decoded key this package accepts for a signing
@@ -61,19 +59,16 @@ const (
 	DefaultContactRateLimitBurst = 5
 	DefaultContactRateLimitPer   = 10 * time.Minute
 
-	// DefaultInstagramAPIVersion reads internal/instagram's own pinned
-	// version rather than repeating it, so the two can never drift.
-	DefaultInstagramAPIVersion = instagram.DefaultVersion
-	// DefaultInstagramPostCount is how many posts the Impressionen
-	// section asks Meta for; the old site asked for the same 20.
-	DefaultInstagramPostCount = 20
-	// DefaultInstagramRefreshInterval is how often the feed is reloaded.
-	DefaultInstagramRefreshInterval = time.Hour
-	// DefaultInstagramTokenRefreshAge is how old the access token may get
-	// before a refresh is attempted. Meta refreshes only tokens older than
-	// 24 hours, and a long lived token expires after 60 days, which is
-	// what bounds this setting at both ends.
-	DefaultInstagramTokenRefreshAge = 7 * 24 * time.Hour
+	// DefaultFeedRefreshInterval is how often the website asks the feed
+	// service for the Impressionen section's posts. The feed service
+	// itself only reloads from Meta on its own, much longer interval
+	// (internal/feedconfig.DefaultSyncInterval, an hour), so polling it
+	// more often than that cannot show a visitor anything fresher; this
+	// is shorter anyway because asking is now a cheap in-cluster call
+	// rather than a request against Meta's own rate limits, and a shorter
+	// interval bounds how long a freshly published post takes to reach
+	// the website after the feed service has it.
+	DefaultFeedRefreshInterval = 5 * time.Minute
 
 	// DefaultMailRateLimitBurst and DefaultMailRateLimitPer bound every
 	// contact mail this service sends in total, independent of who is
@@ -88,15 +83,11 @@ const (
 	DefaultMailRateLimitPer   = time.Hour
 )
 
-// Instagram refresh bounds, the range INSTAGRAM_TOKEN_REFRESH_AGE and
-// INSTAGRAM_REFRESH_INTERVAL are checked against; see the defaults above.
+// Feed refresh bounds, the range FEED_REFRESH_INTERVAL is checked
+// against; see DefaultFeedRefreshInterval above.
 const (
-	minInstagramRefreshInterval = time.Minute
-	maxInstagramRefreshInterval = 24 * time.Hour
-	minInstagramTokenRefreshAge = 24 * time.Hour
-	maxInstagramTokenRefreshAge = 50 * 24 * time.Hour
-	minInstagramPostCount       = 1
-	maxInstagramPostCount       = 100
+	minFeedRefreshInterval = time.Minute
+	maxFeedRefreshInterval = 24 * time.Hour
 )
 
 // umamiWebsiteID is the lowercase UUID Umami names a website by. Anything
@@ -175,28 +166,19 @@ type Config struct {
 	ContactRateLimitBurst int
 	ContactRateLimitPer   time.Duration
 
-	// InstagramToken is the access token the home page's Impressionen
-	// section is loaded with, server side. Empty switches the section off
-	// entirely: no syncer runs, the feed stays empty, and the frontend
-	// renders no section at all. It is a secret like every other one here,
-	// so INSTAGRAM_TOKEN_FILE works in its place.
-	//
-	// A refreshed token lives in memory only: this repository has no
-	// secret manager client, so a restart falls back to whatever value
-	// this variable carries. Meta expires a long lived token after 60
-	// days, so the configured value still needs rotating by whoever owns
-	// the deployment; see internal/instagram's Syncer.
-	InstagramToken string
-	// InstagramAPIVersion pins the Graph API version calls are made
-	// against; see internal/instagram.DefaultVersion.
-	InstagramAPIVersion string
-	// InstagramPostCount is how many posts are asked for per sync.
-	InstagramPostCount int
-	// InstagramRefreshInterval is how often the feed is reloaded.
-	InstagramRefreshInterval time.Duration
-	// InstagramTokenRefreshAge is how old the token may get before a
-	// refresh is attempted; see DefaultInstagramTokenRefreshAge.
-	InstagramTokenRefreshAge time.Duration
+	// FeedServiceURL is the origin of the feed service that loads the home
+	// page's Impressionen section: internal/feedclient asks it for the
+	// post list and the picture behind each one, and this is the only
+	// network dependency that section has. Empty switches the section off
+	// entirely, the same way an absent Instagram token did before this
+	// service existed: no syncer runs, the cache stays empty, and the
+	// frontend renders no section at all. This website has no Instagram
+	// or Meta credential and no OpenBao client of its own; both live in
+	// the feed service (cmd/feed), reached over this URL alone.
+	FeedServiceURL string
+	// FeedRefreshInterval is how often the website asks the feed service
+	// for the current post list; see DefaultFeedRefreshInterval.
+	FeedRefreshInterval time.Duration
 
 	// UmamiURL and UmamiWebsiteID reach the self-hosted Umami every page
 	// view is reported to, server to server. Both empty count nothing, and
@@ -234,12 +216,8 @@ func Load(getenv func(string) string) (Config, error) {
 		ChallengeRateLimitPer:   loader.Duration("CHALLENGE_RATE_LIMIT_PER", DefaultChallengeRateLimitPer, time.Second, time.Hour),
 		ContactRateLimitBurst:   loader.Int("CONTACT_RATE_LIMIT_BURST", DefaultContactRateLimitBurst, 1, 100_000),
 		ContactRateLimitPer:     loader.Duration("CONTACT_RATE_LIMIT_PER", DefaultContactRateLimitPer, time.Second, 24*time.Hour),
-		InstagramAPIVersion:     loader.String("INSTAGRAM_API_VERSION", DefaultInstagramAPIVersion),
-		InstagramPostCount:      loader.Int("INSTAGRAM_POST_COUNT", DefaultInstagramPostCount, minInstagramPostCount, maxInstagramPostCount),
-		InstagramRefreshInterval: loader.Duration("INSTAGRAM_REFRESH_INTERVAL", DefaultInstagramRefreshInterval,
-			minInstagramRefreshInterval, maxInstagramRefreshInterval),
-		InstagramTokenRefreshAge: loader.Duration("INSTAGRAM_TOKEN_REFRESH_AGE", DefaultInstagramTokenRefreshAge,
-			minInstagramTokenRefreshAge, maxInstagramTokenRefreshAge),
+		FeedRefreshInterval: loader.Duration("FEED_REFRESH_INTERVAL", DefaultFeedRefreshInterval,
+			minFeedRefreshInterval, maxFeedRefreshInterval),
 		MailRateLimitBurst: loader.Int("MAIL_RATE_LIMIT_BURST", DefaultMailRateLimitBurst, 1, 100_000),
 		MailRateLimitPer:   loader.Duration("MAIL_RATE_LIMIT_PER", DefaultMailRateLimitPer, time.Second, 24*time.Hour),
 	}
@@ -289,11 +267,13 @@ func Load(getenv func(string) string) (Config, error) {
 	fail(wrap("CSRF_KEY", err))
 	cfg.CSRFKey = csrfKey
 
-	cfg.InstagramToken = loader.SecretOrFile("INSTAGRAM_TOKEN")
-
 	// Read raw rather than through loader.URL: that helper treats an empty
-	// value as a missing required one, and an empty UMAMI_URL is this
-	// feature switched off, not a mistake.
+	// value as a missing required one, and an empty FEED_SERVICE_URL is
+	// this section switched off, not a mistake, the same reasoning
+	// UMAMI_URL below already applies.
+	cfg.FeedServiceURL = strings.TrimRight(loader.String("FEED_SERVICE_URL", ""), "/")
+	fail(wrap("FEED_SERVICE_URL", validateOptionalURL(cfg.FeedServiceURL)))
+
 	cfg.UmamiURL = strings.TrimRight(loader.String("UMAMI_URL", ""), "/")
 	cfg.UmamiWebsiteID = loader.String("UMAMI_WEBSITE_ID", "")
 	fail(wrap("UMAMI_URL", validateUmami(cfg.UmamiURL, cfg.UmamiWebsiteID)))
@@ -302,6 +282,32 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// validateOptionalURL checks that raw is empty, or an absolute http or
+// https URL with no credentials, query or fragment. Shared by every
+// optional URL setting this package has (UMAMI_URL, FEED_SERVICE_URL):
+// each one is a feature switched off when empty, not a mistake, which is
+// why none of them is read through loader.URL, whose "" means "required
+// and missing".
+func validateOptionalURL(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	parsed, err := url.Parse(raw)
+	switch {
+	case err != nil:
+		return fmt.Errorf("must be a URL: %w", err)
+	case parsed.Scheme != "http" && parsed.Scheme != "https":
+		return errors.New("must start with http:// or https://")
+	case parsed.Host == "":
+		return errors.New("must contain a host")
+	case parsed.User != nil:
+		return errors.New("must not contain credentials")
+	case parsed.RawQuery != "" || parsed.Fragment != "":
+		return errors.New("must not contain a query or a fragment")
+	}
+	return nil
 }
 
 // validateUmami checks the pair UMAMI_URL and UMAMI_WEBSITE_ID form. Both
@@ -315,21 +321,11 @@ func validateUmami(rawURL, websiteID string) error {
 	if (rawURL == "") != (websiteID == "") {
 		return errors.New("and UMAMI_WEBSITE_ID are set together or not at all")
 	}
+	if err := validateOptionalURL(rawURL); err != nil {
+		return err
+	}
 	if rawURL == "" {
 		return nil
-	}
-	parsed, err := url.Parse(rawURL)
-	switch {
-	case err != nil:
-		return fmt.Errorf("must be a URL: %w", err)
-	case parsed.Scheme != "http" && parsed.Scheme != "https":
-		return errors.New("must start with http:// or https://")
-	case parsed.Host == "":
-		return errors.New("must contain a host")
-	case parsed.User != nil:
-		return errors.New("must not contain credentials")
-	case parsed.RawQuery != "" || parsed.Fragment != "":
-		return errors.New("must not contain a query or a fragment")
 	}
 	if !umamiWebsiteID.MatchString(websiteID) {
 		return errors.New("UMAMI_WEBSITE_ID must be the lowercase UUID of the website in Umami")

@@ -71,11 +71,8 @@ listener (`ADMIN_ADDR`), never on this public one; see the Configuration table b
 | `CHALLENGE_RATE_LIMIT_PER` | That burst's refill period | `20s` | no |
 | `CONTACT_RATE_LIMIT_BURST` | Contact submissions one client address may make before waiting | `5` | no |
 | `CONTACT_RATE_LIMIT_PER` | That burst's refill period | `10m` | no |
-| `INSTAGRAM_TOKEN` (+ `_FILE`) | Instagram access token the Impressionen section is loaded with. Empty renders no section at all | none | no |
-| `INSTAGRAM_API_VERSION` | Pinned Instagram Graph API version | `v23.0` | no |
-| `INSTAGRAM_POST_COUNT` | Posts loaded per sync, 1 to 100 | `20` | no |
-| `INSTAGRAM_REFRESH_INTERVAL` | How often the feed is reloaded, at least `1m` | `1h` | no |
-| `INSTAGRAM_TOKEN_REFRESH_AGE` | How old the token may get before a refresh, `1d` to `50d` | `7d` | no |
+| `FEED_SERVICE_URL` | Origin of the feed service the Impressionen section is loaded from. Empty renders no section at all | none | no |
+| `FEED_REFRESH_INTERVAL` | How often the website asks the feed service for the post list, at least `1m` | `5m` | no |
 | `UMAMI_URL` | Base URL of the Umami page views are reported to. Empty counts nothing | none | no\*\* |
 | `UMAMI_WEBSITE_ID` | Lowercase UUID of the website in Umami | none | no\*\* |
 | `MAIL_RATE_LIMIT_BURST` | Contact mails this service sends in total, across every client address, before waiting | `50` | no |
@@ -89,17 +86,18 @@ working. `CSRF_KEY` has no such fallback: the server refuses to start without it
 them is refused at startup rather than silently counting nothing.
 
 The Impressionen section and the visitor statistic are both switched off by default and
-both run server side only. Without `INSTAGRAM_TOKEN` no feed is loaded and the section is
-not rendered; the rest of the page is unaffected, and a failure reaching Meta never
-changes what a visitor sees. The posts and their pictures are fetched by this server and
-served from this domain, so a visitor's browser never connects to Instagram or Meta.
-Without `UMAMI_URL` and `UMAMI_WEBSITE_ID` no page view is reported; with them, this
-server reports each view to Umami itself, with no script, cookie or beacon in the
-visitor's browser, and a failure reaching Umami never affects the response.
+both run server side only. Without `FEED_SERVICE_URL` no cache is loaded and the section
+is not rendered; the rest of the page is unaffected, and a feed service that is
+unreachable or empty never changes what a visitor sees, the same way an unconfigured URL
+does. The posts and their pictures are fetched by this server, from the feed service, and
+served from this domain, so a visitor's browser never connects to the feed service,
+Instagram or Meta. Without `UMAMI_URL` and `UMAMI_WEBSITE_ID` no page view is reported;
+with them, this server reports each view to Umami itself, with no script, cookie or
+beacon in the visitor's browser, and a failure reaching Umami never affects the response.
 
-A refreshed Instagram token lives in memory only. There is no secret manager client here,
-so a restart falls back to whatever `INSTAGRAM_TOKEN` carries: rotate that value before
-Meta expires it, 60 days after it was issued.
+This binary has no Instagram or Meta credential and no OpenBao client: both live in the
+feed service instead, a second binary (`cmd/feed`) with its own configuration and its own
+chart entry, reached over `FEED_SERVICE_URL` alone.
 
 `CONTACT_RATE_LIMIT_BURST` bounds one client address; `MAIL_RATE_LIMIT_BURST` bounds the mail
 account itself, across every address at once, which the per-client limit alone cannot do: a
