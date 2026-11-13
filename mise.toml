@@ -18,6 +18,13 @@ task = "3"
 # one major beyond the strict minimum; it is chosen to match the sibling repository
 # rather than put a third pnpm major into the organisation. 12.19.0 is the patch a cold-store install
 # and a cold-store "pnpm install --frozen-lockfile" were both verified against here.
+#
+# Regenerating web/pnpm-lock.yaml: pnpm 12 enforces a minimum release age and refuses a
+# package published within roughly the last day with ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION.
+# Preserving an existing lockfile then fails where a full fresh resolve succeeds, so
+# regenerate from scratch rather than fighting it. Verify the result with a frozen install
+# into an empty directory with a cold store: inspecting web/node_modules proves nothing,
+# because --frozen-lockfile leaves an already populated tree untouched.
 node = "26"
 pnpm = "12.19.0"
 # Pinned to the patch, not "2": a golangci-lint release is built against one Go patch and

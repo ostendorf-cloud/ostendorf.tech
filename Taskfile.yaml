@@ -112,7 +112,7 @@ tasks:
       - go test -race -count=1 ./...
 
   check:govue-version:
-    desc: Verify go.mod and web/package.json pin the same govue version
+    desc: Verify go.mod and web/package.json pin the same govue version, and that the lockfile pins its subdirectory
     cmds:
       - go test -race -count=1 ./internal/depsync/...
 

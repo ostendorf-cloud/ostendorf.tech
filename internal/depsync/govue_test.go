@@ -173,7 +173,7 @@ var govueLockfileEntryPattern = regexp.MustCompile(
 
 // govueLockfileResolutionPathPattern pulls the "path" field out of a resolution object
 // matched by govueLockfileEntryPattern, when present.
-var govueLockfileResolutionPathPattern = regexp.MustCompile(`path:\s*([^,}]+)`)
+var govueLockfileResolutionPathPattern = regexp.MustCompile(`(?:^|[{,]\s*)path:\s*([^,}]+)`)
 
 // govueLockfileResolutionPath reads web/pnpm-lock.yaml and returns the "path" field pnpm
 // wrote into packageJSONName's resolution object, or an error when the package has no
