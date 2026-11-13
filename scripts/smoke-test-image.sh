@@ -107,7 +107,7 @@ assert_status "/readyz" "200"
 # alone, is what actually proves the prerendered HTML survived into this
 # image instead of an empty shell that would also answer 200.
 assert_status "/de/" "200"
-assert_contains "/de/" 'id="hero-title"'
+assert_contains "/de/" 'id="hero-title-PROBE-SHOULD-FAIL"'
 assert_status "/en/" "200"
 assert_contains "/en/" 'id="hero-title"'
 
