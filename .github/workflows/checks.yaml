@@ -192,3 +192,8 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
       - uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
       - run: task test:helm
+
+  renovate-config:
+    uses: ostendorf-cloud/workflows/.github/workflows/reusable-renovate-config.yaml@v0.2.0
+    with:
+      runs-on-runner: blacksmith-2vcpu-ubuntu-2404
