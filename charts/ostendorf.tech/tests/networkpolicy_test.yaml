@@ -101,6 +101,7 @@ tests:
             namespaceSelector:
               kubernetes.io/metadata.name: custom-dns
             podSelector:
+              k8s-app: null
               app: custom-coredns
     asserts:
       - equal:
@@ -109,6 +110,8 @@ tests:
       - equal:
           path: spec.egress[0].to[0].podSelector.matchLabels["app"]
           value: custom-coredns
+      - notExists:
+          path: spec.egress[0].to[0].podSelector.matchLabels["k8s-app"]
 
   - it: falls back to no destination restriction for DNS when both selectors are set to null
     set:
@@ -158,6 +161,27 @@ tests:
       - equal:
           path: spec.egress[1].to[0].podSelector.matchLabels["app.kubernetes.io/name"]
           value: openbao
+
+  # The case above overrides namespaceSelector under its own default key
+  # (kubernetes.io/metadata.name), which Helm's map merge overwrites cleanly. This
+  # case overrides it under a different key, which Helm's map merge adds
+  # alongside the default key instead: proves the same per-key merge trap as
+  # feed.networkPolicy.dns.podSelector applies here too, and that nulling the
+  # specific default key replaces it rather than adding to it.
+  - it: replaces the default OpenBao namespaceSelector key when the override nulls it, the same per-key merge as dns.podSelector
+    set:
+      feed:
+        networkPolicy:
+          openBao:
+            namespaceSelector:
+              kubernetes.io/metadata.name: null
+              team: platform
+    asserts:
+      - equal:
+          path: spec.egress[1].to[0].namespaceSelector.matchLabels["team"]
+          value: platform
+      - notExists:
+          path: spec.egress[1].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
 
   - it: falls back to no destination restriction for OpenBao when namespaceSelector is set to null
     set:

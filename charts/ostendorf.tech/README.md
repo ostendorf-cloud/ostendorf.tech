@@ -274,13 +274,36 @@ well as by port below; Meta is scoped by port only, and stays that way.**
 - DNS, UDP and TCP port 53, scoped by `feed.networkPolicy.dns.namespaceSelector` and
   `.podSelector`. Both default to kube-dns's own conventional namespace and pod label
   (`kube-system` / `k8s-app: kube-dns`), which CoreDNS also carries on most clusters for
-  compatibility, kubeadm's default install included. **If your cluster's DNS `Service` does not
-  carry these labels, the feed pod cannot resolve any name at all, Meta's included, which looks
-  identical to a Meta outage from the outside rather than a policy error.** Verify your cluster's
-  actual DNS `Service` labels before relying on the default. Set both selectors to `null` (not
-  `{}`: Helm merges a map default with an empty override instead of clearing it, so `{}` here
-  would silently keep the default) to fall back to the port-only rule this chart shipped before,
-  with no destination scoping at all.
+  compatibility, kubeadm's default install included. **If your cluster's DNS pods do not carry
+  these labels, the feed pod cannot resolve any name at all, Meta's included, which looks
+  identical to a Meta outage from the outside rather than a policy error.** A `NetworkPolicy`
+  peer's `podSelector` matches pods, not the `Service` in front of them, and the two can
+  disagree, so verify the actual DNS pod labels, for example with
+  `kubectl get pods -n kube-system -l k8s-app=kube-dns --show-labels`, before relying on the
+  default. NodeLocal DNSCache is a second way this default misses: on a cluster running it, the
+  pod's resolver points at a per-node pod labelled `k8s-app: node-local-dns`, not `kube-dns`,
+  and whether that traffic is admitted then rests on the "traffic to and from the node is always
+  allowed" exception this chart already relies on for kubelet probes, see above.
+
+  Helm merges a user's override into the default map key by key, not key for key: an override
+  under a key the default does not already use is added alongside the default, not instead of
+  it. Setting `feed.networkPolicy.dns.podSelector` to `{app: coredns}` on a cluster whose CoreDNS
+  pods carry `app: coredns` instead of `k8s-app: kube-dns` therefore renders both keys, a
+  selector that matches no pod carrying only one of the two, and DNS stays blocked. Null the
+  specific default key you mean to replace to drop it instead:
+
+  ```yaml
+  feed:
+    networkPolicy:
+      dns:
+        podSelector:
+          k8s-app: null
+          app: coredns
+  ```
+
+  Set both selectors to `null` entirely (not `{}`: Helm merges a map default with an empty
+  override instead of clearing it, so `{}` here would silently keep the default) to fall back to
+  the port-only rule this chart shipped before, with no destination scoping at all.
 - OpenBao, on `feed.networkPolicy.openBaoPort` (default `8200`, OpenBao's conventional API port)
   and `feed.networkPolicy.openBao.namespaceSelector`/`.podSelector`. The port is kept as its own
   explicit value rather than parsed out of `feed.config.openBaoAddr`'s URL, because Helm's
@@ -292,8 +315,11 @@ well as by port below; Meta is scoped by port only, and stays that way.**
   own namespace is named `openbao`. No default pod selector: namespace scoping alone is already a
   significant tightening over the previous, fully open rule, and OpenBao deployments vary too much
   in their own pod labels for one default to fit everywhere. Keep the port in sync by hand with
-  whatever port `feed.config.openBaoAddr` actually names, if it ever differs from the default; set
-  `namespaceSelector` to `null` for the same port-only fallback as DNS above, for the same reason.
+  whatever port `feed.config.openBaoAddr` actually names, if it ever differs from the default. The
+  same per-key merge as DNS above applies to `namespaceSelector`: an override under a key other
+  than `kubernetes.io/metadata.name` is added alongside that default key, not instead of it, so
+  null that key explicitly to replace it; set `namespaceSelector` to `null` entirely for the same
+  port-only fallback as DNS above, for the same reason.
 - Meta's Graph API, TCP port 443. **Left open, not merely unscoped by omission**: Meta serves this
   from a CDN with no fixed, documentable IP range, so there is no destination this rule could name
   that would not go stale. Of the three egress rules, this is the one that still admits any
@@ -329,7 +355,7 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `config.umamiWebsiteId` | Lowercase UUID of the website in Umami, set together with `config.umamiUrl` | `""` |
 | `existingSecret.name` | Name of the existing `Secret` | `""` (required) |
 | `feed.enabled` | Create the feed service's `Deployment`, `Service`, `ServiceAccount` and `NetworkPolicy`; see "Feed service" above | `false` |
-| `feed.image.repository` | Feed service container image; not published yet, see "Feed service" above | `ghcr.io/ostendorf-cloud/ostendorf.tech-feed` |
+| `feed.image.repository` | Feed service container image, published by the `feed-image` job; see "Feed service" above | `ghcr.io/ostendorf-cloud/ostendorf.tech-feed` |
 | `feed.service.port` | Feed service's one container and Service port | `8081` |
 | `feed.config.openBaoAddr` | OpenBao address the feed service authenticates against. Required when `feed.enabled` is true; see "Feed service" above | `""` (required) |
 | `feed.config.openBaoRole` | OpenBao Kubernetes auth role the feed service logs in as. Required when `feed.enabled` is true; see "Feed service" above | `""` (required) |

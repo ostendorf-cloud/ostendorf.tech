@@ -46,7 +46,7 @@ spec:
     #
     # DNS. feed.networkPolicy.dns scopes this rule's destination, on top of
     # the port restriction below. Restricting only the port used to be the
-    # whole rule, because the cluster's DNS Service's own namespace and pod
+    # whole rule, because the cluster's DNS pods' own namespace and pod
     # labels are not something this chart can know in advance across every
     # cluster it might be installed on, and guessing wrong would fail
     # silently at runtime, indistinguishable from a Meta outage, rather than
@@ -60,10 +60,10 @@ spec:
         - protocol: TCP
           port: 53
       {{- $dnsPeer := dict }}
-      {{- with .Values.feed.networkPolicy.dns.namespaceSelector }}
+      {{- with (.Values.feed.networkPolicy.dns).namespaceSelector }}
       {{- $_ := set $dnsPeer "namespaceSelector" (dict "matchLabels" .) }}
       {{- end }}
-      {{- with .Values.feed.networkPolicy.dns.podSelector }}
+      {{- with (.Values.feed.networkPolicy.dns).podSelector }}
       {{- $_ := set $dnsPeer "podSelector" (dict "matchLabels" .) }}
       {{- end }}
       {{- if $dnsPeer }}
@@ -86,10 +86,10 @@ spec:
         - protocol: TCP
           port: {{ .Values.feed.networkPolicy.openBaoPort }}
       {{- $openBaoPeer := dict }}
-      {{- with .Values.feed.networkPolicy.openBao.namespaceSelector }}
+      {{- with (.Values.feed.networkPolicy.openBao).namespaceSelector }}
       {{- $_ := set $openBaoPeer "namespaceSelector" (dict "matchLabels" .) }}
       {{- end }}
-      {{- with .Values.feed.networkPolicy.openBao.podSelector }}
+      {{- with (.Values.feed.networkPolicy.openBao).podSelector }}
       {{- $_ := set $openBaoPeer "podSelector" (dict "matchLabels" .) }}
       {{- end }}
       {{- if $openBaoPeer }}

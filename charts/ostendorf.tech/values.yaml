@@ -338,15 +338,29 @@ feed:
     # restriction alone. Both default to kube-dns's own conventional
     # namespace and pod label, which CoreDNS also carries on most clusters
     # for compatibility (kubeadm's default install included). Wrong on a
-    # cluster whose DNS Service does not carry these labels: the feed pod
-    # then cannot resolve any name at all, Meta's included, which looks
-    # identical to a Meta outage from the outside rather than a policy
-    # error. Verify your cluster's actual DNS Service labels before relying
-    # on the default; see README.md. Set both namespaceSelector and
-    # podSelector to null (not {}: Helm merges a map default with an empty
-    # override instead of clearing it, so {} here would silently keep
-    # kube-system/kube-dns) to fall back to the port-only rule this chart
-    # shipped before, with no destination scoping at all.
+    # cluster whose DNS pods do not carry these labels: the feed pod then
+    # cannot resolve any name at all, Meta's included, which looks identical
+    # to a Meta outage from the outside rather than a policy error. Verify
+    # your cluster's actual DNS pod labels, for example with
+    # `kubectl get pods -n kube-system -l k8s-app=kube-dns --show-labels`,
+    # before relying on the default; see README.md. A Service's own labels
+    # do not bind the NetworkPolicy, which matches pods directly, and the
+    # two can disagree. NodeLocal DNSCache is a second way this default
+    # misses: on a cluster running it, the pod's resolver points at a
+    # per-node pod labelled `k8s-app: node-local-dns`, not `kube-dns`.
+    #
+    # Helm merges a user's override into this default map key by key, not
+    # key for key: an override under a key the default does not already use
+    # is added alongside the default, not instead of it. `podSelector:
+    # {app: coredns}` here would therefore render `app: coredns` AND
+    # `k8s-app: kube-dns`, a selector that matches no pod carrying only one
+    # of the two. Null the specific default key you mean to replace to drop
+    # it, for example `podSelector: {k8s-app: null, app: coredns}`. Set both
+    # namespaceSelector and podSelector to null entirely (not {}: Helm
+    # merges a map default with an empty override instead of clearing it, so
+    # {} here would silently keep kube-system/kube-dns) to fall back to the
+    # port-only rule this chart shipped before, with no destination scoping
+    # at all.
     dns:
       namespaceSelector:
         kubernetes.io/metadata.name: kube-system
@@ -361,8 +375,12 @@ feed:
     # already set that address sets this too. The default below matches
     # this organisation's own namespace-per-topic convention (see
     # kubernetes-conventions): OpenBao's own namespace is named "openbao".
-    # Set namespaceSelector to null for the same port-only fallback as dns
-    # above, for the same reason: null, not {}.
+    # The same per-key merge applies here as for dns above: an override of
+    # namespaceSelector under a key other than `kubernetes.io/metadata.name`
+    # is added alongside that default key, not instead of it, so null that
+    # key explicitly to replace it. Set namespaceSelector to null entirely
+    # for the same port-only fallback as dns above, for the same reason:
+    # null, not {}.
     openBao:
       namespaceSelector:
         kubernetes.io/metadata.name: openbao
