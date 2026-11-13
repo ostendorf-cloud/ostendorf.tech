@@ -784,6 +784,65 @@ func TestAppAssetRateLimitStaysJSON(t *testing.T) {
 	}
 }
 
+// TestAppContactGeneralRateLimitAppliesBeforeTheHandler proves
+// a.rateLimit.Middleware, the general per-client limiter every other route
+// already spends from, now also guards POST /api/v1/contact: a request
+// beyond its burst is refused with a 429 before it ever reaches
+// requireSession, the CSRF protector or handleContact, none of which either
+// request in this test satisfies (no session cookie, no CSRF token). The
+// response is distinguished from contactLimiter's and mailLimiter's own
+// 429s, which both carry the localized tooMany message (see
+// TestAppContactHoneypotSilentlyAccepted and
+// TestAppContactMailCeilingOnlySpentOnARealSendAttempt), by carrying govue's
+// fixed English default instead, the same fallback
+// TestAppAssetRateLimitStaysJSON already proves for a non-page path.
+func TestAppContactGeneralRateLimitAppliesBeforeTheHandler(t *testing.T) {
+	cfg := testConfig(t, map[string]string{
+		"RATE_LIMIT_BURST": "1",
+		"RATE_LIMIT_PER":   "1m",
+	})
+	dist, prerendered := testFS()
+	app, err := New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	post := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact",
+			strings.NewReader(`{"name":"Erika","email":"erika@example.test","message":"hi","consent":true}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "203.0.113.90:1234"
+		rec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	// The first request still has to prove something other than 429: the
+	// burst of 1 has not been spent yet, and requireSession refuses it for
+	// carrying no session at all, same as TestAppContactRefusedWithNoSessionAtAll.
+	first := post()
+	if first.Code != http.StatusForbidden {
+		t.Fatalf("first request status = %d, want %d (requireSession refusing a missing session), body = %s",
+			first.Code, http.StatusForbidden, first.Body)
+	}
+
+	second := post()
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request status = %d, want %d (the general limiter's burst of 1, spent by the first request), body = %s",
+			second.Code, http.StatusTooManyRequests, second.Body)
+	}
+	code, message := decodeError(t, second.Body.Bytes())
+	if code != api.CodeTooManyRequests {
+		t.Errorf("code = %q, want %q", code, api.CodeTooManyRequests)
+	}
+	const govueDefaultTooMany = "too many requests, please wait a moment"
+	if message != govueDefaultTooMany {
+		t.Errorf("message = %q, want govue's default %q, not a message coming from requireSession, the CSRF "+
+			"protector or handleContact's own contactLimiter/mailLimiter, none of which this request ever reached",
+			message, govueDefaultTooMany)
+	}
+}
+
 // TestAppContactMailCeilingOnlySpentOnARealSendAttempt proves two things
 // about the mail ceiling (finding 6), across three client addresses so the
 // per-client contactLimiter (kept wide open here) can never be the reason
