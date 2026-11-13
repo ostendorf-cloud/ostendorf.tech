@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sync/atomic"
 	"time"
 
 	"github.com/ostendorf-cloud/govue/api"
@@ -84,6 +85,14 @@ type App struct {
 	mailLimiter      *ratelimit.Limiter
 	clientIPs        *clientip.Resolver
 	protector        *csrf.Protector
+
+	// mailCeilingWarnedAt is the unix nanosecond timestamp warnMailCeiling
+	// last actually logged at, zero meaning "never yet"; mailCeilingWarnEvery
+	// is how long it waits before logging again. Together they keep a
+	// sustained flood of refused submissions from turning into one warning
+	// per request: see warnMailCeiling.
+	mailCeilingWarnedAt  atomic.Int64
+	mailCeilingWarnEvery time.Duration
 
 	sessions *session.Manager
 	csrfKey  []byte
@@ -180,6 +189,11 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	// contactLimiter, so it bounds every mail this service ever sends in
 	// the same window, no matter how many addresses asked.
 	a.mailLimiter = ratelimit.New(cfg.MailRateLimitBurst, cfg.MailRateLimitPer, 1)
+	// warnMailCeiling logs at most once per window; a window the same
+	// length as the ceiling's own is what keeps one log line per burst of
+	// refusals, however long that burst runs, rather than one per refused
+	// request.
+	a.mailCeilingWarnEvery = cfg.MailRateLimitPer
 
 	a.sessions, err = session.New(session.Config{
 		Store:          session.NewMemoryStore(nil, maxSessions),
@@ -318,6 +332,30 @@ func (a *App) trackPageView(r *http.Request, title string) {
 	}
 	if v, ok := analytics.FromRequest(r, a.clientIPs.Resolve(r), title, a.siteURL.Hostname()); ok {
 		a.analyticsClient.Track(v)
+	}
+}
+
+// warnMailCeiling logs that the mail ceiling (mailLimiter) refused a
+// submission, at most once per mailCeilingWarnEvery: a sustained flood of
+// refused requests, each one already answered with its own 429, must not
+// also turn into one WarnContext call per request, which would make the
+// access log itself the amplifier the ceiling exists to guard against. The
+// compare-and-swap loop is what lets several requests race on the same
+// window without more than one of them winning the log line: a losing
+// attempt simply means another goroutine already logged recently enough,
+// never a reason to retry logging itself.
+func (a *App) warnMailCeiling(ctx context.Context, wait time.Duration) {
+	now := time.Now()
+	for {
+		last := a.mailCeilingWarnedAt.Load()
+		if now.Sub(time.Unix(0, last)) < a.mailCeilingWarnEvery {
+			return
+		}
+		if a.mailCeilingWarnedAt.CompareAndSwap(last, now.UnixNano()) {
+			a.logger.WarnContext(ctx, "contact form: mail ceiling reached, refusing submissions",
+				"retry_after", wait.String())
+			return
+		}
 	}
 }
 

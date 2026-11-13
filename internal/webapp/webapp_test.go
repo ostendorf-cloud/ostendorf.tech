@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -783,12 +784,27 @@ func TestAppAssetRateLimitStaysJSON(t *testing.T) {
 	}
 }
 
-// TestAppContactMailCeilingAppliesAcrossClientAddresses proves the mail
-// ceiling (finding 6) bounds the mail account itself, not one client
-// address: with the per-client contact limit wide open, two submissions
-// from two entirely distinct client addresses still collide on the one
-// shared mailLimiter bucket.
-func TestAppContactMailCeilingAppliesAcrossClientAddresses(t *testing.T) {
+// TestAppContactMailCeilingOnlySpentOnARealSendAttempt proves two things
+// about the mail ceiling (finding 6), across three client addresses so the
+// per-client contactLimiter (kept wide open here) can never be the reason
+// for any of the three outcomes below:
+//
+//  1. A submission that never gets far enough to attempt a send (no proof of
+//     work at all, so it fails at the PoW == nil check) must never spend the
+//     ceiling's one token. If it did, the ceiling would protect nothing: an
+//     attacker could drain the whole mail account's budget with requests
+//     that could never have sent a mail in the first place, exactly the bug
+//     this test is written against.
+//  2. A second, fully valid submission from a different address must
+//     therefore still find the token available, and reach the mailer (it
+//     gets refused there instead, for want of a real SMTP server in this
+//     test, but that refusal is a 503, never a 429).
+//  3. A third, equally valid submission from yet another address must now be
+//     refused by the ceiling: the second submission's real attempt to send
+//     is what actually spent the one token burst=1 allows, so the ceiling
+//     still does its job of bounding the mail account once a submission
+//     earns its way that far.
+func TestAppContactMailCeilingOnlySpentOnARealSendAttempt(t *testing.T) {
 	cfg := testConfig(t, map[string]string{
 		"CHALLENGE_KEY":            validHexKey,
 		"SMTP_USERNAME":            "no-reply@example.test",
@@ -804,24 +820,35 @@ func TestAppContactMailCeilingAppliesAcrossClientAddresses(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	submit := func(remoteAddr string) *httptest.ResponseRecorder {
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	app.challenges.Now = func() time.Time { return now }
+
+	// challenge fetches a real challenge for remoteAddr and returns it
+	// alongside the session cookies and CSRF token a POST needs, the same
+	// GET-then-POST pattern every other contact test in this file follows.
+	challenge := func(remoteAddr string) (pow.Challenge, []*http.Cookie, string) {
 		getReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge", nil)
 		getReq.RemoteAddr = remoteAddr
 		getRec := httptest.NewRecorder()
 		app.Handler().ServeHTTP(getRec, getReq)
-		cookies := getRec.Result().Cookies()
-		var challenge struct {
+		if getRec.Code != http.StatusOK {
+			t.Fatalf("challenge for %s status = %d, want %d, body = %s", remoteAddr, getRec.Code, http.StatusOK, getRec.Body)
+		}
+		var body struct {
+			pow.Challenge
 			CSRFToken string `json:"csrfToken"`
 		}
-		if err := json.Unmarshal(getRec.Body.Bytes(), &challenge); err != nil {
+		if err := json.Unmarshal(getRec.Body.Bytes(), &body); err != nil {
 			t.Fatalf("decode challenge: %v", err)
 		}
+		return body.Challenge, getRec.Result().Cookies(), body.CSRFToken
+	}
 
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact",
-			strings.NewReader(`{"name":"Erika","email":"erika@example.test","message":"hi","consent":true}`))
+	post := func(remoteAddr, body string, cookies []*http.Cookie, csrfToken string) *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact", strings.NewReader(body))
 		req.RemoteAddr = remoteAddr
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set(csrf.HeaderName, challenge.CSRFToken)
+		req.Header.Set(csrf.HeaderName, csrfToken)
 		for _, c := range cookies {
 			req.AddCookie(c)
 		}
@@ -830,14 +857,155 @@ func TestAppContactMailCeilingAppliesAcrossClientAddresses(t *testing.T) {
 		return rec
 	}
 
-	first := submit("203.0.113.51:1111")
-	if first.Code == http.StatusTooManyRequests {
-		t.Fatalf("first submission already rate limited, body = %s", first.Body)
+	// 1. Address A: no pow field at all. This must be refused at validation,
+	// before mailLimiter.Take ever runs, so it must never touch the ceiling.
+	_, cookiesA, csrfA := challenge("203.0.113.61:1111")
+	first := post("203.0.113.61:1111", `{"name":"Erika","email":"erika@example.test","message":"hi","consent":true}`, cookiesA, csrfA)
+	if first.Code != http.StatusBadRequest {
+		t.Fatalf("address A (missing pow) status = %d, want %d, body = %s", first.Code, http.StatusBadRequest, first.Body)
 	}
-	second := submit("203.0.113.52:2222")
-	if second.Code != http.StatusTooManyRequests {
-		t.Fatalf("second submission from a different client address status = %d, want %d (the shared mail ceiling), body = %s",
+
+	// 2. Address B: a real, solved challenge. If address A's worthless
+	// submission above had wrongly spent the ceiling's one token, this
+	// would come back 429; it must not, since nothing has actually tried to
+	// send a mail yet.
+	challengeB, cookiesB, csrfB := challenge("203.0.113.62:2222")
+	solutionB := solveChallenge(t, challengeB)
+	now = now.Add(5 * time.Second)
+	bodyB, err := json.Marshal(map[string]any{
+		"name": "Erika", "email": "erika@example.test", "message": "hi", "consent": true, "pow": solutionB,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := post("203.0.113.62:2222", string(bodyB), cookiesB, csrfB)
+	if second.Code == http.StatusTooManyRequests {
+		t.Fatalf("address B (valid submission) status = %d, want anything but %d (the ceiling must still have its token), body = %s",
 			second.Code, http.StatusTooManyRequests, second.Body)
+	}
+
+	// 3. Address C: another real, solved challenge. Address B's attempt
+	// above is what actually spent the one token burst=1 allows, so this
+	// one must now be refused by the ceiling.
+	challengeC, cookiesC, csrfC := challenge("203.0.113.63:3333")
+	solutionC := solveChallenge(t, challengeC)
+	now = now.Add(5 * time.Second)
+	bodyC, err := json.Marshal(map[string]any{
+		"name": "Erika", "email": "erika@example.test", "message": "hi", "consent": true, "pow": solutionC,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	third := post("203.0.113.63:3333", string(bodyC), cookiesC, csrfC)
+	if third.Code != http.StatusTooManyRequests {
+		t.Fatalf("address C (valid submission) status = %d, want %d (the ceiling spent by address B), body = %s",
+			third.Code, http.StatusTooManyRequests, third.Body)
+	}
+}
+
+// recordingHandler is a minimal slog.Handler fake that keeps every record's
+// message, standing in for a real sink so a test can assert on how many
+// times something was logged without parsing text output.
+type recordingHandler struct {
+	mu       sync.Mutex
+	messages []string
+}
+
+func (h *recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *recordingHandler) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.messages = append(h.messages, r.Message)
+	return nil
+}
+
+func (h *recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h *recordingHandler) WithGroup(string) slog.Handler { return h }
+
+// count returns how many recorded messages equal message exactly.
+func (h *recordingHandler) count(message string) int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	n := 0
+	for _, m := range h.messages {
+		if m == message {
+			n++
+		}
+	}
+	return n
+}
+
+// TestAppContactMailCeilingWarningLogsOnceAcrossARepeatedTrip proves
+// warnMailCeiling's own job: tripping the mail ceiling repeatedly in quick
+// succession, well inside one MailRateLimitPer window, still produces
+// exactly one warning line, not one per refused request, which is what a
+// sustained flood would otherwise turn the access log into.
+func TestAppContactMailCeilingWarningLogsOnceAcrossARepeatedTrip(t *testing.T) {
+	handler := &recordingHandler{}
+	cfg := testConfig(t, map[string]string{
+		"CHALLENGE_KEY":         validHexKey,
+		"SMTP_USERNAME":         "no-reply@example.test",
+		"SMTP_PASSWORD":         "s3cret",
+		"MAIL_RATE_LIMIT_BURST": "1",
+		"MAIL_RATE_LIMIT_PER":   "1m",
+	})
+	dist, prerendered := testFS()
+	app, err := New(cfg, slog.New(handler), dist, prerendered)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	app.challenges.Now = func() time.Time { return now }
+
+	submit := func() *httptest.ResponseRecorder {
+		getReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/challenge", nil)
+		getRec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(getRec, getReq)
+		var challenge struct {
+			pow.Challenge
+			CSRFToken string `json:"csrfToken"`
+		}
+		if err := json.Unmarshal(getRec.Body.Bytes(), &challenge); err != nil {
+			t.Fatalf("decode challenge: %v", err)
+		}
+		solution := solveChallenge(t, challenge.Challenge)
+		now = now.Add(5 * time.Second)
+
+		body, err := json.Marshal(map[string]any{
+			"name": "Erika", "email": "erika@example.test", "message": "hi", "consent": true, "pow": solution,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/contact", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(csrf.HeaderName, challenge.CSRFToken)
+		for _, c := range getRec.Result().Cookies() {
+			req.AddCookie(c)
+		}
+		rec := httptest.NewRecorder()
+		app.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	first := submit()
+	if first.Code == http.StatusTooManyRequests {
+		t.Fatalf("first submission already refused by the ceiling, body = %s", first.Body)
+	}
+	for i := range 2 {
+		rec := submit()
+		if rec.Code != http.StatusTooManyRequests {
+			t.Fatalf("refusal %d status = %d, want %d (the ceiling, spent by the first submission), body = %s",
+				i, rec.Code, http.StatusTooManyRequests, rec.Body)
+		}
+	}
+
+	const warning = "contact form: mail ceiling reached, refusing submissions"
+	if n := handler.count(warning); n != 1 {
+		t.Errorf("warning logged %d times across three trips of the ceiling, want exactly 1", n)
 	}
 }
 

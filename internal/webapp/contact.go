@@ -181,24 +181,6 @@ func (a *App) handleContact(w http.ResponseWriter, r *http.Request) error {
 
 	// Only after the honeypot: bots filling it must not use up the budget of
 	// people behind the same address, nor the site-wide mail ceiling below.
-	//
-	// mailLimiter is checked first: it is the hard ceiling on the mail
-	// account itself, independent of how many client addresses an attacker
-	// spreads their requests across (see mailLimiter's own comment in
-	// webapp.go), so it is what actually protects the account. Unlike the
-	// per-client limiter below, tripping it is logged: a single address
-	// hitting its own limit is ordinary and expected, but every contact
-	// mail this service can ever send running out in one window means
-	// either an attack or a real surge in genuine enquiries, either of
-	// which the operator needs to know about rather than read as a string
-	// of ordinary 429s in the access log.
-	if allowed, wait := a.mailLimiter.Take(mailLimiterKey); !allowed {
-		a.logger.WarnContext(r.Context(), "contact form: mail ceiling reached, refusing submissions",
-			"retry_after", wait.String())
-		err := api.New(http.StatusTooManyRequests, api.CodeTooManyRequests, messages.tooMany)
-		err.RetryAfter = wait
-		return err
-	}
 	if allowed, wait := a.contactLimiter.Take(clientip.Key(a.clientIPs.Resolve(r))); !allowed {
 		err := api.New(http.StatusTooManyRequests, api.CodeTooManyRequests, messages.tooMany)
 		err.RetryAfter = wait
@@ -225,6 +207,40 @@ func (a *App) handleContact(w http.ResponseWriter, r *http.Request) error {
 		default:
 			return api.Invalid(messages.poWFailed)
 		}
+	}
+
+	// mailLimiter is checked only now, once every earlier gate (honeypot,
+	// validation, proof of work) has already been cleared: it is the hard
+	// ceiling on the mail account itself, independent of how many client
+	// addresses an attacker spreads their requests across (see mailLimiter's
+	// own comment in webapp.go), and a request that could never have reached
+	// a send attempt anyway must never spend a share of that ceiling.
+	// Checking it any earlier, as this used to, let a flood of invalid or
+	// unsolved submissions drain the whole site's mail budget without ever
+	// coming close to sending a mail.
+	//
+	// The token taken here is never given back, even when contact.Build or
+	// a.mailer.Send below goes on to fail: govue's ratelimit.Limiter offers
+	// no way to return one, only Take, and adding one would mean changing
+	// govue itself, out of scope for this service. A refund would also
+	// reopen exactly the oracle this ceiling exists to close, since anyone
+	// who found a reliable way to make Send fail after a valid proof of
+	// work would then get unlimited free retries against it. A failed Send
+	// still means an SMTP conversation with the mail submission server was
+	// actually opened, which is worth bounding on its own, whether or not
+	// the message was ultimately accepted.
+	//
+	// Tripping it is logged, through warnMailCeiling rather than directly:
+	// a single address hitting its own contactLimiter above is ordinary and
+	// expected, but every contact mail this service can ever send running
+	// out in one window means either an attack or a real surge in genuine
+	// enquiries, either of which the operator needs to know about, just not
+	// once per refused request under a sustained flood.
+	if allowed, wait := a.mailLimiter.Take(mailLimiterKey); !allowed {
+		a.warnMailCeiling(r.Context(), wait)
+		err := api.New(http.StatusTooManyRequests, api.CodeTooManyRequests, messages.tooMany)
+		err.RetryAfter = wait
+		return err
 	}
 
 	msg, err := contact.Build(a.envelope, req, time.Now(), rand.Reader)
