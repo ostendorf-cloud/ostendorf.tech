@@ -93,11 +93,12 @@ func (a *App) handleChallenge(w http.ResponseWriter, r *http.Request) error {
 	messages := messagesFor(locale)
 
 	if len(a.challengeKeys) == 0 {
-		// Below 500 on purpose: api.WriteError collapses any 5xx to a fixed
-		// "internal error", which would swallow this localized message
-		// before it ever reached the visitor. The Code stays unavailable;
-		// only the status moves.
-		return api.New(http.StatusConflict, api.CodeUnavailable, messages.unavailable)
+		// 503 is the honest status: no challenge key is configured, so the
+		// contact form really is unavailable, a dependency this deployment
+		// has not supplied yet. Exposed is safe here: messages.unavailable
+		// is a fixed, localized string with no interpolation anywhere in
+		// it, so there is nothing for it to leak.
+		return api.Unavailable(messages.unavailable).Exposed()
 	}
 	challenge, err := a.challenges.Create(a.challengeKeys[0])
 	if err != nil {
@@ -124,11 +125,13 @@ func (a *App) handleContact(w http.ResponseWriter, r *http.Request) error {
 	messages := messagesFor(locale)
 
 	if !a.smtpConfigured || len(a.challengeKeys) == 0 {
-		// Below 500 on purpose: api.WriteError collapses any 5xx to a fixed
-		// "internal error", which would swallow this localized message
-		// before it ever reached the visitor. The Code stays unavailable;
-		// only the status moves.
-		return api.New(http.StatusConflict, api.CodeUnavailable, messages.unavailable)
+		// 503 is the honest status, exactly as in handleChallenge: SMTP
+		// credentials or a challenge key are missing, a dependency this
+		// deployment has not supplied yet, not anything the caller got
+		// wrong. Exposed is safe here for the same reason: messages.unavailable
+		// is the same fixed, localized string with no interpolation, so
+		// there is nothing for it to leak.
+		return api.Unavailable(messages.unavailable).Exposed()
 	}
 
 	req := contact.Request{Name: body.Name, Email: body.Email, Message: body.Message, Consent: body.Consent, Honeypot: body.Website}
@@ -177,12 +180,23 @@ func (a *App) handleContact(w http.ResponseWriter, r *http.Request) error {
 	ctx, cancel := context.WithTimeout(r.Context(), sendTimeout)
 	defer cancel()
 	if err := a.mailer.Send(ctx, a.smtpCreds, a.envelope.From.Address, a.envelope.To.Address, msg); err != nil {
+		// The real cause is logged here, with everything the SMTP error
+		// carries, and nowhere else.
 		a.logger.ErrorContext(r.Context(), "contact form: send mail", "error", err.Error())
-		// Below 500 on purpose: api.WriteError collapses any 5xx to a fixed
-		// "internal error", which would swallow this localized message
-		// before it ever reached the visitor. The Code stays unavailable;
-		// only the status moves.
-		return api.New(http.StatusUnprocessableEntity, api.CodeUnavailable, messages.sendFailed).WithCause(err)
+		// 503 is the honest status: the mail submission server is the
+		// dependency that failed, not anything the caller got wrong. The
+		// rule is not "never Exposed an error that could carry a cause", it
+		// is "never let a cause reach the client" — so the fix is to never
+		// hand the client an error that has one, not to avoid Exposed on an
+		// error that does. api.Unavailable(messages.sendFailed) below is
+		// built fresh from the fixed, localized text alone; err is never
+		// passed to it and WithCause is never called on it, so there is
+		// nothing for Exposed to leak. A derived error — this one made by
+		// taking the err-carrying error and stripping WithCause back off —
+		// would depend on that stripping happening correctly forever; a
+		// fresh one can't regress that way even if this function grows more
+		// error paths later.
+		return api.Unavailable(messages.sendFailed).Exposed()
 	}
 	a.logger.InfoContext(r.Context(), "contact form: mail sent")
 	return api.Write(w, http.StatusOK, contactResponse{Message: messages.sent})
