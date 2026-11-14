@@ -6,14 +6,19 @@
  * rule added that the old site never needed.
  *
  * That rule is the layer order. The old site was dark only, so white text
- * on a darkened photograph was safe by construction. This theme has a
- * light mode, and a dark photograph under light mode text is the failure
- * that is easy to ship. So the scrim is the last decorative layer, over
- * the photo and over the beams alike, and the hero's text sits on nothing
- * else. What is behind the scrim then cannot affect the hero's contrast
- * at all, whatever photograph is in it and whichever mode the visitor
- * reads in; see --hero-scrim-alpha in src/theme/vtech.css and the hero
- * half of src/theme/contrast.test.ts for the number and its proof.
+ * on a darkened photograph was safe by construction. This hero is dark in
+ * both of this theme's modes, which gets the photograph back to full
+ * strength, but it still does not lean on the photograph being dark: the
+ * scrim is the last decorative layer, over the photo and over the beams
+ * alike, and the hero's text sits on nothing else. What is behind the
+ * scrim then cannot affect the hero's contrast at all, whatever
+ * photograph is in it; see --hero-scrim-alpha in src/theme/vtech.css and
+ * the hero half of src/theme/contrast.test.ts for the number and its
+ * proof.
+ *
+ * Every colour below comes from a theme token, and .hero pins
+ * color-scheme: dark, so all of them resolve to their dark values here
+ * however the rest of the page is painted.
  *
  * That only describes the ground the hero's text reads on if the text
  * paints after this whole element, which is what --hero-layer-stage below
@@ -179,7 +184,7 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
 /*
  * The scrim. Its weakest stop is --hero-scrim-alpha, which is the one
  * number the hero's whole contrast guarantee rests on; it only ever gets
- * more opaque further down, where the hero hands over to the page.
+ * more opaque further down, where it reaches the hero's own floor.
  */
 .hero-scrim {
   position: absolute;

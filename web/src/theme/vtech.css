@@ -8,10 +8,13 @@
  * near-black stage ground, the panels above it and the gradient's far end
  * all sit on one hue family rather than two.
  *
- * Dark mode is the primary: a near-black blue stage ground (#050a14)
- * under blue tinted panels, with the cyan kept at full strength for
- * fills, icons and the focus ring, where it has the most contrast it will
- * ever have.
+ * Dark mode is the primary, and it is also the default: a near-black
+ * blue stage ground (#050a14) under blue tinted panels, with the cyan
+ * kept at full strength for fills, icons and the focus ring, where it
+ * has the most contrast it will ever have. Every visitor starts here,
+ * whatever their operating system is set to, and only their own use of
+ * the toggle makes the page light; src/lib/theme.ts is where that
+ * default is declared.
  *
  * Light mode is authored fresh rather than inverted: a plain white
  * surface on a faint blue tinted ground, with a deeper, more saturated
@@ -82,37 +85,52 @@
   /*
    * The hero stage.
    *
+   * The hero is dark in both modes. It pins color-scheme: dark on .hero
+   * itself, in src/views/HomeView.vue; color-scheme inherits, and
+   * light-dark() resolves against the element the token is used on, so
+   * that one declaration hands every token used anywhere inside the hero
+   * its dark end. The stage ground, the headline gradient, the body text
+   * and the two buttons therefore come out of the palette above rather
+   * than out of a second copy of it written into the hero, and nothing
+   * below in this file has to split the hero on the mode any more.
+   *
+   * It answers two things at once. The photograph reads at full strength
+   * in light mode, instead of washing out under a near-white scrim, and a
+   * light mode page opens on a strong coloured anchor instead of on
+   * white.
+   *
    * The old site was dark only, so a photograph of a lit stage carried
-   * white text on its own. This theme has a light mode too, and a dark
-   * photograph under light mode text is the failure that is easy to ship
-   * and hard to notice. The way out is to stop the photograph from being
-   * part of the contrast question at all: the photo, the haze and the
-   * beams all sit *under* one scrim painted in --color-bg, and nothing
-   * decorative is ever drawn on top of it. The worst case behind the
-   * scrim is then a pure white pixel in dark mode and a pure black one in
-   * light mode, whatever the photograph happens to contain, and that is a
-   * number rather than a hope.
+   * white text on its own. The way the contrast is held here is still not
+   * that: the photo, the haze and the beams all sit *under* one scrim
+   * painted in --color-bg, and nothing decorative is ever drawn on top of
+   * it, so the worst case behind the scrim is a pure white pixel whatever
+   * the photograph happens to contain. One ground, one worst case, one
+   * number, where there used to be two of each.
    *
-   * 0.78 is the measured floor for that number, not a guess: at that
-   * alpha the scrim over the worst case still carries --color-text at
+   * 0.73 is the measured floor for that number, not a guess: at that
+   * alpha the scrim over a pure white pixel still carries --color-text at
    * 4.5:1 and --color-accent, --color-accent-text and --color-focus at
-   * 3:1, in both modes. 0.77 does not, so this is the last step that
-   * holds. src/theme/contrast.test.ts recomputes exactly that and fails
-   * the build if either this alpha or any token it is measured against
-   * moves. It is the floor for the scrim's weakest point, not for the
-   * whole scrim: the scrim itself is a gradient that only ever gets more
-   * opaque further down, where it hands over to the page.
+   * 3:1. 0.72 does not, so this is the last step that holds.
+   * src/theme/contrast.test.ts recomputes exactly that and fails the
+   * build if either this alpha or any token it is measured against moves.
+   * It is the floor for the scrim's weakest point, not for the whole
+   * scrim: the scrim itself is a gradient that only ever gets more opaque
+   * further down, where it reaches the hero's own floor.
    *
-   * Light mode's --color-accent is what binds it, at 3.08:1 against a
-   * 3:1 floor, and that is the tightest pair in this file. The headline
-   * gradient's far end costs the photograph nothing on this palette, so
-   * a flat --color-accent headline would buy none of it back: the
-   * gradient is free here, which it was not when the far end was purple.
+   * Dark mode's --color-accent-text is what binds it now, at 3.07:1
+   * against a 3:1 floor: the headline gradient's far end, the one brand
+   * role that sits closest to the ground it is painted on. Light mode's
+   * --color-accent, which bound the old 0.78 at 3.08:1, is no longer part
+   * of the question at all, and the floor falls five points with it. So
+   * unlike before, the gradient's far end is not free here: a flat
+   * --color-accent headline would buy the photograph a little more room.
+   * The gradient is the brand, so it keeps the room instead.
    *
-   * The price is paid in the photograph, which shows through at 22%.
+   * The price is paid in the photograph, which shows through at 27%
+   * rather than 22%.
    */
   --hero-scrim-color: var(--color-bg);
-  --hero-scrim-alpha: 0.78;
+  --hero-scrim-alpha: 0.73;
 
   /*
    * The hero's two paint layers, as numbers rather than as an accident of
@@ -131,29 +149,25 @@
   --hero-layer-content: 1;
 
   /*
-   * How the photograph is graded before the scrim goes over it. Purely a
-   * matter of taste, and deliberately so: the scrim's worst case is a
-   * pure white or a pure black pixel either way, so nothing here can move
-   * the guarantee above, and the grade is free to do whatever the picture
-   * needs. Light mode needs almost nothing, because 22% of a photograph
-   * off a near-white ground already reads as a washed print; dark mode
-   * needs a great deal, because the same 22% of a stage photograph on
-   * near-black is a muddy one. The dark value is below, since a filter is
-   * not a colour and light-dark() carries colours only.
+   * How the photograph is graded before the scrim goes over it, and how
+   * the haze and the beams meet it. Purely a matter of taste, and
+   * deliberately so: the scrim's worst case is a pure white pixel
+   * whatever the layers below it did, so nothing here can move the
+   * guarantee above, and both are free to do whatever the picture needs.
+   *
+   * The grade lifts the picture a long way, because 27% of a stage
+   * photograph on near-black is a muddy one. The beams screen over it, as
+   * on the old site, so a beam adds light instead of covering what is
+   * behind it, which is what keeps the stage readable through them.
+   *
+   * Both of these used to be a pair of values, one per mode, declared
+   * across a media query and a [data-mode] rule rather than in one
+   * light-dark() like every colour above, because a filter is not a
+   * colour and a blend mode is not either. The hero has one mode now, so
+   * both are one value and that split is gone.
    */
-  --hero-photo-filter: saturate(1.25) contrast(1.05);
-
-  /*
-   * How the haze and the beams meet the photograph. The old site screened
-   * them over it, so a beam added light instead of covering what was
-   * behind it, which is what keeps the stage readable through them; on a
-   * near-white ground screening adds nothing visible, so light mode
-   * multiplies instead and a beam is a coloured shaft rather than a lit
-   * one. Free to be either, for the same reason the grade above is: both
-   * sit under the scrim, whose worst case is a pure white or pure black
-   * pixel whatever the layers below it did.
-   */
-  --hero-beam-blend: multiply;
+  --hero-photo-filter: brightness(1.55) saturate(1.45);
+  --hero-beam-blend: screen;
 
   /*
    * The brand gradient, the cyan to blue of the logo. It carries the
@@ -164,24 +178,4 @@
    */
   --brand-gradient-from: var(--color-accent);
   --brand-gradient-to: var(--color-accent-text);
-}
-
-/*
- * The hero photograph's dark mode grade. The two selectors are the same
- * two states govue's own dark variant splits on: the explicit choice the
- * theme composable writes into data-mode wins, and the system setting
- * decides where there is none. Every other token on this page says both
- * of its values in one light-dark() declaration instead, which is better
- * and is why this is the only pair here that does not.
- */
-@media (prefers-color-scheme: dark) {
-  :root[data-theme='vtech']:not([data-mode='light']) {
-    --hero-photo-filter: brightness(1.55) saturate(1.45);
-    --hero-beam-blend: screen;
-  }
-}
-
-:root[data-theme='vtech'][data-mode='dark'] {
-  --hero-photo-filter: brightness(1.55) saturate(1.45);
-  --hero-beam-blend: screen;
 }

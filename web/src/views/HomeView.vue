@@ -249,8 +249,28 @@ const aboutFacts = computed<Fact[]>(() => [
  * page's own padding and maximum width happen to be. The negative top
  * margin eats the page's first row of padding, so the stage starts
  * directly under the header rather than on a strip of page background.
+ *
+ * It is dark in both modes, and this is the one declaration that makes it
+ * so: color-scheme inherits, and light-dark() resolves against the
+ * element a token is used on rather than the one it was declared on, so
+ * pinning the scheme here gives the stage ground, the headline gradient,
+ * the text and both buttons their dark values out of the theme's own
+ * palette. No hero rule names a colour of its own. See "the hero stage"
+ * in src/theme/vtech.css for why the hero stays dark and what the scrim
+ * then has to prove, and src/theme/contrast.test.ts for the proof, which
+ * reads this declaration back out of this file.
+ *
+ * The hero therefore ends on a hard edge against a light mode page
+ * instead of fading into it: in dark mode, which is what a visitor gets
+ * unless they ask for light, the hero's floor and the page's background
+ * are the same colour and there is no edge at all, so softening it would
+ * mean drawing a divider across the mode almost everybody reads in to
+ * smooth a seam only a light mode visitor ever meets. The band is
+ * deliberate; the header above it already sits on its own ground the same
+ * way.
  */
 .hero {
+  color-scheme: dark;
   position: relative;
   isolation: isolate;
   display: grid;

@@ -143,18 +143,24 @@ describe('the vtech theme', () => {
  *
  * HeroStage.vue layers a photograph, the haze and the light beams under
  * one scrim painted in --hero-scrim-color, and the hero's text sits on
- * top of that scrim with nothing decorative between. So the darkest a
- * dark mode hero ground can ever be read as, and the lightest a light
- * mode one can, follows from two declared numbers and a worst case pixel
- * rather than from what the photograph happens to contain: a pure white
- * pixel is the worst a light text can sit on, a pure black one the worst
- * a dark text can.
+ * top of that scrim with nothing decorative between. So the darkest the
+ * hero's ground can ever be read as follows from two declared numbers and
+ * a worst case pixel rather than from what the photograph happens to
+ * contain: a pure white pixel is the worst a light text can sit on.
  *
  * Swapping the photograph for another one therefore cannot regress any
  * of this, and neither can a photograph that is lighter than the one
  * shipped today, which is the whole point of putting the scrim last.
+ *
+ * There is one scrim to prove rather than two, because the hero is dark
+ * whichever mode the rest of the page is in. That is not an assumption
+ * this file is free to make: HomeView.vue has to pin the scheme on the
+ * hero for the dark palette below to be the one the hero actually paints
+ * with, so the first test here reads that declaration back out of it. Were
+ * it to go, this file would be proving the contrast of a hero that no
+ * longer exists.
  */
-const WORST_CASE_BEHIND_SCRIM = { light: 0x00, dark: 0xff } as const
+const WORST_CASE_BEHIND_SCRIM = 0xff
 
 /** Every role the hero paints on the scrim, with the ratio WCAG 2.2 AA
  *  asks of it. The headline is clamped to at least 2.3rem at 850 weight,
@@ -215,20 +221,34 @@ function heroFailures(palette: Palette, refs: Record<string, string>, ground: st
 
 const hero = heroTokens(css)
 
+/** The hero's own stylesheet, where the scheme it paints in is pinned.
+ *  Resolved the same way the theme above is, and for the same reason. */
+const homeView = readFileSync(join(process.cwd(), 'src/views/HomeView.vue'), 'utf-8')
+
 describe('the hero scrim', () => {
+  it('is painted in the mode this file measures, whatever the page is in', () => {
+    expect(homeView).toMatch(/\.hero\s*\{[^}]*\bcolor-scheme:\s*dark\s*;/)
+  })
+
   it('is built from the theme, not from a value of its own', () => {
     expect(hero.refs['hero-scrim-color']).toBe('bg')
     expect(hero.refs['brand-gradient-from']).toBe('accent')
     expect(hero.refs['brand-gradient-to']).toBe('accent-text')
   })
 
-  it('carries every hero role over the brightest possible pixel in dark mode', () => {
-    const ground = heroGround(dark.bg, hero.alpha, WORST_CASE_BEHIND_SCRIM.dark)
+  it('carries every hero role over the brightest possible pixel', () => {
+    const ground = heroGround(dark.bg, hero.alpha, WORST_CASE_BEHIND_SCRIM)
     expect(heroFailures(dark, hero.refs, ground)).toEqual([])
   })
 
-  it('carries every hero role over the darkest possible pixel in light mode', () => {
-    const ground = heroGround(light.bg, hero.alpha, WORST_CASE_BEHIND_SCRIM.light)
-    expect(heroFailures(light, hero.refs, ground)).toEqual([])
+  // The scrim is the only thing standing between the photograph and the
+  // hero's text, so every hundredth of alpha above the floor is paid for
+  // out of the picture. Holding the alpha *at* the floor rather than
+  // merely above it is what stops a floor that has since dropped, because
+  // a token moved or because a mode stopped being proved here, from
+  // quietly keeping the photograph dimmer than it has to be.
+  it('is no thicker than the roles it carries need', () => {
+    const thinner = heroGround(dark.bg, hero.alpha - 0.01, WORST_CASE_BEHIND_SCRIM)
+    expect(heroFailures(dark, hero.refs, thinner)).not.toEqual([])
   })
 })
