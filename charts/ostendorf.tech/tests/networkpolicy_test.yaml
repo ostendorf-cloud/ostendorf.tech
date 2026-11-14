@@ -113,6 +113,21 @@ tests:
       - notExists:
           path: spec.egress[0].to[0].podSelector.matchLabels["k8s-app"]
 
+  - it: replaces the default DNS namespaceSelector key when the override nulls it, the same per-key merge as podSelector
+    set:
+      feed:
+        networkPolicy:
+          dns:
+            namespaceSelector:
+              kubernetes.io/metadata.name: null
+              team: platform
+    asserts:
+      - equal:
+          path: spec.egress[0].to[0].namespaceSelector.matchLabels["team"]
+          value: platform
+      - notExists:
+          path: spec.egress[0].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+
   - it: falls back to no destination restriction for DNS when both selectors are set to null
     set:
       feed:
@@ -182,6 +197,19 @@ tests:
           value: platform
       - notExists:
           path: spec.egress[1].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+
+  - it: keeps only the override key for the OpenBao podSelector, with no default key in place today to collide
+    set:
+      feed:
+        networkPolicy:
+          openBao:
+            podSelector:
+              app: openbao
+    asserts:
+      - equal:
+          path: spec.egress[1].to[0].podSelector.matchLabels
+          value:
+            app: openbao
 
   - it: falls back to no destination restriction for OpenBao when namespaceSelector is set to null
     set:

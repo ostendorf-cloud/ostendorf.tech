@@ -351,11 +351,16 @@ feed:
     #
     # Helm merges a user's override into this default map key by key, not
     # key for key: an override under a key the default does not already use
-    # is added alongside the default, not instead of it. `podSelector:
-    # {app: coredns}` here would therefore render `app: coredns` AND
-    # `k8s-app: kube-dns`, a selector that matches no pod carrying only one
-    # of the two. Null the specific default key you mean to replace to drop
-    # it, for example `podSelector: {k8s-app: null, app: coredns}`. Set both
+    # is added alongside the default, not instead of it. This applies to
+    # both selectors below. `namespaceSelector: {team: platform}` here would
+    # render `team: platform` AND `kubernetes.io/metadata.name: kube-system`,
+    # a selector that matches no namespace carrying only one of the two.
+    # Null the specific default key you mean to replace to drop it, for
+    # example `namespaceSelector: {kubernetes.io/metadata.name: null, team:
+    # platform}`. `podSelector: {app: coredns}` here would likewise render
+    # `app: coredns` AND `k8s-app: kube-dns`, a selector that matches no pod
+    # carrying only one of the two; null that key the same way, for example
+    # `podSelector: {k8s-app: null, app: coredns}`. Set both
     # namespaceSelector and podSelector to null entirely (not {}: Helm
     # merges a map default with an empty override instead of clearing it, so
     # {} here would silently keep kube-system/kube-dns) to fall back to the
@@ -394,6 +399,13 @@ feed:
       # open rule, and OpenBao deployments vary too much in their own pod
       # labels for one default to fit; add matchLabels here to scope
       # further.
+      #
+      # An override here has no default key to collide with today, since
+      # there is none: `podSelector: {app: openbao}` becomes the whole
+      # selector with nothing added alongside it. The same per-key merge
+      # trap as namespaceSelector and dns above applies the moment a
+      # default key is ever added here: a future default's key would need
+      # the same explicit null in any override meant to replace it, not {}.
       podSelector: {}
 
   # The projected ServiceAccount token used as the OpenBao login credential;

@@ -301,6 +301,20 @@ well as by port below; Meta is scoped by port only, and stays that way.**
           app: coredns
   ```
 
+  The same applies to `namespaceSelector`: overriding it under a key other than
+  `kubernetes.io/metadata.name`, for example to also require a second label the namespace
+  carries, adds that key alongside the default rather than replacing it, and DNS stays blocked
+  the same way. Null the default key explicitly to replace it there too:
+
+  ```yaml
+  feed:
+    networkPolicy:
+      dns:
+        namespaceSelector:
+          kubernetes.io/metadata.name: null
+          team: platform
+  ```
+
   Set both selectors to `null` entirely (not `{}`: Helm merges a map default with an empty
   override instead of clearing it, so `{}` here would silently keep the default) to fall back to
   the port-only rule this chart shipped before, with no destination scoping at all.
@@ -320,6 +334,12 @@ well as by port below; Meta is scoped by port only, and stays that way.**
   than `kubernetes.io/metadata.name` is added alongside that default key, not instead of it, so
   null that key explicitly to replace it; set `namespaceSelector` to `null` entirely for the same
   port-only fallback as DNS above, for the same reason.
+
+  `podSelector` has no default key today, so an override such as `{app: openbao}` becomes the
+  whole selector with nothing in place to collide with. The same per-key merge trap as
+  `namespaceSelector` above and `dns.podSelector` applies the moment a default key is ever added
+  here: that default's own key would need the same explicit null in any override meant to
+  replace it, not `{}`.
 - Meta's Graph API, TCP port 443. **Left open, not merely unscoped by omission**: Meta serves this
   from a CDN with no fixed, documentable IP range, so there is no destination this rule could name
   that would not go stale. Of the three egress rules, this is the one that still admits any
