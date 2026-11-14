@@ -164,7 +164,15 @@ jobs:
       - run: task lint:shell
 
   docker-build:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+        include:
+          - platform: linux/amd64
+            runner: blacksmith-2vcpu-ubuntu-2404
+          - platform: linux/arm64
+            runner: blacksmith-2vcpu-ubuntu-2404-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -173,13 +181,22 @@ jobs:
         with:
           context: .
           target: website
+          platforms: ${{ matrix.platform }}
           push: false
           load: true
           tags: ostendorf-tech:smoke
       - run: scripts/smoke-test-image.sh ostendorf-tech:smoke
 
   docker-build-feed:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+        include:
+          - platform: linux/amd64
+            runner: blacksmith-2vcpu-ubuntu-2404
+          - platform: linux/arm64
+            runner: blacksmith-2vcpu-ubuntu-2404-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
@@ -188,6 +205,7 @@ jobs:
         with:
           context: .
           target: feed
+          platforms: ${{ matrix.platform }}
           push: false
           load: true
           tags: ostendorf-tech-feed:smoke

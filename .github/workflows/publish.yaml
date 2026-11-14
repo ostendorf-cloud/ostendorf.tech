@@ -27,9 +27,17 @@ jobs:
           - platform: linux/arm64
             runner: blacksmith-2vcpu-ubuntu-2404-arm
     runs-on: ${{ matrix.runner }}
+    # The Vue build and the Go build of both binaries run inside this
+    # Dockerfile stage, then the image is pushed by digest: the slowest
+    # leg of the slowest job in this workflow, on the least proven
+    # runner, so it gets the largest budget rather than checks.yaml's
+    # flat 10.
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -50,8 +58,6 @@ jobs:
       - name: Build and push by digest
         id: build
         uses: useblacksmith/build-push-action@9b0579bbec7a6cad2f171596c57e7ac1e7658850  # v2
-        env:
-          IMAGE: ghcr.io/${{ github.repository }}
         with:
           context: .
           target: website
@@ -71,10 +77,14 @@ jobs:
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
+          overwrite: true
 
   image-merge:
     needs: image-build
     runs-on: blacksmith-2vcpu-ubuntu-2404
+    # Metadata only: download the digests, assemble and push one
+    # manifest list, inspect it back. No build.
+    timeout-minutes: 5
     permissions:
       packages: write
     steps:
@@ -103,6 +113,8 @@ jobs:
           pattern: image-digests-*
           merge-multiple: true
 
+      # docker/setup-buildx-action, not useblacksmith/setup-docker-builder:
+      # this job builds nothing, only assembles and pushes a manifest list.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
 
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
@@ -117,13 +129,19 @@ jobs:
           TAGS: ${{ steps.tags.outputs.tags }}
         working-directory: /tmp/digests
         run: |
+          shopt -s nullglob
+          digests=(*)
+          if [ "${#digests[@]}" -ne 2 ]; then
+            echo "expected 2 digests, found ${#digests[@]}: ${digests[*]}" >&2
+            exit 1
+          fi
           mapfile -t tags <<< "${TAGS}"
           tag_args=()
           for tag in "${tags[@]}"; do
             tag_args+=("-t" "${tag}")
           done
           digest_args=()
-          for digest in *; do
+          for digest in "${digests[@]}"; do
             digest_args+=("${IMAGE}@sha256:${digest}")
           done
           docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
@@ -157,11 +175,20 @@ jobs:
           - platform: linux/arm64
             runner: blacksmith-2vcpu-ubuntu-2404-arm
     runs-on: ${{ matrix.runner }}
+    # The feed binary alone, no frontend: lighter than image-build's
+    # website target, so it keeps checks.yaml's docker-build-feed budget
+    # rather than image-build's.
+    timeout-minutes: 10
     permissions:
       contents: read
       packages: write
+    env:
+      # "-feed" matches charts/ostendorf.tech's values.yaml own
+      # feed.image.repository default exactly: the two have to agree
+      # since nothing renders one from the other.
+      IMAGE: ghcr.io/${{ github.repository }}-feed
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Turn the platform into a name an artifact can carry
         id: platform
@@ -171,7 +198,7 @@ jobs:
 
       - uses: useblacksmith/setup-docker-builder@06dd9c83a5d541274d2e3ac67625560979275267  # v2
 
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -180,11 +207,6 @@ jobs:
       - name: Build and push by digest
         id: build
         uses: useblacksmith/build-push-action@9b0579bbec7a6cad2f171596c57e7ac1e7658850  # v2
-        env:
-          # "-feed" matches charts/ostendorf.tech's values.yaml own
-          # feed.image.repository default exactly: the two have to agree
-          # since nothing renders one from the other.
-          IMAGE: ghcr.io/${{ github.repository }}-feed
         with:
           context: .
           target: feed
@@ -204,10 +226,12 @@ jobs:
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
+          overwrite: true
 
   feed-image-merge:
     needs: feed-image-build
     runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
     permissions:
       packages: write
     steps:
@@ -236,9 +260,11 @@ jobs:
           pattern: feed-image-digests-*
           merge-multiple: true
 
+      # docker/setup-buildx-action, not useblacksmith/setup-docker-builder:
+      # this job builds nothing, only assembles and pushes a manifest list.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
 
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -250,13 +276,19 @@ jobs:
           TAGS: ${{ steps.tags.outputs.tags }}
         working-directory: /tmp/digests
         run: |
+          shopt -s nullglob
+          digests=(*)
+          if [ "${#digests[@]}" -ne 2 ]; then
+            echo "expected 2 digests, found ${#digests[@]}: ${digests[*]}" >&2
+            exit 1
+          fi
           mapfile -t tags <<< "${TAGS}"
           tag_args=()
           for tag in "${tags[@]}"; do
             tag_args+=("-t" "${tag}")
           done
           digest_args=()
-          for digest in *; do
+          for digest in "${digests[@]}"; do
             digest_args+=("${IMAGE}@sha256:${digest}")
           done
           docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
@@ -279,7 +311,10 @@ jobs:
           fi
 
   chart:
+    needs: [image-merge, feed-image-merge]
     runs-on: blacksmith-2vcpu-ubuntu-2404
+    # Packaging and pushing one chart file, no build.
+    timeout-minutes: 5
     permissions:
       contents: read
       packages: write
