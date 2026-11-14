@@ -248,8 +248,6 @@ implemented. Left out, tracked as later milestones:
   `ostendorf-cloud/workflows` has not cut one yet. Repoint at `v0` once it exists.
 - No CodeQL workflow. Code scanning on a private repository needs GitHub Advanced
   Security, which this account does not have.
-- Every job runs on `blacksmith-2vcpu-ubuntu-2404`, never on a GitHub hosted runner:
-  this repository is private, so its minutes are billed.
 - The Helm chart lives at `charts/ostendorf.tech/`, matching the repository's own name,
   but its `Chart.yaml` `name` and every rendered object name use `ostendorf-tech`
   instead: a literal dot is invalid in a `Service`'s `metadata.name` (RFC 1035 label),
