@@ -1,16 +1,17 @@
 ---
-suite: deployment with the feed service URL and Umami configured
+suite: deployment with the feed service enabled, its URL and Umami configured
 templates:
   - templates/deployment.yaml
 set:
   existingSecret:
     name: ostendorf-tech-secrets
   feed:
+    enabled: true
     config:
       openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
       openBaoRole: ostendorf-tech-feed
 tests:
-  - it: always carries FEED_SERVICE_URL, resolving to the chart's own feed Service, with no values override possible
+  - it: carries FEED_SERVICE_URL once feed.enabled is true, resolving to the chart's own feed Service
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env

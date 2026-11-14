@@ -5,11 +5,20 @@ set:
   existingSecret:
     name: ostendorf-tech-secrets
   feed:
+    enabled: true
     config:
       openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
       openBaoRole: ostendorf-tech-feed
 tests:
-  - it: renders by default, since feed.networkPolicy.enabled defaults to true
+  - it: renders nothing when feed.enabled is false, the default, even though feed.networkPolicy.enabled defaults to true
+    set:
+      feed:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders by default once feed.enabled is true, since feed.networkPolicy.enabled defaults to true
     asserts:
       - hasDocuments:
           count: 1
@@ -68,7 +77,7 @@ tests:
           path: spec.egress
           count: 3
 
-  - it: allows DNS egress on UDP and TCP 53 with no destination restriction
+  - it: allows DNS egress on UDP and TCP 53, scoped to kube-dns's own default namespace and pod label
     asserts:
       - equal:
           path: spec.egress[0].ports
@@ -77,16 +86,69 @@ tests:
               port: 53
             - protocol: TCP
               port: 53
+      - equal:
+          path: spec.egress[0].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: kube-system
+      - equal:
+          path: spec.egress[0].to[0].podSelector.matchLabels["k8s-app"]
+          value: kube-dns
+
+  - it: follows a non-default feed.networkPolicy.dns selector, proving it is value-driven
+    set:
+      feed:
+        networkPolicy:
+          dns:
+            namespaceSelector:
+              kubernetes.io/metadata.name: custom-dns
+            podSelector:
+              k8s-app: null
+              app: custom-coredns
+    asserts:
+      - equal:
+          path: spec.egress[0].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: custom-dns
+      - equal:
+          path: spec.egress[0].to[0].podSelector.matchLabels["app"]
+          value: custom-coredns
+      - notExists:
+          path: spec.egress[0].to[0].podSelector.matchLabels["k8s-app"]
+
+  - it: replaces the default DNS namespaceSelector key when the override nulls it, the same per-key merge as podSelector
+    set:
+      feed:
+        networkPolicy:
+          dns:
+            namespaceSelector:
+              kubernetes.io/metadata.name: null
+              team: platform
+    asserts:
+      - equal:
+          path: spec.egress[0].to[0].namespaceSelector.matchLabels["team"]
+          value: platform
+      - notExists:
+          path: spec.egress[0].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+
+  - it: falls back to no destination restriction for DNS when both selectors are set to null
+    set:
+      feed:
+        networkPolicy:
+          dns:
+            namespaceSelector: null
+            podSelector: null
+    asserts:
       - isNull:
           path: spec.egress[0].to
 
-  - it: allows OpenBao egress on the documented default port with no destination restriction
+  - it: allows OpenBao egress on the documented default port, scoped to its own default namespace
     asserts:
       - equal:
           path: spec.egress[1].ports[0].port
           value: 8200
+      - equal:
+          path: spec.egress[1].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: openbao
       - isNull:
-          path: spec.egress[1].to
+          path: spec.egress[1].to[0].podSelector
 
   - it: follows a non-default feed.networkPolicy.openBaoPort for the OpenBao egress rule, proving it is value-driven
     set:
@@ -98,7 +160,68 @@ tests:
           path: spec.egress[1].ports[0].port
           value: 8300
 
-  - it: allows Meta's Graph API egress on HTTPS with no destination restriction
+  - it: follows a non-default feed.networkPolicy.openBao selector, proving it is value-driven
+    set:
+      feed:
+        networkPolicy:
+          openBao:
+            namespaceSelector:
+              kubernetes.io/metadata.name: custom-openbao
+            podSelector:
+              app.kubernetes.io/name: openbao
+    asserts:
+      - equal:
+          path: spec.egress[1].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: custom-openbao
+      - equal:
+          path: spec.egress[1].to[0].podSelector.matchLabels["app.kubernetes.io/name"]
+          value: openbao
+
+  # The case above overrides namespaceSelector under its own default key
+  # (kubernetes.io/metadata.name), which Helm's map merge overwrites cleanly. This
+  # case overrides it under a different key, which Helm's map merge adds
+  # alongside the default key instead: proves the same per-key merge trap as
+  # feed.networkPolicy.dns.podSelector applies here too, and that nulling the
+  # specific default key replaces it rather than adding to it.
+  - it: replaces the default OpenBao namespaceSelector key when the override nulls it, the same per-key merge as dns.podSelector
+    set:
+      feed:
+        networkPolicy:
+          openBao:
+            namespaceSelector:
+              kubernetes.io/metadata.name: null
+              team: platform
+    asserts:
+      - equal:
+          path: spec.egress[1].to[0].namespaceSelector.matchLabels["team"]
+          value: platform
+      - notExists:
+          path: spec.egress[1].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+
+  - it: keeps only the override key for the OpenBao podSelector, with no default key in place today to collide
+    set:
+      feed:
+        networkPolicy:
+          openBao:
+            podSelector:
+              app: openbao
+    asserts:
+      - equal:
+          path: spec.egress[1].to[0].podSelector.matchLabels
+          value:
+            app: openbao
+
+  - it: falls back to no destination restriction for OpenBao when namespaceSelector is set to null
+    set:
+      feed:
+        networkPolicy:
+          openBao:
+            namespaceSelector: null
+    asserts:
+      - isNull:
+          path: spec.egress[1].to
+
+  - it: allows Meta's Graph API egress on HTTPS with no destination restriction, deliberately left unscoped
     asserts:
       - equal:
           path: spec.egress[2].ports[0].port
