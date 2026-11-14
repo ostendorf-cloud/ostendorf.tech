@@ -89,8 +89,8 @@ const aboutFacts = computed<Fact[]>(() => [
       </a>
     </section>
 
-    <section id="services" aria-labelledby="services-title" class="scroll-mt-20 py-8 sm:py-14">
-      <header class="mb-6 flex flex-col gap-2">
+    <section id="services" aria-labelledby="services-title" class="panel-section scroll-mt-20">
+      <header class="panel-group-header flex flex-col gap-2">
         <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">
           {{ t('home.services.eyebrow') }}
         </p>
@@ -100,7 +100,7 @@ const aboutFacts = computed<Fact[]>(() => [
         <p class="text-lg text-text-muted">{{ t('home.services.lead') }}</p>
       </header>
 
-      <div class="grid gap-6 md:grid-cols-2">
+      <div class="panel-grid grid md:grid-cols-2">
         <GovueCard class="panel-lit">
           <h3 class="mb-4 text-lg font-semibold text-text">
             {{ t('home.services.panelTechnology') }}
@@ -129,7 +129,7 @@ const aboutFacts = computed<Fact[]>(() => [
               {{ rt(area) }}
             </li>
           </ul>
-          <p class="mt-4 text-sm">
+          <p class="mt-auto pt-5 text-sm">
             <a href="mailto:simon@ostendorf.tech" class="text-accent-text hover:underline">
               {{ t('home.services.more') }}
             </a>
@@ -142,8 +142,8 @@ const aboutFacts = computed<Fact[]>(() => [
          show; see InstagramFeed.vue. -->
     <InstagramFeed />
 
-    <section id="bands" aria-labelledby="bands-title" class="scroll-mt-20 py-8 sm:py-14">
-      <header class="mb-6 flex flex-col gap-2">
+    <section id="bands" aria-labelledby="bands-title" class="panel-section scroll-mt-20">
+      <header class="panel-group-header flex flex-col gap-2">
         <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">
           {{ t('home.bands.eyebrow') }}
         </p>
@@ -153,10 +153,10 @@ const aboutFacts = computed<Fact[]>(() => [
         <p class="text-lg text-text-muted">{{ t('home.bands.lead') }}</p>
       </header>
 
-      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="panel-grid grid sm:grid-cols-2 lg:grid-cols-3">
         <GovueCard v-for="band in bands" :key="band.slug" class="panel-lit">
-          <h3 class="mb-2 text-lg font-semibold text-text">{{ t(`bands.${band.slug}.name`) }}</h3>
-          <div v-if="band.hasDescription" class="mb-3 flex flex-col gap-2 text-sm text-text-muted">
+          <h3 class="mb-3 text-lg font-semibold text-text">{{ t(`bands.${band.slug}.name`) }}</h3>
+          <div v-if="band.hasDescription" class="flex flex-col gap-2 text-sm text-text-muted">
             <p v-for="(paragraph, index) in tm(`bands.${band.slug}.paragraphs`)" :key="index">
               {{ rt(paragraph) }}
             </p>
@@ -165,7 +165,7 @@ const aboutFacts = computed<Fact[]>(() => [
             :href="band.instagramUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex min-h-11 items-center gap-1 text-sm text-accent-text hover:underline"
+            class="mt-auto inline-flex min-h-11 items-center gap-1 self-start pt-3 text-sm text-accent-text hover:underline"
           >
             {{ t('home.bands.instagramLabel') }}: {{ band.instagramHandle }}
           </a>
@@ -396,18 +396,58 @@ const aboutFacts = computed<Fact[]>(() => [
   }
 }
 
+/*
+ * The two panel groups: Leistungen and Einsatzbereiche above, the bands
+ * below. Both are built from GovueCard, whose own padding and radius are
+ * sized for a form field or a notice rather than for a panel that carries
+ * a whole section of the page, so all four measurements below scale with
+ * the viewport instead of holding one value at every width: the padding
+ * inside a panel, its corner radius, the gap between panels, and the room
+ * the group gets from the heading above it and the sections either side.
+ *
+ * Every clamp has a real floor rather than a proportional one, so a
+ * 360px phone gets a deliberately smaller version of the same spacing
+ * instead of a desktop value squeezed into a third of the room.
+ */
+.panel-section {
+  padding-block: clamp(2.5rem, 1.6rem + 3.6vw, 4.75rem);
+}
+
+.panel-group-header {
+  margin-bottom: clamp(1.75rem, 1.2rem + 2.2vw, 3rem);
+}
+
+.panel-grid {
+  gap: clamp(1.25rem, 0.85rem + 1.6vw, 2.25rem);
+}
+
 /* A thin lit edge along the top of every panel, as on the old site: the
    depth comes from the light, not from a heavier shadow. */
 .panel-lit {
+  --panel-padding: clamp(1.25rem, 0.95rem + 1.2vw, 2rem);
+
   position: relative;
+  border-radius: clamp(0.875rem, 0.7rem + 0.7vw, 1.25rem);
+}
+
+/*
+ * GovueCard's own content wrapper, its only child here: neither of these
+ * groups fills the header or the footer slot. Made a column so a panel
+ * whose neighbour in the row is taller can push its closing link to the
+ * bottom edge rather than leaving it floating mid-card.
+ */
+.panel-lit :deep(> div) {
+  display: flex;
+  flex-direction: column;
+  padding: var(--panel-padding);
 }
 
 .panel-lit::before {
   content: '';
   position: absolute;
   top: -1px;
-  right: 1.5rem;
-  left: 1.5rem;
+  right: var(--panel-padding);
+  left: var(--panel-padding);
   height: 1px;
   background: linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-to));
 }
