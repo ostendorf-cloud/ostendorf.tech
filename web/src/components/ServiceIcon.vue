@@ -2,7 +2,7 @@
 /**
  * The six Leistungen icons, ported stroke for stroke from
  * old_simon-ostendorf.de's cmd/website/templates/home.html: a fader bank,
- * a microphone, a mixer, a moving head, a camera and a flight case, one
+ * a microphone, a speaker, a moving head, a camera and a flight case, one
  * per entry of home.services.items and in that same order.
  *
  * Decorative: every icon sits next to the name it illustrates, so it is

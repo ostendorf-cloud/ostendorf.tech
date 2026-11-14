@@ -171,6 +171,12 @@ const { t } = useI18n()
     transition: none;
   }
 
+  /* The base transition as well as the hover one: clearing only the
+     hover rule still animates the five bars back down on the way out. */
+  .meter span {
+    transition: none;
+  }
+
   .strip:hover .meter span,
   .strip:focus-visible .meter span {
     animation: none;

@@ -64,7 +64,13 @@ export const heroWebp = srcset([
 
 export const heroFallback = heroJpeg
 
-export const PORTRAIT_INTRINSIC = { width: 1200, height: 1200 } as const
+/** The box the portrait is laid out in, for the <img>'s own width and
+ *  height attributes. The source file is square, 1200x1200, but
+ *  .portrait img crops it to 4 / 5 with object-fit, so the file's own
+ *  size would have the browser reserve a box the page never uses. These
+ *  two numbers carry that 4 / 5 instead, which is the only thing the
+ *  attributes are read for. */
+export const PORTRAIT_BOX = { width: 1200, height: 1500 } as const
 
 /** The portrait is capped at 460 CSS pixels by the Über mich layout. */
 export const PORTRAIT_SIZES = '(min-width: 920px) 460px, min(100vw - 2rem, 460px)'
