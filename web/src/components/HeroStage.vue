@@ -15,6 +15,13 @@
  * reads in; see --hero-scrim-alpha in src/theme/vtech.css and the hero
  * half of src/theme/contrast.test.ts for the number and its proof.
  *
+ * That only describes the ground the hero's text reads on if the text
+ * paints after this whole element, which is what --hero-layer-stage below
+ * and --hero-layer-content on the hero's own content are for: this is a
+ * positioned element, so without an explicit z-index it would paint over
+ * static in-flow content regardless of document order. The test that
+ * holds those two apart is src/views/heroLayers.test.ts.
+ *
  * Decorative throughout, so the photograph carries an empty alt and the
  * whole element is hidden from assistive technology: every word the hero
  * says is in the markup next to it.
@@ -57,6 +64,7 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
 <style scoped>
 .hero-stage {
   position: absolute;
+  z-index: var(--hero-layer-stage);
   inset: 0;
   overflow: hidden;
   pointer-events: none;

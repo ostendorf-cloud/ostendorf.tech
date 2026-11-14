@@ -15,7 +15,7 @@ import { serviceIcons } from '../data/services'
 import { experienceYearsFloor } from '../lib/experienceYears'
 import type { Fact } from '../lib/facts'
 import {
-  PORTRAIT_INTRINSIC,
+  PORTRAIT_BOX,
   PORTRAIT_SIZES,
   portraitAvif,
   portraitFallback,
@@ -184,8 +184,8 @@ const aboutFacts = computed<Fact[]>(() => [
             <source type="image/webp" :srcset="portraitWebp" :sizes="PORTRAIT_SIZES" />
             <img
               :src="portraitFallback"
-              :width="PORTRAIT_INTRINSIC.width"
-              :height="PORTRAIT_INTRINSIC.height"
+              :width="PORTRAIT_BOX.width"
+              :height="PORTRAIT_BOX.height"
               :alt="t('home.about.portraitAlt')"
               loading="lazy"
               decoding="async"
@@ -270,7 +270,17 @@ const aboutFacts = computed<Fact[]>(() => [
   }
 }
 
+/*
+ * Both of the hero's own children carry an explicit layer. HeroStage is
+ * absolutely positioned, so it would otherwise paint over anything static
+ * beside it whatever the markup order says, and the hero-rise animation
+ * would hide that for exactly as long as it holds a transform. .hero
+ * isolates, so the two numbers are local to the hero and mean nothing
+ * outside it; see --hero-layer-stage in src/theme/vtech.css.
+ */
 .hero-inner {
+  position: relative;
+  z-index: var(--hero-layer-content);
   display: flex;
   max-width: 48rem;
   flex-direction: column;
@@ -317,6 +327,17 @@ const aboutFacts = computed<Fact[]>(() => [
   }
 }
 
+/* Forced colours replaces the gradient with the user's own background and
+   keeps the transparent fill, which leaves the headline invisible. The
+   fill goes back to the text colour the mode itself picked. */
+@media (forced-colors: active) {
+  .hero-title {
+    background: none;
+    -webkit-text-fill-color: currentcolor;
+    color: canvastext;
+  }
+}
+
 .hero-tagline {
   display: flex;
   max-width: 47.5rem;
@@ -344,6 +365,7 @@ const aboutFacts = computed<Fact[]>(() => [
 /* A mouse outline with a dot rolling down it. */
 .hero-cue {
   position: absolute;
+  z-index: var(--hero-layer-content);
   bottom: 1.75rem;
   left: 50%;
   width: 1.625rem;

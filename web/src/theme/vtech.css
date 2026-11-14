@@ -115,6 +115,22 @@
   --hero-scrim-alpha: 0.78;
 
   /*
+   * The hero's two paint layers, as numbers rather than as an accident of
+   * document order. The scrim guarantee above is a statement about what
+   * the hero's text sits on, and it only holds if the text actually paints
+   * after the stage: a positioned stage with z-index: auto paints over
+   * static in-flow content no matter where it sits in the markup, which is
+   * what the hero shipped before these two existed.
+   *
+   * Every direct child of .hero names one of them, and .hero isolates, so
+   * the two values are compared against each other and against nothing
+   * else on the page. src/views/heroLayers.test.ts holds the order and the
+   * naming; moving either number past the other fails it.
+   */
+  --hero-layer-stage: 0;
+  --hero-layer-content: 1;
+
+  /*
    * How the photograph is graded before the scrim goes over it. Purely a
    * matter of taste, and deliberately so: the scrim's worst case is a
    * pure white or a pure black pixel either way, so nothing here can move
