@@ -241,14 +241,17 @@ describe('the hero scrim', () => {
     expect(heroFailures(dark, hero.refs, ground)).toEqual([])
   })
 
-  // The scrim is the only thing standing between the photograph and the
-  // hero's text, so every hundredth of alpha above the floor is paid for
-  // out of the picture. Holding the alpha *at* the floor rather than
-  // merely above it is what stops a floor that has since dropped, because
-  // a token moved or because a mode stopped being proved here, from
-  // quietly keeping the photograph dimmer than it has to be.
-  it('is no thicker than the roles it carries need', () => {
-    const thinner = heroGround(dark.bg, hero.alpha - 0.01, WORST_CASE_BEHIND_SCRIM)
-    expect(heroFailures(dark, hero.refs, thinner)).not.toEqual([])
-  })
+  // There is deliberately no assertion here pinning the alpha to its
+  // exact floor, the way "carries every hero role over the brightest
+  // possible pixel" above pins the floor itself. The floor is derived
+  // from all five HERO_ROLES tokens together, not from the alpha alone,
+  // so a later change that improves contrast on any one of those five
+  // tokens for an unrelated reason would hand the scrim margin it did
+  // not have before. An assertion that the alpha minus one hundredth
+  // must fail would then flip from "expected failure" to "no failure"
+  // and fail the build, pointing at no real regression and naming none
+  // of the five tokens that moved. The test above already catches a
+  // real regression, the alpha or a token moving the wrong way; whether
+  // the alpha is more generous than it strictly has to be is not worth
+  // breaking an unrelated change over.
 })

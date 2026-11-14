@@ -1,3 +1,9 @@
+<!-- No data-theme/data-mode here: this file cannot import src/lib/theme.ts,
+     and a hardcoded copy of THEME_NAME/DEFAULT_MODE would be a third one.
+     main.ts's useTheme call sets both once the dev bundle loads, so the
+     dev server briefly shows the fallback theme rather than vtech dark;
+     a flash only JS fixes, which is fine here since no page is ever
+     prerendered in dev. -->
 <!doctype html>
 <html lang="de">
   <head>
