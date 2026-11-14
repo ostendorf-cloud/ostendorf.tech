@@ -93,33 +93,35 @@
    * light mode, whatever the photograph happens to contain, and that is a
    * number rather than a hope.
    *
-   * 0.82 is a measured number, not a guess: at that alpha the scrim over
-   * the worst case still carries --color-text at 4.5:1 and
-   * --color-accent, --color-accent-text and --color-focus at 3:1, in both
-   * modes, with margin. src/theme/contrast.test.ts recomputes exactly
-   * that and fails the build if either this alpha or any token it is
-   * measured against moves. It is a ceiling on the scrim's weakest point,
-   * not on the whole scrim: the scrim itself is a gradient that only ever
-   * gets more opaque further down, where it hands over to the page.
+   * 0.78 is the measured floor for that number, not a guess: at that
+   * alpha the scrim over the worst case still carries --color-text at
+   * 4.5:1 and --color-accent, --color-accent-text and --color-focus at
+   * 3:1, in both modes. 0.77 does not, so this is the last step that
+   * holds. src/theme/contrast.test.ts recomputes exactly that and fails
+   * the build if either this alpha or any token it is measured against
+   * moves. It is the floor for the scrim's weakest point, not for the
+   * whole scrim: the scrim itself is a gradient that only ever gets more
+   * opaque further down, where it hands over to the page.
    *
-   * The price is paid in the photograph, which shows through at 18%. On
-   * this palette the floor is 0.78, which would show it at 22%: light
-   * mode's --color-accent is what sets it, so the headline gradient's far
-   * end no longer costs the photograph anything and a flat headline would
-   * buy nothing back. The remaining 0.04 is margin held on purpose, since
-   * the roles above clear 3:1 by very little at the floor itself.
+   * Light mode's --color-accent is what binds it, at 3.08:1 against a
+   * 3:1 floor, and that is the tightest pair in this file. The headline
+   * gradient's far end costs the photograph nothing on this palette, so
+   * a flat --color-accent headline would buy none of it back: the
+   * gradient is free here, which it was not when the far end was purple.
+   *
+   * The price is paid in the photograph, which shows through at 22%.
    */
   --hero-scrim-color: var(--color-bg);
-  --hero-scrim-alpha: 0.82;
+  --hero-scrim-alpha: 0.78;
 
   /*
    * How the photograph is graded before the scrim goes over it. Purely a
    * matter of taste, and deliberately so: the scrim's worst case is a
    * pure white or a pure black pixel either way, so nothing here can move
    * the guarantee above, and the grade is free to do whatever the picture
-   * needs. Light mode needs almost nothing, because 18% of a photograph
+   * needs. Light mode needs almost nothing, because 22% of a photograph
    * off a near-white ground already reads as a washed print; dark mode
-   * needs a great deal, because the same 18% of a stage photograph on
+   * needs a great deal, because the same 22% of a stage photograph on
    * near-black is a muddy one. The dark value is below, since a filter is
    * not a colour and light-dark() carries colours only.
    */
