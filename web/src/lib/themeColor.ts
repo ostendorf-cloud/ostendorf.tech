@@ -4,9 +4,13 @@
  *
  * The prerendered <head> is the only place this is needed: the SPA never
  * changes it after load. It used to carry the dark value as a literal,
- * which meant a light mode visitor got near-black chrome around a
- * near-white page, and it meant --color-bg had a copy nothing held to it.
- * Reading the token here removes the copy instead of guarding it.
+ * which meant --color-bg had a copy nothing held to it. Reading the token
+ * here removes the copy instead of guarding it.
+ *
+ * Both ends are returned rather than the one the pages currently ship in,
+ * because which end that is belongs to src/lib/theme.ts: this file's job
+ * is only to say what the theme declares, and failing when the token has
+ * been renamed or reshaped is the whole of the rest of it.
  */
 
 /** The light and dark ends of one light-dark() colour token. */

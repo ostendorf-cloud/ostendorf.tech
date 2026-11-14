@@ -4,13 +4,15 @@ import { useTheme } from '@ostendorf-cloud/govue'
 
 import App from './App.vue'
 import { createAppI18n, detectPreferredLocale, isLocale } from './i18n'
+import { DEFAULT_MODE, THEME_NAME } from './lib/theme'
 import { attachLocaleSync, createAppRouter } from './router'
 import './styles.css'
 
-// The theme never varies: this site ships exactly one brand. Mode starts
-// at "system", the visitor's own choice only overrides it once they use
-// the toggle, matching useTheme's own documented default.
-useTheme({ theme: 'vtech' })
+// The theme and the starting mode both come from src/lib/theme.ts, which
+// the prerender script reads as well: the markup a visitor first paints
+// is already in the mode this call would otherwise switch them to. The
+// visitor's own choice, once they use the toggle, still wins over both.
+useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE })
 
 const firstSegment = window.location.pathname.split('/')[1] ?? ''
 const initialLocale = isLocale(firstSegment)

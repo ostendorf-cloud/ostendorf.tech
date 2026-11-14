@@ -4,6 +4,7 @@ import { useTheme } from '@ostendorf-cloud/govue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppI18n } from '../i18n'
+import { DEFAULT_MODE } from '../lib/theme'
 import ThemeToggle from './ThemeToggle.vue'
 
 function renderToggle() {
@@ -53,6 +54,18 @@ describe('ThemeToggle', () => {
     renderToggle()
 
     expect(screen.getByRole('button', { name: 'Zu hellem Modus wechseln' })).toBeVisible()
+  })
+
+  // The site does not start on "system": src/lib/theme.ts starts it dark,
+  // and main.ts and the prerender script both hand that to useTheme. So
+  // the state a visitor who has never touched the toggle actually finds
+  // it in is dark, with the system setting as the next step, and the moon
+  // rather than the sun on the button.
+  it('shows the mode this site starts in, with the system setting as the next step', () => {
+    useTheme().setMode(DEFAULT_MODE)
+    renderToggle()
+
+    expect(screen.getByRole('button', { name: 'Systemeinstellung übernehmen' })).toBeVisible()
   })
 
   it('cycles through light, dark and back to system on repeated clicks', async () => {

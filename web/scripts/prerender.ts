@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { createMemoryHistory } from 'vue-router'
+import { useTheme } from '@ostendorf-cloud/govue'
 
 import App from '../src/App.vue'
 import { createAppI18n, SUPPORTED_LOCALES, type Locale } from '../src/i18n'
@@ -30,6 +31,7 @@ import {
   pageMeta,
   type PageRoute,
 } from '../src/lib/seo'
+import { DEFAULT_MODE, THEME_NAME } from '../src/lib/theme'
 import { themeColors } from '../src/lib/themeColor'
 import { attachLocaleSync, createAppRouter, NOT_FOUND_ROUTE_NAME } from '../src/router'
 // Inlined into this script's own bundle at build time, so the theme's
@@ -41,6 +43,15 @@ import vtechCss from '../src/theme/vtech.css?raw'
 const here = dirname(fileURLToPath(import.meta.url))
 const distDir = join(here, '../../cmd/website/dist')
 const outDir = join(here, '../../cmd/website/prerendered')
+
+// The same call main.ts makes, for the same two values, before anything
+// is rendered. useTheme holds one shared state per process and the header
+// reads it to draw the theme toggle, so without this the toggle would be
+// prerendered as the sun with "switch to light mode" on it and then flip
+// to the moon the moment the bundle hydrated. There is no document here,
+// so the attribute writing half of useTheme does nothing;
+// renderDocument below writes those attributes itself.
+useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE })
 
 /** loadPages turns the shared route table into this script's own page
  *  list, pairing each entry's name with the router route and the SEO
@@ -77,17 +88,19 @@ interface Assets {
  *  second time, under different names. */
 const HERO_VARIANT = /^src\/assets\/hero-(\d+)\.avif$/
 
-/** The browser chrome around the page, one meta per mode, both read out
- *  of the theme's own --color-bg. The page itself follows the visitor's
- *  colour scheme, so a single value would frame a near-white page in
- *  near-black for everyone reading in light mode. */
-const themeColorMetas = (() => {
-  const { light, dark } = themeColors(vtechCss)
-  return [
-    `<meta name="theme-color" content="${light}" media="(prefers-color-scheme: light)">`,
-    `<meta name="theme-color" content="${dark}" media="(prefers-color-scheme: dark)">`,
-  ].join('\n    ')
-})()
+/** The browser chrome around the page, read out of the theme's own
+ *  --color-bg at the mode the document itself ships in.
+ *
+ *  One meta, with no media query. There used to be two, one per
+ *  prefers-color-scheme, because the page followed the visitor's own
+ *  colour scheme and a single value would have framed a near-white page
+ *  in near-black. The document now pins its mode (see renderDocument
+ *  below), so the system setting no longer says anything about what this
+ *  page is painted in, and a pair keyed on it would be wrong for exactly
+ *  the visitor it used to be right for: someone on a light system reading
+ *  a dark page. A visitor who has chosen the other mode keeps this chrome
+ *  colour, which is the one thing a static <head> cannot know. */
+const themeColorMeta = `<meta name="theme-color" content="${themeColors(vtechCss)[DEFAULT_MODE]}">`
 
 function heroSrcset(manifest: Record<string, ManifestEntry>): string {
   const variants = Object.entries(manifest)
@@ -202,14 +215,23 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(meta.description)}">
     <meta property="og:url" content="${url}">
-    ${themeColorMetas}
+    ${themeColorMeta}
     ${heroPreload}${styleLinks}
     <script type="module" src="/${assets.script}" defer></script>`
 }
 
+/** renderDocument wraps one rendered page.
+ *
+ *  data-theme and data-mode are the two attributes govue's stylesheets
+ *  switch on, and they are written here rather than left to useTheme so
+ *  the very first paint of a prerendered page is already the right one: an
+ *  absent data-mode is useTheme's "follow the operating system" state, so
+ *  without it a visitor on a light system would see a light page until the
+ *  bundle loaded and then watch it turn dark. Both values come from
+ *  src/lib/theme.ts, the same module main.ts starts useTheme from. */
 function renderDocument(locale: Locale, head: string, body: string): string {
   return `<!doctype html>
-<html lang="${locale}" data-theme="vtech">
+<html lang="${locale}" data-theme="${THEME_NAME}" data-mode="${DEFAULT_MODE}">
   <head>
     ${head}
   </head>
