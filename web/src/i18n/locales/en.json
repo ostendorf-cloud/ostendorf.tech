@@ -37,7 +37,8 @@
       "title": "Event Technology",
       "tagline": ["Full Service", "Live Sound / Bands", "Sound Engineering", "Lighting", "Video"],
       "ctaContact": "Contact",
-      "ctaServices": "Services"
+      "ctaServices": "Services",
+      "scrollCue": "Continue to the services"
     },
     "services": {
       "eyebrow": "What I offer",
@@ -92,7 +93,8 @@
         "disciplines": { "label": "disciplines: sound, light, stage, video" },
         "contact": { "label": "point of contact from the idea to teardown" }
       },
-      "cta": "Request a project"
+      "cta": "Request a project",
+      "portraitAlt": "Simon Ostendorf"
     },
     "contact": {
       "eyebrow": "Get in touch",

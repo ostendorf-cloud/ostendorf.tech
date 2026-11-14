@@ -8,9 +8,10 @@ import { prefersReducedMotion } from '../lib/motion'
 /**
  * The header's dark/light toggle. useTheme's mode already has three
  * states, light, dark and system, in that cycling order; this button only
- * ever cycles through them, system is the default this app starts
- * useTheme with in main.ts and the prerender script, so that is also what
- * a visitor who has not chosen yet gets.
+ * ever cycles through them. A visitor who has not chosen yet is on dark,
+ * the default main.ts and the prerender script both start useTheme with
+ * (src/lib/theme.ts), so the first click from there offers the system
+ * setting and the one after that offers light.
  *
  * The label names the mode a click switches to, the next one in that
  * order, not the one currently active: an accessible name on a button

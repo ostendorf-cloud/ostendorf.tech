@@ -43,7 +43,8 @@
         "Videotechnik"
       ],
       "ctaContact": "Kontakt",
-      "ctaServices": "Leistungen"
+      "ctaServices": "Leistungen",
+      "scrollCue": "Weiter zu den Leistungen"
     },
     "services": {
       "eyebrow": "Was ich biete",
@@ -101,7 +102,8 @@
         "disciplines": { "label": "Gewerke: Ton, Licht, Bühne, Video" },
         "contact": { "label": "Ansprechpartner von der Idee bis zum Abbau" }
       },
-      "cta": "Projekt anfragen"
+      "cta": "Projekt anfragen",
+      "portraitAlt": "Simon Ostendorf"
     },
     "contact": {
       "eyebrow": "Anfrage",

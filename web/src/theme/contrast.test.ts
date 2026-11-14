@@ -9,6 +9,11 @@
  * same pairs, read directly out of govue's source at the pinned version
  * this package depends on, so a change to either side is caught here
  * rather than two implementations quietly drifting apart.
+ *
+ * The second half of the file is this app's own, and has no counterpart
+ * upstream: the home page's hero paints text over a photograph, which is
+ * a pair no token list can describe. See "the hero stage" there for what
+ * it proves and why the photograph itself never enters the arithmetic.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -131,4 +136,122 @@ describe('the vtech theme', () => {
   it('declares every non-text pair at 3:1 in dark mode', () => {
     expect(failures(dark, NON_TEXT_PAIRS, NON_TEXT_MINIMUM)).toEqual([])
   })
+})
+
+/*
+ * The hero stage.
+ *
+ * HeroStage.vue layers a photograph, the haze and the light beams under
+ * one scrim painted in --hero-scrim-color, and the hero's text sits on
+ * top of that scrim with nothing decorative between. So the darkest the
+ * hero's ground can ever be read as follows from two declared numbers and
+ * a worst case pixel rather than from what the photograph happens to
+ * contain: a pure white pixel is the worst a light text can sit on.
+ *
+ * Swapping the photograph for another one therefore cannot regress any
+ * of this, and neither can a photograph that is lighter than the one
+ * shipped today, which is the whole point of putting the scrim last.
+ *
+ * There is one scrim to prove rather than two, because the hero is dark
+ * whichever mode the rest of the page is in. That is not an assumption
+ * this file is free to make: HomeView.vue has to pin the scheme on the
+ * hero for the dark palette below to be the one the hero actually paints
+ * with, so the first test here reads that declaration back out of it. Were
+ * it to go, this file would be proving the contrast of a hero that no
+ * longer exists.
+ */
+const WORST_CASE_BEHIND_SCRIM = 0xff
+
+/** Every role the hero paints on the scrim, with the ratio WCAG 2.2 AA
+ *  asks of it. The headline is clamped to at least 2.3rem at 850 weight,
+ *  which is large text, so its gradient's two ends carry the 3:1 large
+ *  text minimum rather than 4.5:1; the eyebrow, the tagline and the
+ *  buttons' own labels are body text and carry 4.5:1. */
+const HERO_ROLES: Array<[token: string, minimum: number]> = [
+  ['text', TEXT_MINIMUM],
+  ['brand-gradient-from', NON_TEXT_MINIMUM],
+  ['brand-gradient-to', NON_TEXT_MINIMUM],
+  ['accent', NON_TEXT_MINIMUM],
+  ['focus', NON_TEXT_MINIMUM],
+]
+
+/** heroTokens resolves the hero's own custom properties, which unlike the
+ *  colour tokens above are written as a plain number or as a var()
+ *  reference to a colour token, so that the gradient provably cannot
+ *  carry a value the palette does not already have. */
+function heroTokens(source: string): { alpha: number; refs: Record<string, string> } {
+  const alphaMatch = /--hero-scrim-alpha:\s*([0-9.]+)/.exec(source)
+  if (!alphaMatch) {
+    throw new Error('contrast: vtech.css declares no --hero-scrim-alpha')
+  }
+  const refs: Record<string, string> = {}
+  const pattern = /--((?:hero|brand)-[\w-]+):\s*var\(\s*--color-([\w-]+)\s*\)/g
+  for (const [, name, target] of source.matchAll(pattern)) {
+    refs[name] = target
+  }
+  return { alpha: Number(alphaMatch[1]), refs }
+}
+
+/** heroGround is the colour the hero's text actually sits on in the worst
+ *  case: the scrim at its weakest declared stop, composited over a pixel
+ *  of `behind` in every channel. */
+function heroGround(scrim: string, alpha: number, behind: number): string {
+  const value = Number.parseInt(scrim.slice(1), 16)
+  const channels = [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff].map((c) =>
+    Math.round(alpha * c + (1 - alpha) * behind),
+  )
+  return `#${channels.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
+
+/** heroFailures reads every hero role out of the palette, following a
+ *  var() reference where the hero declares one, and reports the ones that
+ *  do not reach their minimum against the ground. */
+function heroFailures(palette: Palette, refs: Record<string, string>, ground: string): string[] {
+  return HERO_ROLES.flatMap(([token, minimum]) => {
+    const colour = palette[refs[token] ?? token]
+    if (colour === undefined) {
+      return [`${token} cannot be checked, it resolves to no colour token`]
+    }
+    const value = ratio(colour, ground)
+    return value < minimum
+      ? [`${token} on the hero scrim is ${round(value)}:1, want ${minimum}:1`]
+      : []
+  })
+}
+
+const hero = heroTokens(css)
+
+/** The hero's own stylesheet, where the scheme it paints in is pinned.
+ *  Resolved the same way the theme above is, and for the same reason. */
+const homeView = readFileSync(join(process.cwd(), 'src/views/HomeView.vue'), 'utf-8')
+
+describe('the hero scrim', () => {
+  it('is painted in the mode this file measures, whatever the page is in', () => {
+    expect(homeView).toMatch(/\.hero\s*\{[^}]*\bcolor-scheme:\s*dark\s*;/)
+  })
+
+  it('is built from the theme, not from a value of its own', () => {
+    expect(hero.refs['hero-scrim-color']).toBe('bg')
+    expect(hero.refs['brand-gradient-from']).toBe('accent')
+    expect(hero.refs['brand-gradient-to']).toBe('accent-text')
+  })
+
+  it('carries every hero role over the brightest possible pixel', () => {
+    const ground = heroGround(dark.bg, hero.alpha, WORST_CASE_BEHIND_SCRIM)
+    expect(heroFailures(dark, hero.refs, ground)).toEqual([])
+  })
+
+  // There is deliberately no assertion here pinning the alpha to its
+  // exact floor, the way "carries every hero role over the brightest
+  // possible pixel" above pins the floor itself. The floor is derived
+  // from all five HERO_ROLES tokens together, not from the alpha alone,
+  // so a later change that improves contrast on any one of those five
+  // tokens for an unrelated reason would hand the scrim margin it did
+  // not have before. An assertion that the alpha minus one hundredth
+  // must fail would then flip from "expected failure" to "no failure"
+  // and fail the build, pointing at no real regression and naming none
+  // of the five tokens that moved. The test above already catches a
+  // real regression, the alpha or a token moving the wrong way; whether
+  // the alpha is more generous than it strictly has to be is not worth
+  // breaking an unrelated change over.
 })

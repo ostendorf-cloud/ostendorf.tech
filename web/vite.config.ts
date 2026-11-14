@@ -21,6 +21,16 @@ export default defineConfig({
     // script and its CSS, so it can write them into the HTML it generates
     // without hardcoding a filename vite is free to change.
     manifest: true,
+    // Every route is prerendered and served as static HTML, and that
+    // HTML has to carry a stylesheet link for everything the page needs
+    // at first paint: a split view stylesheet arrives with the route
+    // chunk, which is after first paint, and never at all for a visitor
+    // with no JavaScript. The prerenderer therefore links every
+    // stylesheet the build emits, whether there is one or ten, so split
+    // CSS would buy the second page nothing and cost it a second
+    // request. One sheet also caches once across all ten pages and has
+    // one unambiguous cascade order.
+    cssCodeSplit: false,
   },
   test: {
     environment: 'jsdom',

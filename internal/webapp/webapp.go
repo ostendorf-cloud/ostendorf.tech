@@ -159,6 +159,9 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	fail(err)
 	a.pages = pages
 
+	scriptHash, err := themeBootScriptHash(prerendered)
+	fail(err)
+
 	a.health = health.New()
 
 	registry := metrics.NewRegistry()
@@ -291,6 +294,17 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	// how this Worker is built, on a path where being wrong means the
 	// contact form never submits at all.
 	a.security.Policy.Add("worker-src", "'self'")
+	// The visitor's stored theme choice is corrected before first paint by a
+	// small inline script in the prerendered <head> (see
+	// web/scripts/prerender.ts and internal/webapp/themeboot.go), which this
+	// site's CSP would otherwise block: script-src carries no 'unsafe-inline'
+	// and the prerendered HTML has no per-response nonce to carry, since it
+	// is served as static bytes. Allowing exactly this script's own hash,
+	// computed above from the real prerendered output rather than a second
+	// copy of its text, is what lets it run.
+	if scriptHash != "" {
+		a.security.Policy.Add("script-src", "'sha256-"+scriptHash+"'")
+	}
 	if cfg.AllowPlainHTTP {
 		// A browser that reached this service over plain HTTP must never
 		// be told to upgrade every future visit to HTTPS.

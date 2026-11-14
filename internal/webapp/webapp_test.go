@@ -81,7 +81,11 @@ func testFS() (dist, prerendered fstest.MapFS) {
 		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('app')")},
 	}
 	prerendered = fstest.MapFS{
-		"de/index.html": &fstest.MapFile{Data: []byte("<html><body>Startseite</body></html>")},
+		// de/index.html carries the theme-boot marker every real
+		// prerendered page does, so New's themeBootScriptHash finds
+		// something to hash, the same as it would against the real
+		// build output.
+		"de/index.html": &fstest.MapFile{Data: []byte(`<html><head><script id="theme-boot">(function(){})();</script></head><body>Startseite</body></html>`)},
 		"de/404.html":   &fstest.MapFile{Data: []byte("<html><body>Nicht gefunden</body></html>")},
 		"en/index.html": &fstest.MapFile{Data: []byte("<html><body>Home</body></html>")},
 		"en/404.html":   &fstest.MapFile{Data: []byte("<html><body>Not found</body></html>")},
@@ -188,7 +192,7 @@ func TestAppRateLimitsExcessRequests(t *testing.T) {
 	})
 	dist := fstest.MapFS{"assets/app.js": &fstest.MapFile{Data: []byte("x")}}
 	prerendered := fstest.MapFS{
-		"de/index.html": &fstest.MapFile{Data: []byte("<html></html>")},
+		"de/index.html": &fstest.MapFile{Data: []byte(`<html><head><script id="theme-boot">(function(){})();</script></head></html>`)},
 		"de/404.html":   &fstest.MapFile{Data: []byte("<html></html>")},
 	}
 	app, err := New(cfg, discardLogger(), dist, prerendered)
@@ -771,7 +775,7 @@ func TestAppAssetRateLimitStaysJSON(t *testing.T) {
 	})
 	dist := fstest.MapFS{"assets/app.js": &fstest.MapFile{Data: []byte("x")}}
 	prerendered := fstest.MapFS{
-		"de/index.html": &fstest.MapFile{Data: []byte("<html></html>")},
+		"de/index.html": &fstest.MapFile{Data: []byte(`<html><head><script id="theme-boot">(function(){})();</script></head></html>`)},
 		"de/404.html":   &fstest.MapFile{Data: []byte("<html></html>")},
 	}
 	app, err := New(cfg, discardLogger(), dist, prerendered)
