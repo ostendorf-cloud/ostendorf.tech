@@ -4,15 +4,20 @@ import { useTheme } from '@ostendorf-cloud/govue'
 
 import App from './App.vue'
 import { createAppI18n, detectPreferredLocale, isLocale } from './i18n'
-import { DEFAULT_MODE, THEME_NAME } from './lib/theme'
+import { DEFAULT_MODE, STORAGE_KEY, THEME_NAME } from './lib/theme'
 import { attachLocaleSync, createAppRouter } from './router'
 import './styles.css'
 
 // The theme and the starting mode both come from src/lib/theme.ts, which
-// the prerender script reads as well: the markup a visitor first paints
-// is already in the mode this call would otherwise switch them to. The
-// visitor's own choice, once they use the toggle, still wins over both.
-useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE })
+// the prerender script reads as well. Avoiding a flash of the wrong mode
+// for a visitor with a stored light or system preference is the
+// prerendered <head>'s own blocking boot script's job (see
+// web/scripts/prerender.ts), not this call's: that script runs before
+// first paint, this call only once the deferred bundle has loaded. This
+// call brings govue's reactive theme state, which the toggle and
+// cycleMode operate on, in line with what the boot script already wrote
+// into the DOM, using the same storage key so both read the same choice.
+useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE, storageKey: STORAGE_KEY })
 
 const firstSegment = window.location.pathname.split('/')[1] ?? ''
 const initialLocale = isLocale(firstSegment)

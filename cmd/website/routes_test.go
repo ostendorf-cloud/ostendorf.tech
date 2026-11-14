@@ -182,6 +182,78 @@ func TestPrerenderedPagesPinTheColourMode(t *testing.T) {
 	}
 }
 
+// TestPrerenderedThemeBootScriptIsByteIdenticalAcrossPages guards the
+// assumption internal/webapp's themeBootScriptHash relies on: it computes
+// one CSP script-src 'sha256-' source from whichever prerendered page it
+// finds the <script id="theme-boot"> tag on first, so that hash only
+// covers every page's own copy of the script if every page's copy is
+// exactly the same bytes. web/scripts/prerender.ts builds the script from
+// two build-time constants with no per-page interpolation, which this
+// test checks against the real output "task prerender" wrote, rather than
+// trusting that description to still hold.
+func TestPrerenderedThemeBootScriptIsByteIdenticalAcrossPages(t *testing.T) {
+	sub, err := fs.Sub(prerenderedFS, "prerendered")
+	if err != nil {
+		t.Fatalf("fs.Sub(prerenderedFS, \"prerendered\") error = %v", err)
+	}
+
+	var first string
+	var firstPath string
+	pages := 0
+	err = fs.WalkDir(sub, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".html") {
+			return nil
+		}
+		data, err := fs.ReadFile(sub, p)
+		if err != nil {
+			return err
+		}
+		script, ok := themeBootScriptOf(string(data))
+		if !ok {
+			t.Errorf("%s has no <script id=\"theme-boot\"> tag", p)
+			return nil
+		}
+		pages++
+		if first == "" {
+			first, firstPath = script, p
+			return nil
+		}
+		if script != first {
+			t.Errorf("%s's theme-boot script differs from %s's; the CSP hash can only cover one", p, firstPath)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("fs.WalkDir(prerendered) error = %v", err)
+	}
+	if pages == 0 {
+		t.Fatal("prerendered has no pages; run task prerender first")
+	}
+}
+
+// themeBootScriptOf returns the text between the theme boot script's open
+// and close tags in one page's HTML, and whether it was found at all. A
+// plain cut, like openingHTMLTag above, over the same real build output
+// rather than a parse, since the exact bytes are what the CSP hash covers.
+func themeBootScriptOf(html string) (string, bool) {
+	const open = `<script id="theme-boot">`
+	const close = `</script>`
+	start := strings.Index(html, open)
+	if start == -1 {
+		return "", false
+	}
+	start += len(open)
+	rest := html[start:]
+	end := strings.Index(rest, close)
+	if end == -1 {
+		return "", false
+	}
+	return rest[:end], true
+}
+
 // openingHTMLTag is the document's <html ...> tag, attributes and all, or
 // an empty string when there is none. It cuts on the raw markup rather
 // than parsing the document, because the attributes are the thing under

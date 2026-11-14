@@ -32,3 +32,17 @@ export const THEME_NAME = 'vtech'
  * and the chrome colour is looked up by this value.
  */
 export const DEFAULT_MODE: Extract<ColorMode, 'light' | 'dark'> = 'dark'
+
+/**
+ * Where the visitor's theme and mode choice is stored. govue's useTheme
+ * defaults to this exact same key when no storageKey option is given, but
+ * that default is not exported, so three places need to agree on it
+ * without being able to import it from govue: this file, main.ts's
+ * useTheme call, and the prerendered <head>'s own blocking boot script
+ * (web/scripts/prerender.ts), which has to read the stored choice the
+ * same way useTheme does, not a second guess at the key. Pinning the
+ * value here, explicitly, rather than leaving it to govue's unexported
+ * default, is what keeps those three in agreement on purpose rather than
+ * by coincidence.
+ */
+export const STORAGE_KEY = 'govue-theme'

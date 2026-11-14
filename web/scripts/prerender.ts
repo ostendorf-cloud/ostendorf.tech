@@ -31,7 +31,7 @@ import {
   pageMeta,
   type PageRoute,
 } from '../src/lib/seo'
-import { DEFAULT_MODE, THEME_NAME } from '../src/lib/theme'
+import { DEFAULT_MODE, STORAGE_KEY, THEME_NAME } from '../src/lib/theme'
 import { themeColors } from '../src/lib/themeColor'
 import { attachLocaleSync, createAppRouter, NOT_FOUND_ROUTE_NAME } from '../src/router'
 // Inlined into this script's own bundle at build time, so the theme's
@@ -51,7 +51,7 @@ const outDir = join(here, '../../cmd/website/prerendered')
 // to the moon the moment the bundle hydrated. There is no document here,
 // so the attribute writing half of useTheme does nothing;
 // renderDocument below writes those attributes itself.
-useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE })
+useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE, storageKey: STORAGE_KEY })
 
 /** loadPages turns the shared route table into this script's own page
  *  list, pairing each entry's name with the router route and the SEO
@@ -98,9 +98,62 @@ const HERO_VARIANT = /^src\/assets\/hero-(\d+)\.avif$/
  *  below), so the system setting no longer says anything about what this
  *  page is painted in, and a pair keyed on it would be wrong for exactly
  *  the visitor it used to be right for: someone on a light system reading
- *  a dark page. A visitor who has chosen the other mode keeps this chrome
- *  colour, which is the one thing a static <head> cannot know. */
-const themeColorMeta = `<meta name="theme-color" content="${themeColors(vtechCss)[DEFAULT_MODE]}">`
+ *  a dark page.
+ *
+ *  That is no longer the whole story, though: a visitor who has stored a
+ *  light or system preference is no longer left to keep this chrome
+ *  colour as their one correction, the way the comment above used to
+ *  read. themeBootScript below corrects data-mode before first paint, and
+ *  the same stored preference means this static meta can be wrong too, so
+ *  it corrects this tag's content as well, right after writing it. A
+ *  resolved-light outcome needs the light colour; a resolved-dark one
+ *  needs no correction, since this default already is the dark colour.
+ *  themeColorValues keeps both ends in scope for that reason, rather than
+ *  the single value DEFAULT_MODE picks for the attribute path below. */
+const themeColorValues = themeColors(vtechCss)
+const themeColorMeta = `<meta name="theme-color" content="${themeColorValues[DEFAULT_MODE]}">`
+
+/** themeBootScript is a small, blocking inline script written into every
+ *  prerendered <head>, before the stylesheet <link>, so a returning
+ *  visitor who stored a light or system preference is not shown a dark
+ *  flash: the prerendered markup above always pins data-mode="dark" (see
+ *  renderDocument), and the only thing that used to correct that for such
+ *  a visitor was main.ts's own useTheme call, which runs only once the
+ *  deferred bundle has loaded, strictly after first paint. This script
+ *  runs before the stylesheet applies instead, which is also why it has
+ *  to sit before the <link rel="stylesheet"> in renderHead rather than
+ *  after it or deferred.
+ *
+ *  It reads localStorage under STORAGE_KEY, the exact key useTheme reads
+ *  and writes, rather than a second guess at it: see that constant's own
+ *  comment for why three places have to agree on it on purpose. Reading
+ *  it the same way useTheme's own restore() does (JSON.parse of
+ *  {theme, mode}, mode one of "light"/"dark"/"system") means this script
+ *  resolves the exact same choice useTheme would, before useTheme ever
+ *  runs.
+ *
+ *  Every failure mode leaves the prerendered dark default untouched: no
+ *  stored value, storage unavailable or throwing, malformed JSON, and an
+ *  unrecognised mode value are all caught and ignored, and the whole
+ *  script is wrapped in its own try/catch besides, so nothing it does can
+ *  ever break the page it runs on.
+ *
+ *  Resolving "system" needs prefers-color-scheme itself, since there is
+ *  no document.documentElement data-mode to read it back from reliably
+ *  before this script has run; once resolved, a light outcome also
+ *  corrects the theme-color meta above to themeColorValues.light, folding
+ *  what would otherwise be a second, separate fix (the same visitor's
+ *  stored light preference leaving the chrome colour wrong too) into this
+ *  one mechanism.
+ *
+ *  Its text has to stay byte identical on every page, with no per-page
+ *  interpolation beyond the two constants below (the same on every page):
+ *  internal/webapp/themeboot.go computes one CSP script-src 'sha256-'
+ *  source from whichever prerendered page it finds this script on first,
+ *  since this site's CSP carries no 'unsafe-inline' for script-src and
+ *  this static HTML has no per-response nonce to carry. The id="theme-boot"
+ *  attribute is what that Go code locates the script by. */
+const themeBootScript = `<script id="theme-boot">(function(){try{var raw=localStorage.getItem(${JSON.stringify(STORAGE_KEY)});if(!raw){return}var stored=JSON.parse(raw);var mode=stored&&stored.mode;if(mode!=='light'&&mode!=='dark'&&mode!=='system'){return}var root=document.documentElement;var resolved=mode;if(mode==='system'){root.removeAttribute('data-mode');resolved=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}else{root.setAttribute('data-mode',mode)}if(resolved==='light'){var meta=document.querySelector('meta[name="theme-color"]');if(meta){meta.setAttribute('content',${JSON.stringify(themeColorValues.light)})}}}catch(e){}})();</script>`
 
 function heroSrcset(manifest: Record<string, ManifestEntry>): string {
   const variants = Object.entries(manifest)
@@ -216,6 +269,7 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
     <meta property="og:description" content="${escapeHtml(meta.description)}">
     <meta property="og:url" content="${url}">
     ${themeColorMeta}
+    ${themeBootScript}
     ${heroPreload}${styleLinks}
     <script type="module" src="/${assets.script}" defer></script>`
 }
@@ -228,7 +282,15 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
  *  absent data-mode is useTheme's "follow the operating system" state, so
  *  without it a visitor on a light system would see a light page until the
  *  bundle loaded and then watch it turn dark. Both values come from
- *  src/lib/theme.ts, the same module main.ts starts useTheme from. */
+ *  src/lib/theme.ts, the same module main.ts starts useTheme from.
+ *
+ *  That pinned default is not the only word on the matter any more,
+ *  though: a visitor who stored a light or system preference would
+ *  otherwise see this dark default flash before main.ts's deferred
+ *  useTheme call corrected it. themeBootScript, written into the <head>
+ *  by renderHead, corrects data-mode (and the theme-color meta) before
+ *  this markup is ever painted, so this function's own pinned default
+ *  stays the fail-safe starting point rather than the whole story. */
 function renderDocument(locale: Locale, head: string, body: string): string {
   return `<!doctype html>
 <html lang="${locale}" data-theme="${THEME_NAME}" data-mode="${DEFAULT_MODE}">
