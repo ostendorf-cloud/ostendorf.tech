@@ -203,12 +203,13 @@ from `Logo_Name.pdf` in the organisation's `old_logo` repository, never hand edi
 The source file bakes in two colours (white for "Simon Ostendorf", a mid blue for
 "Veranstaltungstechnik"), meant for the dark stage background the old site always
 rendered on; both are overridden to one flat colour per variant, navy
-(`#1b1030`, this theme's own `--color-text`) for light mode and white for dark mode,
-matching the two variants the design calls for. The command:
+(`#0f1a2e`, this theme's own `--color-text`) for light mode and white for dark mode,
+matching the two variants the design calls for. Moving that token means regenerating
+the light variant: it carries the value, not a reference to it. The command:
 
 ```sh
 pdftocairo -svg Logo_Name.pdf logo-wordmark-light.svg
-# then replace every fill="rgb(...)" with fill="#1b1030" (light) or fill="#ffffff" (dark)
+# then replace every fill="rgb(...)" with fill="#0f1a2e" (light) or fill="#ffffff" (dark)
 svgo --multipass -i logo-wordmark-light.svg -o logo-wordmark-light.svg
 ```
 

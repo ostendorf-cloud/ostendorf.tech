@@ -1,17 +1,24 @@
 /*
  * vtech: the brand theme of Simon Ostendorf Veranstaltungstechnik.
  *
- * Dark mode carries the brand as it already exists on the old site: a
- * near-black stage background (#07060f) and the cyan (#1ee3f5) to purple
- * (#7b3cf5) fader gradient, read off cmd/website/static/style.css of
- * old_simon-ostendorf.de. The neutral ramp there is already a purple
- * tinted dark, not a plain grey, which is kept here.
+ * The brand colour is the cyan of the logo (#1ee3f5) and the fader
+ * gradient that starts from it. The old site ran that gradient out into a
+ * purple and tinted its whole neutral ramp to match; this theme runs it
+ * out into a blue instead, and tints the ramp the same way, so the
+ * near-black stage ground, the panels above it and the gradient's far end
+ * all sit on one hue family rather than two.
  *
- * Light mode is authored fresh rather than inverted: a plain white surface
- * on a faint violet tinted ground, with a darker, more saturated purple
- * for text, fills and the focus ring, since the vivid dark-mode cyan has
- * nowhere near enough contrast against a light ground to read as
- * anything, let alone as a brand colour.
+ * Dark mode is the primary: a near-black blue stage ground (#050a14)
+ * under blue tinted panels, with the cyan kept at full strength for
+ * fills, icons and the focus ring, where it has the most contrast it will
+ * ever have.
+ *
+ * Light mode is authored fresh rather than inverted: a plain white
+ * surface on a faint blue tinted ground, with a deeper, more saturated
+ * blue for text, fills and the focus ring, since the vivid dark-mode cyan
+ * has nowhere near enough contrast against a light ground to read as
+ * anything, let alone as a brand colour. The gradient therefore runs blue
+ * to deeper blue there, not cyan to blue.
  *
  * Every pair below is checked against WCAG 2.2 AA by govue's own
  * web/src/styles/contrast.test.ts, run over every committed theme
@@ -21,33 +28,35 @@
  */
 
 :root[data-theme='vtech'] {
-  --color-bg: light-dark(#f7f3fb, #07060f);
-  --color-bg-subtle: light-dark(#efe7f7, #0d0b1c);
-  --color-surface: light-dark(#ffffff, #15122a);
-  --color-surface-hover: light-dark(#f1e9f9, #1c1836);
-  --color-overlay: light-dark(rgb(27 16 48 / 0.45), rgb(7 6 15 / 0.68));
+  --color-bg: light-dark(#f4f7fd, #050a14);
+  --color-bg-subtle: light-dark(#e7eefb, #0a1222);
+  --color-surface: light-dark(#ffffff, #101a2e);
+  --color-surface-hover: light-dark(#e9f1fd, #18253f);
+  --color-overlay: light-dark(rgb(15 26 46 / 0.45), rgb(5 10 20 / 0.68));
 
-  --color-border: light-dark(#e3d8ef, #241f3a);
-  --color-border-strong: light-dark(#8a7fa0, #6b6380);
+  --color-border: light-dark(#d8e3f5, #22304b);
+  --color-border-strong: light-dark(#74829b, #6b7a92);
 
-  --color-text: light-dark(#1b1030, #f2f1fb);
-  --color-text-muted: light-dark(#4a3b5c, #b5b4be);
-  --color-text-faint: light-dark(#5f5270, #8b8a93);
+  --color-text: light-dark(#0f1a2e, #eef3fc);
+  --color-text-muted: light-dark(#3d4d66, #b3bdcc);
+  --color-text-faint: light-dark(#55657b, #8b95a5);
 
   /* accent carries fills and icons at 3:1; accent-text is the brand
-     gradient's purple end, darkened in light mode for 4.5:1 on white and
-     lightened in dark mode for 4.5:1 on near-black, which is exactly what
-     the old site's own --violet token already did for the same reason. */
-  --color-accent: light-dark(#7b3cf5, #1ee3f5);
-  --color-accent-text: light-dark(#5b2bc4, #a47cff);
-  --color-accent-strong: light-dark(#5b2bc4, #5b2bc4);
-  --color-accent-strong-hover: light-dark(#4a2099, #6a35dd);
-  --color-accent-on: light-dark(#ffffff, #fbf7ff);
-  --color-accent-subtle: light-dark(#ece0fb, #2a1f4a);
+     gradient's blue end, deepened in light mode for 4.5:1 on white and
+     lightened in dark mode for 4.5:1 on near-black. A blue is darker than
+     the purple it replaces at the same nominal lightness, because green
+     weighs ten times what blue does in the luminance sum, so both ends
+     moved further from the mid tone than swapping the hue alone implies. */
+  --color-accent: light-dark(#2a5ce6, #1ee3f5);
+  --color-accent-text: light-dark(#1f4fc4, #6b97ff);
+  --color-accent-strong: light-dark(#1f4fc4, #1f4fc4);
+  --color-accent-strong-hover: light-dark(#173e9c, #2b63e0);
+  --color-accent-on: light-dark(#ffffff, #f7faff);
+  --color-accent-subtle: light-dark(#dfe8fd, #152a4d);
   /* The ring stays the cyan the brand gradient starts from in dark mode,
-     vivid against the near-black stage; light mode needs the darker
-     purple instead, the cyan has nowhere near enough contrast on white. */
-  --color-focus: light-dark(#5b2bc4, #1ee3f5);
+     vivid against the near-black stage; light mode needs the deeper blue
+     instead, the cyan has nowhere near enough contrast on white. */
+  --color-focus: light-dark(#1f4fc4, #1ee3f5);
 
   /* Semantic. These four hold the same values govue's own base.css and
      sample.css ship: they are not brand colours, and reusing values already
@@ -65,10 +74,10 @@
   --color-info-text: light-dark(#0e6281, #5abff2);
   --color-info-subtle: light-dark(#d1e9f5, #17393f);
 
-  --shadow-card: 0 1px 2px light-dark(rgb(27 16 48 / 0.07), rgb(0 0 0 / 0.52));
+  --shadow-card: 0 1px 2px light-dark(rgb(15 26 46 / 0.07), rgb(0 0 0 / 0.52));
   --shadow-dialog:
-    0 10px 30px -12px light-dark(rgb(27 16 48 / 0.26), rgb(0 0 0 / 0.78)),
-    0 2px 6px light-dark(rgb(27 16 48 / 0.09), rgb(0 0 0 / 0.52));
+    0 10px 30px -12px light-dark(rgb(15 26 46 / 0.26), rgb(0 0 0 / 0.78)),
+    0 2px 6px light-dark(rgb(15 26 46 / 0.09), rgb(0 0 0 / 0.52));
 
   /*
    * The hero stage.
@@ -84,19 +93,21 @@
    * light mode, whatever the photograph happens to contain, and that is a
    * number rather than a hope.
    *
-   * 0.82 is the measured floor for that number, not a guess: at that
-   * alpha the scrim over the worst case still carries --color-text at
-   * 4.5:1 and --color-accent, --color-accent-text and --color-focus at
-   * 3:1, in both modes, with margin. src/theme/contrast.test.ts
-   * recomputes exactly that and fails the build if either this alpha or
-   * any token it is measured against moves. It is the minimum: the scrim
-   * itself is a gradient that only ever gets more opaque further down,
-   * where it hands over to the page.
+   * 0.82 is a measured number, not a guess: at that alpha the scrim over
+   * the worst case still carries --color-text at 4.5:1 and
+   * --color-accent, --color-accent-text and --color-focus at 3:1, in both
+   * modes, with margin. src/theme/contrast.test.ts recomputes exactly
+   * that and fails the build if either this alpha or any token it is
+   * measured against moves. It is a ceiling on the scrim's weakest point,
+   * not on the whole scrim: the scrim itself is a gradient that only ever
+   * gets more opaque further down, where it hands over to the page.
    *
-   * The price is paid in the photograph, which shows through at 18%. The
-   * headline gradient's darker end is what sets it: a flat --color-accent
-   * headline would pass at 0.70 and show the photo at 30%. The gradient
-   * is the brand, so the photo pays.
+   * The price is paid in the photograph, which shows through at 18%. On
+   * this palette the floor is 0.78, which would show it at 22%: light
+   * mode's --color-accent is what sets it, so the headline gradient's far
+   * end no longer costs the photograph anything and a flat headline would
+   * buy nothing back. The remaining 0.04 is margin held on purpose, since
+   * the roles above clear 3:1 by very little at the floor itself.
    */
   --hero-scrim-color: var(--color-bg);
   --hero-scrim-alpha: 0.82;
@@ -127,7 +138,7 @@
   --hero-beam-blend: multiply;
 
   /*
-   * The brand gradient, the cyan to purple of the logo. It carries the
+   * The brand gradient, the cyan to blue of the logo. It carries the
    * hero's headline, the lit edge along the top of every panel and the
    * frame around the portrait. Both ends are tokens rather than fresh
    * values, so light mode gets the same sweep the dark one does without

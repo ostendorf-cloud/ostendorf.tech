@@ -153,7 +153,7 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(meta.description)}">
     <meta property="og:url" content="${url}">
-    <meta name="theme-color" content="#07060f">
+    <meta name="theme-color" content="#050a14">
     ${heroPreload}${styleLinks}
     <script type="module" src="/${assets.script}" defer></script>`
 }
