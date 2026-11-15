@@ -1,12 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":semanticCommits"],
-  "pinDigests": true,
-  "labels": ["dependencies"],
-  "packageRules": [
-    {
-      "matchManagers": ["npm"],
-      "minimumReleaseAge": "2 days"
-    }
-  ]
+  "extends": ["github>ostendorf-cloud/workflows#v0.3.0"]
 }
