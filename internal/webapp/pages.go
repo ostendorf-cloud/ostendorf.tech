@@ -118,8 +118,15 @@ type pageServer struct {
 
 // newPageServer validates that dist carries the assets/ directory the SPA
 // build writes, so a missing build is reported once at startup rather than
-// as a 404 on the first request.
+// as a 404 on the first request. fs.Sub alone would not catch this: it
+// builds a filesystem rooted at the given directory lazily, with no check
+// that the directory exists, for every fs.FS that does not implement
+// fs.SubFS itself (embed.FS included), so the explicit fs.Stat below is
+// what actually does the validating.
 func newPageServer(dist, prerendered fs.FS) (*pageServer, error) {
+	if _, err := fs.Stat(dist, "assets"); err != nil {
+		return nil, fmt.Errorf("webapp: dist has no assets directory: %w", err)
+	}
 	assets, err := fs.Sub(dist, "assets")
 	if err != nil {
 		return nil, fmt.Errorf("webapp: dist has no assets directory: %w", err)

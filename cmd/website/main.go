@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/signal"
 	"syscall"
@@ -34,11 +33,11 @@ func run() error {
 
 	logger := logging.New(os.Stdout, cfg.LogLevel)
 
-	dist, err := fs.Sub(distFS, "dist")
+	dist, err := embeddedSubtree(distFS, "dist")
 	if err != nil {
 		return fmt.Errorf("website: %w", err)
 	}
-	prerendered, err := fs.Sub(prerenderedFS, "prerendered")
+	prerendered, err := embeddedSubtree(prerenderedFS, "prerendered")
 	if err != nil {
 		return fmt.Errorf("website: %w", err)
 	}
