@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,6 +15,7 @@ import (
 	"github.com/ostendorf-cloud/govue/logging"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/embedfs"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/webapp"
 )
 
@@ -34,11 +34,11 @@ func run() error {
 
 	logger := logging.New(os.Stdout, cfg.LogLevel)
 
-	dist, err := fs.Sub(distFS, "dist")
+	dist, err := embedfs.Subtree(distFS, "dist")
 	if err != nil {
 		return fmt.Errorf("website: %w", err)
 	}
-	prerendered, err := fs.Sub(prerenderedFS, "prerendered")
+	prerendered, err := embedfs.Subtree(prerenderedFS, "prerendered")
 	if err != nil {
 		return fmt.Errorf("website: %w", err)
 	}

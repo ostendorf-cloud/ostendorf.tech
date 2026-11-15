@@ -359,6 +359,26 @@ func TestOnlyARealPageViewIsTracked(t *testing.T) {
 	}
 }
 
+// TestNewPageServerFailsWhenDistHasNoAssetsDirectory reproduces the
+// defect fs.Sub itself cannot catch: it builds a filesystem rooted at a
+// given directory lazily, with no check that the directory exists, for
+// every fs.FS that does not implement fs.SubFS itself, embed.FS and
+// fstest.MapFS included. A bare fs.Sub(dist, "assets") therefore returns
+// no error for a dist carrying no assets directory at all, and the
+// absence only surfaces later, as an empty or 404 asset response, far
+// from where newPageServer's own doc comment says it should be caught.
+func TestNewPageServerFailsWhenDistHasNoAssetsDirectory(t *testing.T) {
+	dist := fstest.MapFS{
+		"index.html": &fstest.MapFile{Data: []byte("<html></html>")},
+	}
+	prerendered := fstest.MapFS{
+		"de/index.html": &fstest.MapFile{Data: []byte("<html><body>Startseite</body></html>")},
+	}
+	if _, err := newPageServer(dist, prerendered); err == nil {
+		t.Fatal("newPageServer() error = nil, want an error naming the missing assets directory")
+	}
+}
+
 func TestSplitLocale(t *testing.T) {
 	tests := map[string]struct {
 		path       string
