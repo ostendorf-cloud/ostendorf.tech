@@ -264,9 +264,6 @@ implemented. Left out, tracked as later milestones:
   cover: the dependencies and their own terms, the brand and imagery, the page texts
   including the band descriptions that belong to those bands, and why the legal pages
   must not be copied.
-- `.github/workflows/dco.yaml` calls `ostendorf-cloud/workflows`'s reusable workflow at
-  `v0.1.1`, the latest tag that exists, not a floating `v0` major tag:
-  `ostendorf-cloud/workflows` has not cut one yet. Repoint at `v0` once it exists.
 - The Helm chart lives at `charts/ostendorf.tech/`, matching the repository's own name,
   but its `Chart.yaml` `name` and every rendered object name use `ostendorf-tech`
   instead: a literal dot is invalid in a `Service`'s `metadata.name` (RFC 1035 label),
