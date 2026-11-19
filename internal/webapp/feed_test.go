@@ -165,11 +165,11 @@ func TestFeedSyncerBuiltWhenFeedServiceConfigured(t *testing.T) {
 	// internal/feedclient's own Run test.
 }
 
-func TestStartWithoutFeedOrAnalyticsRunsNothing(t *testing.T) {
-	// The default deployment configures neither, and Start has to be
-	// callable anyway: main calls it unconditionally.
+func TestStartWithoutFeedRunsNothing(t *testing.T) {
+	// The default deployment configures no feed service, and Start has to
+	// be callable anyway: main calls it unconditionally.
 	app := testApp(t)
-	if app.feedSyncer != nil || app.analyticsClient != nil {
+	if app.feedSyncer != nil {
 		t.Fatal("a background worker was built without configuration for it")
 	}
 	app.Start(t.Context())

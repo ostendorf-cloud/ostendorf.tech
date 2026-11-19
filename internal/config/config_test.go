@@ -93,26 +93,26 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.FeedRefreshInterval != DefaultFeedRefreshInterval {
 		t.Errorf("FeedRefreshInterval = %v, want %v", cfg.FeedRefreshInterval, DefaultFeedRefreshInterval)
 	}
-	if cfg.UmamiURL != "" || cfg.UmamiWebsiteID != "" {
-		t.Errorf("umami = %q/%q, want both empty by default", cfg.UmamiURL, cfg.UmamiWebsiteID)
+	if cfg.Umami.Enabled() || cfg.Umami.URL != "" || cfg.Umami.WebsiteID != "" {
+		t.Errorf("umami = %q/%q, want both empty by default", cfg.Umami.URL, cfg.Umami.WebsiteID)
 	}
 }
 
 func TestLoadOverrides(t *testing.T) {
 	cfg, err := Load(env(withCSRFKey(map[string]string{
-		"LISTEN_ADDR":         ":9090",
-		"ADMIN_ADDR":          ":9091",
-		"SITE_URL":            "https://example.test",
-		"LOG_LEVEL":           "debug",
-		"TRUSTED_PROXY_CIDRS": "10.0.0.0/8, 192.168.1.1",
-		"RATE_LIMIT_BURST":    "30",
-		"RATE_LIMIT_PER":      "30s",
-		"ALLOW_PLAIN_HTTP":    "true",
-		"SMTP_ADDR":           "smtp.example.test:587",
-		"SMTP_USERNAME":       "no-reply@example.test",
-		"SMTP_PASSWORD":       "s3cret",
-		"CONTACT_TO":          "someone@example.test",
-		"CONTACT_FROM":        "Example <no-reply@example.test>",
+		"LISTEN_ADDR":      ":9090",
+		"ADMIN_ADDR":       ":9091",
+		"SITE_URL":         "https://example.test",
+		"LOG_LEVEL":        "debug",
+		"TRUSTED_PROXIES":  "10.0.0.0/8, 192.168.1.1",
+		"RATE_LIMIT_BURST": "30",
+		"RATE_LIMIT_PER":   "30s",
+		"ALLOW_PLAIN_HTTP": "true",
+		"SMTP_ADDR":        "smtp.example.test:587",
+		"SMTP_USERNAME":    "no-reply@example.test",
+		"SMTP_PASSWORD":    "s3cret",
+		"CONTACT_TO":       "someone@example.test",
+		"CONTACT_FROM":     "Example <no-reply@example.test>",
 	})))
 	if err != nil {
 		t.Fatalf("Load() returned an unexpected error: %v", err)
@@ -338,8 +338,8 @@ func TestLoadRejectsEachInvalidField(t *testing.T) {
 			want: "LOG_LEVEL",
 		},
 		"invalid trusted proxy cidr": {
-			env:  map[string]string{"TRUSTED_PROXY_CIDRS": "not-a-cidr"},
-			want: "TRUSTED_PROXY_CIDRS",
+			env:  map[string]string{"TRUSTED_PROXIES": "not-a-cidr"},
+			want: "TRUSTED_PROXIES",
 		},
 		"rate limit burst out of range": {
 			env:  map[string]string{"RATE_LIMIT_BURST": "0"},
@@ -402,11 +402,14 @@ func TestLoadFeedAndUmamiOverrides(t *testing.T) {
 	if cfg.FeedRefreshInterval != 30*time.Minute {
 		t.Errorf("FeedRefreshInterval = %v, want 30m", cfg.FeedRefreshInterval)
 	}
-	if cfg.UmamiURL != "http://umami.umami.svc.cluster.local" {
-		t.Errorf("UmamiURL = %q, want the trailing slash trimmed", cfg.UmamiURL)
+	if cfg.Umami.URL != "http://umami.umami.svc.cluster.local" {
+		t.Errorf("Umami.URL = %q, want the trailing slash trimmed", cfg.Umami.URL)
 	}
-	if cfg.UmamiWebsiteID != validUmamiWebsiteID {
-		t.Errorf("UmamiWebsiteID = %q, want %q", cfg.UmamiWebsiteID, validUmamiWebsiteID)
+	if cfg.Umami.WebsiteID != validUmamiWebsiteID {
+		t.Errorf("Umami.WebsiteID = %q, want %q", cfg.Umami.WebsiteID, validUmamiWebsiteID)
+	}
+	if !cfg.Umami.Enabled() {
+		t.Error("Umami.Enabled() = false, want true with both values set")
 	}
 }
 
@@ -418,20 +421,32 @@ func TestLoadRejectsInvalidUmamiPairs(t *testing.T) {
 		"URL with query":   {"UMAMI_URL": "http://umami/?x=1", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
 		"URL with user":    {"UMAMI_URL": "http://a:b@umami", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
 		"ftp URL":          {"UMAMI_URL": "ftp://umami", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
-		"uppercase ID":     {"UMAMI_URL": "http://umami", "UMAMI_WEBSITE_ID": strings.ToUpper(validUmamiWebsiteID)},
 		"ID that is no ID": {"UMAMI_URL": "http://umami", "UMAMI_WEBSITE_ID": "ostendorf.tech"},
+		"plain http host":  {"UMAMI_URL": "http://umami.example.test", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
 	}
 
 	for name, values := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := Load(env(withCSRFKey(values)))
 			if err == nil {
-				t.Fatal("Load() = nil error, want one naming UMAMI_URL")
+				t.Fatal("Load() = nil error, want one naming UMAMI_URL or UMAMI_WEBSITE_ID")
 			}
-			if !strings.Contains(err.Error(), "UMAMI_URL") {
-				t.Errorf("Load() error = %q, want it to mention UMAMI_URL", err.Error())
+			if !strings.Contains(err.Error(), "UMAMI_") {
+				t.Errorf("Load() error = %q, want it to mention the UMAMI_ variable at fault", err.Error())
 			}
 		})
+	}
+
+	// govue accepts an upper case id and lowers it: a UUID is case
+	// insensitive. The site's own check used to refuse it.
+	cfg, err := Load(env(withCSRFKey(map[string]string{
+		"UMAMI_URL": "http://umami", "UMAMI_WEBSITE_ID": strings.ToUpper(validUmamiWebsiteID),
+	})))
+	if err != nil {
+		t.Fatalf("Load() with an upper case id = %v, want nil", err)
+	}
+	if cfg.Umami.WebsiteID != validUmamiWebsiteID {
+		t.Errorf("Umami.WebsiteID = %q, want it lowered to %q", cfg.Umami.WebsiteID, validUmamiWebsiteID)
 	}
 
 	// Both unset is the feature switched off, not a problem.

@@ -55,7 +55,7 @@ listener (`ADMIN_ADDR`), never on this public one; see the Configuration table b
 | `ADMIN_ADDR` | Address govue's admin listener listens on: `/healthz`, `/readyz` and `/metrics` | `:8081` | no |
 | `SITE_URL` | The site's own canonical origin, used for SEO tags and the sitemap | `https://ostendorf.tech` | no |
 | `LOG_LEVEL` | `debug`, `info`, `warn` or `error` | `info` | no |
-| `TRUSTED_PROXY_CIDRS` | Comma separated CIDRs or addresses trusted to set `X-Forwarded-For` | none | no |
+| `TRUSTED_PROXIES` | Comma separated CIDRs or addresses trusted to set `X-Forwarded-For` | none | no |
 | `ALLOW_PLAIN_HTTP` | Drops the session cookie's `Secure` attribute, for a plain HTTP dev run | `false` | no |
 | `RATE_LIMIT_BURST` | Requests one client address may make before waiting | `120` | no |
 | `RATE_LIMIT_PER` | The burst's refill period | `1m` | no |
@@ -73,8 +73,10 @@ listener (`ADMIN_ADDR`), never on this public one; see the Configuration table b
 | `CONTACT_RATE_LIMIT_PER` | That burst's refill period | `10m` | no |
 | `FEED_SERVICE_URL` | Origin of the feed service the Impressionen section is loaded from. Empty renders no section at all | none | no |
 | `FEED_REFRESH_INTERVAL` | How often the website asks the feed service for the post list, at least `1m` | `5m` | no |
-| `UMAMI_URL` | Base URL of the Umami page views are reported to. Empty counts nothing | none | no\*\* |
-| `UMAMI_WEBSITE_ID` | Lowercase UUID of the website in Umami | none | no\*\* |
+| `UMAMI_URL` | Base URL of the Umami page views are reported to. `https`, or `http` only for localhost or a name inside the cluster. Empty counts nothing | none | no\*\* |
+| `UMAMI_WEBSITE_ID` | UUID of the website in Umami | none | no\*\* |
+| `UMAMI_TIMEOUT` | Bound of one post to Umami, `1s` to `30s` | `5s` | no |
+| `UMAMI_QUEUE_SIZE` | Page views that may wait for a worker, `1` to `10000`; a full queue drops the view | `256` | no |
 | `MAIL_RATE_LIMIT_BURST` | Contact mails this service sends in total, across every client address, before waiting | `50` | no |
 | `MAIL_RATE_LIMIT_PER` | That burst's refill period | `1h` | no |
 
@@ -94,6 +96,17 @@ served from this domain, so a visitor's browser never connects to the feed servi
 Instagram or Meta. Without `UMAMI_URL` and `UMAMI_WEBSITE_ID` no page view is reported;
 with them, this server reports each view to Umami itself, with no script, cookie or
 beacon in the visitor's browser, and a failure reaching Umami never affects the response.
+The counting is govue's `analytics` package. It reports the route pattern of a served
+page (never the path or a query string), the origin of the referrer, the browser
+language, the user agent and the client address shortened to its /24 (IPv4) or /48
+(IPv6). It leaves out Do Not Track, Global Privacy Control, prefetch, bots, private
+client addresses, redirects, errors, assets and the API. Behind a proxy it needs
+`TRUSTED_PROXIES`: without it every request comes from the proxy's private
+address and nothing is counted (the startup log says so). The variable names did not
+change when the site moved to govue's package, so an existing deployment keeps working.
+Two things are stricter than before: plain `http` is accepted only for localhost or a
+name inside the cluster, and an invalid value stops the start with a message naming
+the variable.
 
 This binary has no Instagram or Meta credential and no OpenBao client: both live in the
 feed service instead, a second binary (`cmd/feed`) with its own configuration and its own
@@ -121,7 +134,7 @@ key verifying a little longer: a leaked `CHALLENGE_KEY` is dropped at once, with
 `CHALLENGE_KEY_PREVIOUS` for it, accepting up to ten minutes of broken challenges rather than
 keeping the leaked key alive a moment longer than replacing it takes.
 
-Behind any reverse proxy or ingress, leaving `TRUSTED_PROXY_CIDRS` unset means every
+Behind any reverse proxy or ingress, leaving `TRUSTED_PROXIES` unset means every
 request is attributed to the proxy's own address, not the visitor's. Every rate limit
 then collapses into one shared bucket for the whole site: about 20 page loads a minute
 site-wide at the documented default, and the contact form blocked for every visitor for

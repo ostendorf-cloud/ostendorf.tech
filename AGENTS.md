@@ -86,15 +86,22 @@ The global baseline already applies here and is not repeated below.
   service, an unset `FEED_SERVICE_URL`, or a feed service with nothing to show, renders no
   Impressionen section at all, exactly as an absent token did before this split.
   `internal/webapp/feed.go` is the one place this package is read from.
-- `internal/analytics` reports page views to Umami from the server, ported from
-  old_simon-ostendorf.de's `internal/analytics` unchanged: no script, no cookie, nothing
-  read from the visitor's device, which again is what the privacy policy states. It
-  counts nothing unless `UMAMI_URL` and `UMAMI_WEBSITE_ID` are both set, leaves out a
-  prefetch, Do Not Track, Global Privacy Control and any client that is not a public
-  address, and drops a view rather than letting a slow Umami hold a response.
-  `internal/webapp`'s `trackPageView` is the one place it is called from, after a page was
-  actually served; the title it reports is read once at startup out of the prerendered
-  HTML's own `<title>`, so Go never carries a second copy of the i18n catalogue.
+- Page views are reported to Umami from the server by govue's `analytics` package; the
+  site has no analytics code of its own. `internal/config` reads it through
+  `analytics.LoadConfig` (`UMAMI_URL`, `UMAMI_WEBSITE_ID`, `UMAMI_TIMEOUT`,
+  `UMAMI_QUEUE_SIZE`), and `internal/webapp`'s `New` builds the client with the trusted
+  proxy resolver (`TRUSTED_PROXIES`, chart value `config.trustedProxies`, the same names
+  on every site), `FullIP` off and the `analytics_views_dropped_total` counter, and
+  `Close` (called by `cmd/website` after the servers stopped, within 5 seconds) sends
+  what is queued. The client's `Middleware` wraps the mux directly in `buildHandler`:
+  it reads the route pattern the mux sets, so no middleware that replaces the request
+  may sit between the two, and every counted page needs its own `ServeMux` pattern
+  (`registerRoutes`). Only a 200 HTML answer to a GET counts, so redirects, the legal
+  aliases, 404s, assets and the API count nothing. No page title is reported.
+  `internal/webapp/analytics_test.go` proves it through the real handler chain. What is
+  counted is stated in `web/src/views/PrivacyView.vue`; change that text whenever the
+  payload changes, which means a govue upgrade that touches the analytics privacy
+  checklist.
 - `internal/webapp` builds two HTTP handlers from govue's packages. `Handler` is the
   public one: the security and access log middleware, the client IP resolver, the rate
   limiter, a session manager and the CSRF protector, in front of pages, assets and the

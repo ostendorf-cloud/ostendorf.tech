@@ -87,7 +87,7 @@
         "adminListenAddr": { "type": "string", "minLength": 1 },
         "siteUrl": { "type": "string", "minLength": 1 },
         "logLevel": { "type": "string", "enum": ["debug", "info", "warn", "error"] },
-        "trustedProxyCidrs": { "type": "string" },
+        "trustedProxies": { "type": "string" },
         "allowPlainHttp": { "type": "boolean" },
         "rateLimitBurst": { "type": "integer", "minimum": 1 },
         "rateLimitPer": { "type": "string" },
@@ -101,8 +101,16 @@
         "contactTo": { "type": "string", "minLength": 1 },
         "contactFrom": { "type": "string", "minLength": 1 },
         "feedRefreshInterval": { "type": "string", "minLength": 1 },
-        "umamiUrl": { "type": "string" },
-        "umamiWebsiteId": { "type": "string" }
+        "umamiUrl": {
+          "type": "string",
+          "pattern": "^(https?://[^/?#@\\s]+(/[^?#\\s]*)?)?$",
+          "description": "Base URL of the Umami instance (UMAMI_URL), no credentials, query or fragment. Plain http only for localhost or a name inside the cluster; the website refuses anything else at startup."
+        },
+        "umamiWebsiteId": {
+          "type": "string",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})?$",
+          "description": "UUID of the website in Umami (UMAMI_WEBSITE_ID)."
+        }
       }
     },
     "existingSecret": {

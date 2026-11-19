@@ -430,23 +430,29 @@ const germanHref = computed(
         uns übermittelt:
       </p>
       <ul class="list-disc pl-6">
-        <li>aufgerufene Seite (ohne angehängte Parameter) und ihr Titel</li>
         <li>
-          Referrer URL ohne Parameter, sofern Sie von einer anderen Website kommen und Ihr Browser
-          sie übermittelt
+          aufgerufene Seite als Routenmuster der Website, nicht als angefragter Pfad und ohne
+          angehängte Parameter (ohne Seitentitel)
+        </li>
+        <li>
+          Herkunft der Referrer URL (Protokoll, Domain und gegebenenfalls Port, ohne Pfad und
+          Parameter), sofern Sie von einer anderen Website kommen und Ihr Browser sie übermittelt
         </li>
         <li>bevorzugte Sprache Ihres Browsers</li>
         <li>Browsertyp und Browserversion sowie verwendetes Betriebssystem (User-Agent)</li>
-        <li>IP-Adresse</li>
+        <li>
+          IP-Adresse, gekürzt auf das Netz /24 (IPv4) bzw. /48 (IPv6); die vollständige IP-Adresse
+          erhält Umami nicht
+        </li>
       </ul>
       <p>
-        Aus der IP-Adresse ermittelt Umami Land, Region und Stadt. Aus IP-Adresse, User-Agent, einem
-        geheimen Schlüssel und dem laufenden Monat bildet Umami eine pseudonyme Kennung, um die
-        Seitenaufrufe eines Besuchs zusammenzufassen; die Kennung wechselt deshalb jeden Monat. Die
-        IP-Adresse und den vollständigen User-Agent speichert Umami nicht, sondern nur die daraus
-        abgeleiteten Angaben (Land, Region, Stadt, Browser, Betriebssystem) zusammen mit der
-        pseudonymen Kennung. Eine Zusammenführung mit anderen Daten oder eine Identifizierung
-        einzelner Besucher findet nicht statt.
+        Aus der gekürzten IP-Adresse ermittelt Umami Land, Region und Stadt. Aus gekürzter
+        IP-Adresse, User-Agent, einem geheimen Schlüssel und dem laufenden Monat bildet Umami eine
+        pseudonyme Kennung, um die Seitenaufrufe eines Besuchs zusammenzufassen; die Kennung
+        wechselt deshalb jeden Monat. Die IP-Adresse und den vollständigen User-Agent speichert
+        Umami nicht, sondern nur die daraus abgeleiteten Angaben (Land, Region, Stadt, Browser,
+        Betriebssystem) zusammen mit der pseudonymen Kennung. Eine Zusammenführung mit anderen Daten
+        oder eine Identifizierung einzelner Besucher findet nicht statt.
       </p>
       <p>
         Die Statistikdaten werden nach 14 Monaten automatisch gelöscht. In den Sicherungskopien der
@@ -996,23 +1002,29 @@ const germanHref = computed(
         request:
       </p>
       <ul class="list-disc pl-6">
-        <li>the page requested (without any attached parameters) and its title</li>
         <li>
-          the referrer URL without parameters, where you come from another website and your browser
-          transmits it
+          the page requested, as the website's route pattern rather than the requested path and
+          without any attached parameters (without the page title)
+        </li>
+        <li>
+          the origin of the referrer URL (protocol, domain and, where present, port, without path
+          and parameters), where you come from another website and your browser transmits it
         </li>
         <li>your browser's preferred language</li>
         <li>browser type and version, and operating system used (user agent)</li>
-        <li>IP address</li>
+        <li>
+          IP address, shortened to the /24 network (IPv4) or the /48 network (IPv6); Umami does not
+          receive the full IP address
+        </li>
       </ul>
       <p>
-        Umami derives the country, region and city from the IP address. From the IP address, the
-        user agent, a secret key and the current month, Umami forms a pseudonymous identifier to
-        group together the page views of one visit; the identifier therefore changes every month.
-        Umami does not store the IP address or the full user agent, only the information derived
-        from them (country, region, city, browser, operating system) together with the pseudonymous
-        identifier. No merging with other data, and no identification of individual visitors, takes
-        place.
+        Umami derives the country, region and city from the shortened IP address. From the shortened
+        IP address, the user agent, a secret key and the current month, Umami forms a pseudonymous
+        identifier to group together the page views of one visit; the identifier therefore changes
+        every month. Umami does not store the IP address or the full user agent, only the
+        information derived from them (country, region, city, browser, operating system) together
+        with the pseudonymous identifier. No merging with other data, and no identification of
+        individual visitors, takes place.
       </p>
       <p>
         The statistics data is automatically deleted after 14 months. In the backup copies of the

@@ -28,7 +28,7 @@ The chart has no usable default for `existingSecret.name`: no name could ever po
 and why it is needed, rather than installing a `Deployment` that crash-loops on a missing
 `CSRF_KEY`.
 
-`config.trustedProxyCidrs` must be set once `ingress.enabled` is true. Left empty behind this
+`config.trustedProxies` must be set once `ingress.enabled` is true. Left empty behind this
 chart's own `Ingress`, every request is attributed to the ingress controller's pod IP, which
 collapses every rate limiter into one shared bucket for the whole site instead of one per
 visitor. `templates/deployment.yaml` rejects an install or template render that leaves this
@@ -142,7 +142,7 @@ that always renders regardless of which routing flag is set.
 
 Set `ingress.enabled: true`. `ingress.hosts` names the host and path rules, and `ingress.tls`
 carries the certificate configuration directly on the `Ingress` object: this chart owns that
-configuration. `ingress.enabled: true` also requires `config.trustedProxyCidrs`; see
+configuration. `ingress.enabled: true` also requires `config.trustedProxies`; see
 "Installing" above for why.
 
 ### Gateway API HTTPRoute
@@ -356,7 +356,7 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `replicaCount` | Pod replicas: 0 (stopped) or 1, never above (see "Replicas" above) | `1` |
 | `service.port` | Public Service and container port, the only one the `Ingress` ever routes to | `8080` |
 | `service.adminPort` | govue's admin listener: health, readiness and metrics, in-cluster only | `8081` |
-| `ingress.enabled` | Create an `Ingress`. Requires `config.trustedProxyCidrs` to be set; see that row. Mutually exclusive with `httpRoute.enabled`; see "External routing" above. | `false` |
+| `ingress.enabled` | Create an `Ingress`. Requires `config.trustedProxies` to be set; see that row. Mutually exclusive with `httpRoute.enabled`; see "External routing" above. | `false` |
 | `ingress.annotations` | Annotations for the `Ingress` | `{}` |
 | `ingress.tls` | TLS configuration for the `Ingress` | `[]` |
 | `httpRoute.enabled` | Create a Gateway API `HTTPRoute`. Mutually exclusive with `ingress.enabled`; see "External routing" above. | `false` |
@@ -369,10 +369,10 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
 | `config.smtpAddr` | SMTP submission server | `mail.ostendorf.cloud:587` |
 | `config.adminListenAddr` | govue's admin listener address (`ADMIN_ADDR`); must match `service.adminPort` | `:8081` |
-| `config.trustedProxyCidrs` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |
+| `config.trustedProxies` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |
 | `config.feedRefreshInterval` | How often the website asks the feed service for the current post list | `5m` |
-| `config.umamiUrl` | Base URL of the Umami that page views are reported to, empty counts nothing | `""` |
-| `config.umamiWebsiteId` | Lowercase UUID of the website in Umami, set together with `config.umamiUrl` | `""` |
+| `config.umamiUrl` | `UMAMI_URL`: base URL of the Umami that page views are reported to, empty counts nothing. Not a secret. Plain `http` only for localhost or a name inside the cluster. Needs `config.trustedProxies` behind an Ingress or Gateway, or nothing is counted | `""` |
+| `config.umamiWebsiteId` | `UMAMI_WEBSITE_ID`: UUID of the website in Umami, set together with `config.umamiUrl`, one alone stops the start. Not a secret | `""` |
 | `existingSecret.name` | Name of the existing `Secret` | `""` (required) |
 | `feed.enabled` | Create the feed service's `Deployment`, `Service`, `ServiceAccount` and `NetworkPolicy`; see "Feed service" above | `false` |
 | `feed.image.repository` | Feed service container image, published by the `feed-image` job; see "Feed service" above | `ghcr.io/ostendorf-cloud/ostendorf.tech-feed` |

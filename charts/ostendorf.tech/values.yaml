@@ -178,7 +178,7 @@ config:
   # templates/deployment.yaml rejects an install or template render that
   # leaves this empty while ingress.enabled is true. Set it to the ingress
   # controller's pod or Service CIDR; see README.md.
-  trustedProxyCidrs: ""
+  trustedProxies: ""
   allowPlainHttp: false
   rateLimitBurst: 120
   rateLimitPer: "1m"
@@ -204,12 +204,17 @@ config:
   # feed.config.syncInterval below; this is only how often the website
   # re-reads the feed service's already-cached result.
   feedRefreshInterval: "5m"
-  # Page views are reported to Umami by the server itself, never by a
-  # script in the visitor's browser. Both empty count nothing; setting
-  # only one of the two is refused at startup rather than half-enabling
-  # the feature. umamiWebsiteId is the lowercase UUID Umami shows for the
-  # website, and umamiUrl its own base URL, typically the in-cluster
-  # Service.
+  # Page views are reported to Umami by the server itself (govue's
+  # analytics package), never by a script in the visitor's browser. Both
+  # empty count nothing; setting only one of the two is refused at startup
+  # rather than half-enabling the feature. Neither is a secret.
+  # umamiWebsiteId is the UUID Umami shows for the website, and umamiUrl
+  # its own base URL, typically the in-cluster Service. Plain http is
+  # accepted only for localhost or a name inside the cluster.
+  # Behind an Ingress or a Gateway set trustedProxies above too: without
+  # it every request comes from the proxy, whose private address is never
+  # counted, so nothing is counted. The client address is reduced to its /24
+  # (IPv4) or /48 (IPv6) before it is sent.
   umamiUrl: ""
   umamiWebsiteId: ""
 

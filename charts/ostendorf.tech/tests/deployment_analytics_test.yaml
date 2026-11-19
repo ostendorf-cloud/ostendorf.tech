@@ -67,6 +67,30 @@ tests:
             name: UMAMI_WEBSITE_ID
             value: "0f1e2d3c-4b5a-4968-8776-655443322110"
 
+  - it: rejects a Umami URL that carries credentials
+    set:
+      config:
+        umamiUrl: https://user:pass@umami.example.test
+        umamiWebsiteId: 0f1e2d3c-4b5a-4968-8776-655443322110
+    asserts:
+      - failedTemplate: {}
+
+  - it: rejects a Umami URL with a query
+    set:
+      config:
+        umamiUrl: https://umami.example.test/?x=1
+        umamiWebsiteId: 0f1e2d3c-4b5a-4968-8776-655443322110
+    asserts:
+      - failedTemplate: {}
+
+  - it: rejects a website id that is no UUID
+    set:
+      config:
+        umamiUrl: https://umami.example.test
+        umamiWebsiteId: not-a-uuid
+    asserts:
+      - failedTemplate: {}
+
   - it: never mounts an Umami script or any other extra volume for it
     set:
       config:

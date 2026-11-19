@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ostendorf-cloud/govue/analytics"
 	"github.com/ostendorf-cloud/govue/api"
 	"github.com/ostendorf-cloud/govue/clientip"
 	"github.com/ostendorf-cloud/govue/csrf"
@@ -30,7 +31,6 @@ import (
 	"github.com/ostendorf-cloud/govue/ratelimit"
 	"github.com/ostendorf-cloud/govue/session"
 
-	"github.com/ostendorf-cloud/ostendorf.tech/internal/analytics"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/contact"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/feedclient"
@@ -131,17 +131,43 @@ type App struct {
 	feedSyncer          *feedclient.Syncer
 	feedRefreshInterval time.Duration
 
-	// analyticsClient reports page views to Umami server to server. Nil
-	// counts nothing, which is what a deployment with no UMAMI_URL gets.
-	analyticsClient *analytics.Client
+	// views counts page views server to server, after a page was served,
+	// and reports them to Umami. Never nil after New; a deployment with no
+	// UMAMI_URL gets a client that counts nothing. Close sends what is
+	// still queued on shutdown.
+	views *analytics.Client
 
 	handler http.Handler
 }
 
+// Option changes how New builds the App. It exists for tests and for the
+// one thing a caller may need to swap, the transport that reaches Umami.
+type Option func(*options)
+
+type options struct {
+	umamiHTTP *http.Client
+}
+
+// WithUmamiHTTPClient sets the client that posts page views to Umami. The
+// default is govue's own: no cookie jar, no redirects. A test passes a fake
+// transport so nothing opens a socket.
+func WithUmamiHTTPClient(c *http.Client) Option {
+	return func(o *options) { o.umamiHTTP = c }
+}
+
+// viewsDroppedMetric names the counter of page views lost to a full queue
+// or to a shutdown before they reached Umami.
+const viewsDroppedMetric = "analytics_views_dropped_total"
+
 // New builds the App from cfg and logger, serving the built SPA and the
 // prerendered HTML out of dist and prerendered. Neither is modified; both
 // are read only, typically the two go:embed filesystems cmd/website embeds.
-func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App, error) {
+// The caller calls Close once the server has stopped.
+func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS, opts ...Option) (*App, error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
 	a := &App{logger: logger}
 
 	var problems []error
@@ -273,10 +299,22 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 		}
 	}
 
-	// config.Load already refused a half-configured pair, so one of the
-	// two being set is enough to decide here.
-	if cfg.UmamiURL != "" {
-		a.analyticsClient = analytics.New(cfg.UmamiURL, cfg.UmamiWebsiteID, cfg.SiteURL.Hostname(), nil, logger)
+	// config.Load already refused a half-configured pair. The whole client
+	// address is never sent: FullIP stays off, so govue masks it to its /24
+	// or /48. The resolver is the same trusted proxy one the rate limiter
+	// and the access log use. Dropped views are counted in /metrics.
+	views, err := analytics.New(cfg.Umami, analytics.Options{
+		Hostname:   cfg.SiteURL.Hostname(),
+		Logger:     logger,
+		HTTPClient: o.umamiHTTP,
+		ClientIP:   clientIPs,
+		OnDrop: metrics.NewCounter(registry, viewsDroppedMetric,
+			"Page views lost to a full queue or a shutdown before they reached Umami."),
+	})
+	fail(err)
+	a.views = views
+	if err == nil {
+		logViewsStatus(logger, cfg, views)
 	}
 
 	a.security = middleware.DefaultSecurity()
@@ -314,15 +352,42 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 	a.accessLog = middleware.AccessLog{ClientIP: clientIPs}
 
 	if err := errors.Join(problems...); err != nil {
+		a.closeViewsNow()
 		return nil, fmt.Errorf("webapp: build app: %w", err)
 	}
 
 	handler, err := a.buildHandler(httpMetrics)
 	if err != nil {
+		a.closeViewsNow()
 		return nil, fmt.Errorf("webapp: build app: %w", err)
 	}
 	a.handler = handler
 	return a, nil
+}
+
+// logViewsStatus says once at startup whether page views are counted: govue
+// logs nothing when counting is off. Counting on with no trusted proxy is a
+// warning, because behind an ingress every request then comes from the
+// proxy's private address and nothing is counted, silently.
+func logViewsStatus(logger *slog.Logger, cfg config.Config, views *analytics.Client) {
+	logger.Info("page view counting", "enabled", views.Enabled())
+	if views.Enabled() && len(cfg.TrustedProxies) == 0 {
+		logger.Warn("page view counting is on but TRUSTED_PROXIES is empty: behind a proxy no view is counted")
+	}
+}
+
+// closeViewsNow stops the page view workers of an App that never got
+// built. Nothing was served, so nothing is queued.
+func (a *App) closeViewsNow() {
+	if a.views != nil {
+		_ = a.views.Close(context.Background())
+	}
+}
+
+// Close sends the page views still queued and stops the workers, within
+// ctx. Call it once, after the server has stopped, with a bounded context.
+func (a *App) Close(ctx context.Context) error {
+	return a.views.Close(ctx)
 }
 
 // Health is the readiness registry, so main can drain it before shutdown.
@@ -331,34 +396,17 @@ func (a *App) Health() *health.Registry {
 }
 
 // Start launches the background work the handler itself never does: the
-// feed service sync loop and the Umami reporter's send loop. Both stop
-// with ctx. It returns at once, and does nothing at all for a deployment
-// that configured neither, so main always calls it unconditionally.
+// feed service sync loop. It stops with ctx. It returns at once, and does
+// nothing at all for a deployment that configured no feed service, so main
+// always calls it unconditionally. The page view workers start in New and
+// stop in Close.
 //
-// Neither loop is part of readiness. A cache that has not loaded yet, or
-// an Umami that cannot be reached, must never keep this service from
-// serving pages, which is the whole reason they live out here rather than
-// inside a request.
+// The loop is not part of readiness. A cache that has not loaded yet must
+// never keep this service from serving pages, which is the whole reason it
+// lives out here rather than inside a request.
 func (a *App) Start(ctx context.Context) {
 	if a.feedSyncer != nil {
 		go a.feedSyncer.Run(ctx, a.feedRefreshInterval)
-	}
-	if a.analyticsClient != nil {
-		go a.analyticsClient.Run(ctx)
-	}
-}
-
-// trackPageView reports one served page to Umami, from this server, never
-// from the browser. analytics.FromRequest decides what must not be counted
-// at all (a prefetch, Do Not Track, Global Privacy Control, a client that
-// is not a public address), and Track never blocks: a full queue drops the
-// view rather than holding the response.
-func (a *App) trackPageView(r *http.Request, title string) {
-	if a.analyticsClient == nil {
-		return
-	}
-	if v, ok := analytics.FromRequest(r, a.clientIPs.Resolve(r), title, a.siteURL.Hostname()); ok {
-		a.analyticsClient.Track(v)
 	}
 }
 
@@ -473,14 +521,14 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP) (http.Handler, error) {
 
 	mux.Handle("/api/", route(api.NotFoundHandler()))
 
-	registerRoutes(mux, a.pages, route, a.trackPageView)
+	registerRoutes(mux, a.pages, route)
 
 	// govue's legal routes: /imprint, /privacy and /terms to the page in the
 	// visitor's language, and the German aliases /impressum, /datenschutz,
 	// /datenschutzerklaerung and /agb to the German page. They answer a bare
 	// 302 and need no session and no CSRF check, so they sit outside the
 	// route chain, as govue's example does; the outer chain still applies.
-	// They never reach trackPageView, so no alias is counted as a page view.
+	// They answer 302, so no alias is counted as a page view.
 	// The site has terms (the AGB page), hence Terms.
 	if err := language.HandleLegal(mux, legalConfig(), nil); err != nil {
 		return nil, fmt.Errorf("legal routes: %w", err)
@@ -488,7 +536,12 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP) (http.Handler, error) {
 
 	mux.Handle("/", route(a.pages.pageHandler()))
 
-	return middleware.Chain(mux,
+	// The page view counter wraps the mux directly and nothing sits between
+	// the two: it reads the route pattern the mux sets on the request, and a
+	// middleware in between that replaces the request (RequestID, security
+	// headers, ...) would hide that pattern, so no view would be counted.
+	// With counting off, Middleware returns the mux unchanged.
+	return middleware.Chain(a.views.Middleware(mux),
 		middleware.Recover(a.logger),
 		middleware.RequestID(a.logger),
 		a.security.Middleware,

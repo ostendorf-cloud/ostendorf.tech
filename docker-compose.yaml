@@ -24,5 +24,9 @@ services:
       SMTP_PASSWORD: "${SMTP_PASSWORD}"
       CONTACT_TO: "${CONTACT_TO}"
       CONTACT_FROM: "${CONTACT_FROM}"
+      # Page view counting is off unless both are set in .env or the shell.
+      # Empty values count as unset.
+      UMAMI_URL: "${UMAMI_URL:-}"
+      UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
     ports:
       - "127.0.0.1:8080:8080"

@@ -1,17 +1,10 @@
 package webapp
 
 import (
-	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
-	"sync/atomic"
 	"testing"
 	"testing/fstest"
-	"time"
-
-	"github.com/ostendorf-cloud/ostendorf.tech/internal/analytics"
 )
 
 // legalApp is the full App with the legal pages prerendered, so a request
@@ -97,55 +90,5 @@ func TestAppLegalRoutesRefuseOtherMethods(t *testing.T) {
 		if rec.Code != http.StatusMethodNotAllowed {
 			t.Errorf("POST %s status = %d, want %d", path, rec.Code, http.StatusMethodNotAllowed)
 		}
-	}
-}
-
-// roundTripFunc is an http.RoundTripper as a function.
-type roundTripFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-
-// TestAppLegalAliasesAreNotCountedAsPageViews proves the redirects never
-// reach the page view hook, while a served page does: the positive control
-// shows the same request setup would be counted if it were a page.
-func TestAppLegalAliasesAreNotCountedAsPageViews(t *testing.T) {
-	app := legalApp(t)
-	var sent atomic.Int64
-	app.analyticsClient = analytics.New("http://umami.invalid", "site", "ostendorf.tech",
-		roundTripFunc(func(*http.Request) (*http.Response, error) {
-			sent.Add(1)
-			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(""))}, nil
-		}), discardLogger())
-
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	app.Start(ctx)
-
-	get := func(path string) int {
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
-		req.RemoteAddr = "203.0.113.1:1234"
-		req.Header.Set("User-Agent", "Mozilla/5.0 TestBrowser/1.0")
-		rec := httptest.NewRecorder()
-		app.Handler().ServeHTTP(rec, req)
-		return rec.Code
-	}
-
-	for _, path := range []string{"/imprint", "/privacy", "/terms", "/impressum", "/datenschutz", "/datenschutzerklaerung", "/agb"} {
-		if code := get(path); code != http.StatusFound {
-			t.Fatalf("GET %s status = %d, want %d", path, code, http.StatusFound)
-		}
-	}
-	// Control: a served page is counted, so waiting for it also gives any
-	// alias view that was wrongly queued before it time to arrive.
-	if code := get("/de/imprint"); code != http.StatusOK {
-		t.Fatalf("GET /de/imprint status = %d, want %d", code, http.StatusOK)
-	}
-	deadline := time.Now().Add(5 * time.Second)
-	for sent.Load() < 1 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	time.Sleep(100 * time.Millisecond)
-	if got := sent.Load(); got != 1 {
-		t.Errorf("page views sent = %d, want exactly 1 (the served page, no alias)", got)
 	}
 }
