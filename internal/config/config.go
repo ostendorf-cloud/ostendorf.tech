@@ -13,10 +13,10 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
+	"github.com/ostendorf-cloud/govue/analytics"
 	"github.com/ostendorf-cloud/govue/clientip"
 	"github.com/ostendorf-cloud/govue/envconf"
 	"github.com/ostendorf-cloud/govue/logging"
@@ -89,11 +89,6 @@ const (
 	minFeedRefreshInterval = time.Minute
 	maxFeedRefreshInterval = 24 * time.Hour
 )
-
-// umamiWebsiteID is the lowercase UUID Umami names a website by. Anything
-// else is a copied-wrong value, not an id, and is refused at startup rather
-// than silently counting nothing.
-var umamiWebsiteID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Config is the website's whole configuration, read once in main.
 type Config struct {
@@ -180,14 +175,14 @@ type Config struct {
 	// for the current post list; see DefaultFeedRefreshInterval.
 	FeedRefreshInterval time.Duration
 
-	// UmamiURL and UmamiWebsiteID reach the self-hosted Umami every page
-	// view is reported to, server to server. Both empty count nothing, and
-	// setting exactly one of them is a configuration mistake rather than a
-	// half-enabled feature. No script, cookie or beacon ever reaches the
-	// visitor's browser either way; the privacy policy says so, and
-	// internal/analytics is what keeps that true.
-	UmamiURL       string
-	UmamiWebsiteID string
+	// Umami is the connection to the self-hosted Umami every page view is
+	// reported to, server to server, read by govue's analytics.LoadConfig
+	// (UMAMI_URL, UMAMI_WEBSITE_ID, UMAMI_TIMEOUT, UMAMI_QUEUE_SIZE). The
+	// zero value counts nothing, and setting exactly one of the two required
+	// values is a configuration mistake rather than a half-enabled feature.
+	// No script, cookie or beacon ever reaches the visitor's browser either
+	// way.
+	Umami analytics.Config
 
 	// MailRateLimitBurst/Per bound every contact mail this service sends
 	// in total, across every client address; see
@@ -269,14 +264,14 @@ func Load(getenv func(string) string) (Config, error) {
 
 	// Read raw rather than through loader.URL: that helper treats an empty
 	// value as a missing required one, and an empty FEED_SERVICE_URL is
-	// this section switched off, not a mistake, the same reasoning
-	// UMAMI_URL below already applies.
+	// this section switched off, not a mistake.
 	cfg.FeedServiceURL = strings.TrimRight(loader.String("FEED_SERVICE_URL", ""), "/")
 	fail(wrap("FEED_SERVICE_URL", validateOptionalURL(cfg.FeedServiceURL)))
 
-	cfg.UmamiURL = strings.TrimRight(loader.String("UMAMI_URL", ""), "/")
-	cfg.UmamiWebsiteID = loader.String("UMAMI_WEBSITE_ID", "")
-	fail(wrap("UMAMI_URL", validateUmami(cfg.UmamiURL, cfg.UmamiWebsiteID)))
+	// govue's own messages name the variable at fault, so no wrap here.
+	umami, err := analytics.LoadConfig(getenv)
+	fail(err)
+	cfg.Umami = umami
 
 	if err := errors.Join(append(problems, loader.Err())...); err != nil {
 		return Config{}, err
@@ -286,10 +281,9 @@ func Load(getenv func(string) string) (Config, error) {
 
 // validateOptionalURL checks that raw is empty, or an absolute http or
 // https URL with no credentials, query or fragment. Shared by every
-// optional URL setting this package has (UMAMI_URL, FEED_SERVICE_URL):
-// each one is a feature switched off when empty, not a mistake, which is
-// why none of them is read through loader.URL, whose "" means "required
-// and missing".
+// optional URL setting this package has (FEED_SERVICE_URL): a feature
+// switched off when empty, not a mistake, which is why it is not read
+// through loader.URL, whose "" means "required and missing".
 func validateOptionalURL(raw string) error {
 	if raw == "" {
 		return nil
@@ -306,29 +300,6 @@ func validateOptionalURL(raw string) error {
 		return errors.New("must not contain credentials")
 	case parsed.RawQuery != "" || parsed.Fragment != "":
 		return errors.New("must not contain a query or a fragment")
-	}
-	return nil
-}
-
-// validateUmami checks the pair UMAMI_URL and UMAMI_WEBSITE_ID form. Both
-// empty is the feature switched off and no problem at all. Exactly one set
-// is refused rather than half-enabled: a deployment that meant to count
-// page views and typed only one of the two would otherwise count nothing
-// and say nothing about it. The error names UMAMI_WEBSITE_ID itself where
-// that is the half at fault, since the caller only wraps it with
-// UMAMI_URL's name.
-func validateUmami(rawURL, websiteID string) error {
-	if (rawURL == "") != (websiteID == "") {
-		return errors.New("and UMAMI_WEBSITE_ID are set together or not at all")
-	}
-	if err := validateOptionalURL(rawURL); err != nil {
-		return err
-	}
-	if rawURL == "" {
-		return nil
-	}
-	if !umamiWebsiteID.MatchString(websiteID) {
-		return errors.New("UMAMI_WEBSITE_ID must be the lowercase UUID of the website in Umami")
 	}
 	return nil
 }

@@ -306,6 +306,10 @@ four points changed as a result, the cookie point; the other three held up uncha
   it as a later milestone); `internal/analytics/analytics.go` only exists in
   `old_simon-ostendorf.de`, so the privacy text's Umami section remains forward-looking and
   unverified against real code, consistent with the standing operational requirement above.
+  Update: the hookup has since landed as govue's `analytics` package (issue #87, which
+  removed the site's own `internal/analytics`), and the Umami section's description of what
+  is counted was changed to match it: route pattern, referrer origin and address shortened
+  to /24 or /48 instead of the path, the referrer without parameters and the full address.
 - The Instagram feed likewise does not exist on `feat/go-live` yet (also a later milestone); the
   privacy text's Instagram section remains forward-looking, based on `old_simon-ostendorf.de`'s
   `internal/instagram/client.go` and `feed.go`, and needs re-checking once that code lands.

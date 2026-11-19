@@ -1169,63 +1169,6 @@ func TestAppContactAcceptsSolutionSignedWithThePreviousChallengeKey(t *testing.T
 	}
 }
 
-func TestAppCountsNothingWithoutUmami(t *testing.T) {
-	app := testApp(t)
-	if app.analyticsClient != nil {
-		t.Fatal("an analytics client was built without UMAMI_URL")
-	}
-	// trackPageView is still called by every route handler; with no
-	// client it has to be a no-op rather than a nil dereference.
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
-	req.RemoteAddr = "203.0.113.1:1234"
-	app.trackPageView(req, "Simon Ostendorf")
-}
-
-func TestAppServesPagesWithUmamiConfigured(t *testing.T) {
-	// With Umami configured, a page view is queued for the background
-	// worker. Nothing about that may change what the visitor gets: the
-	// page still answers 200 with its own body, and it answers whether or
-	// not anything is listening at the Umami end, because nothing here
-	// waits for it. No worker is started in this test, so the queue is
-	// never drained, which is the slowest case there is.
-	cfg := testConfig(t, map[string]string{
-		"UMAMI_URL":        "http://umami.invalid",
-		"UMAMI_WEBSITE_ID": "0f1e2d3c-4b5a-4968-8776-655443322110",
-	})
-	dist, prerendered := testFS()
-	app, err := New(cfg, discardLogger(), dist, prerendered)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	if app.analyticsClient == nil {
-		t.Fatal("no analytics client built for a configured Umami")
-	}
-
-	for range 3 {
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
-		req.RemoteAddr = "203.0.113.1:1234"
-		req.Header.Set("User-Agent", "Mozilla/5.0 TestBrowser/1.0")
-		rec := httptest.NewRecorder()
-		app.Handler().ServeHTTP(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-		}
-		if !strings.Contains(rec.Body.String(), "Startseite") {
-			t.Errorf("body = %q, want the prerendered page", rec.Body.String())
-		}
-		// No script, no cookie, no beacon: the privacy policy's claim
-		// that Umami never runs in the visitor's browser is a property of
-		// the response, so it is checked on the response.
-		if cookies := rec.Result().Cookies(); len(cookies) != 0 {
-			t.Errorf("page set cookies %v, want none", cookies)
-		}
-		if strings.Contains(strings.ToLower(rec.Body.String()), "umami") {
-			t.Errorf("body mentions umami, want nothing of it in the browser: %q", rec.Body.String())
-		}
-	}
-}
-
 // solveChallenge finds the number the browser worker would, the same brute
 // force internal/pow's own tests use, and returns the full solution ready
 // to post back.

@@ -6,10 +6,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/ostendorf-cloud/govue/httpserver"
 	"github.com/ostendorf-cloud/govue/logging"
@@ -51,13 +53,12 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// The feed service sync loop and the Umami reporter, both of which
-	// stop with ctx. Neither runs for a deployment that configured no
-	// feed service and no Umami, and neither can keep the server from
-	// serving.
+	// The feed service sync loop, which stops with ctx. It does not run
+	// for a deployment that configured no feed service, and it cannot
+	// keep the server from serving.
 	app.Start(ctx)
 
-	return httpserver.RunAdmin(ctx, httpserver.Config{
+	runErr := httpserver.RunAdmin(ctx, httpserver.Config{
 		Addr:    cfg.ListenAddr,
 		Handler: app.Handler(),
 		Logger:  logger,
@@ -70,4 +71,13 @@ func run() error {
 		Addr:    cfg.AdminListenAddr,
 		Handler: app.AdminHandler(),
 	})
+
+	// The servers have stopped, so what is still queued for Umami is sent
+	// now, within a bound, on a fresh context: ctx has ended already.
+	closeCtx, cancel := context.WithTimeout(context.Background(), viewsCloseTimeout)
+	defer cancel()
+	return errors.Join(runErr, app.Close(closeCtx))
 }
+
+// viewsCloseTimeout bounds how long shutdown waits for queued page views.
+const viewsCloseTimeout = 5 * time.Second

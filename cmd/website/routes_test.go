@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/routes"
-	"github.com/ostendorf-cloud/ostendorf.tech/internal/webapp"
 )
 
 // TestPrerenderedOutputMatchesRouteTable is the check that proves
@@ -73,54 +72,6 @@ func TestPrerenderedOutputMatchesRouteTable(t *testing.T) {
 			}
 			if !wantFiles[file] {
 				t.Errorf("locale %q: prerendered file %q answers no route in routes.json", locale, file)
-			}
-		}
-	}
-}
-
-// TestPrerenderedPagesCarryATitle guards what internal/webapp's page view
-// reporting reads. The title Umami records is taken from each prerendered
-// page's own <title>, rather than from a second copy of the i18n
-// catalogue in Go, and the privacy policy names that title as one of the
-// things reported ("aufgerufene Seite (ohne angehängte Parameter) und ihr
-// Titel"). A missing title degrades to an empty one rather than failing a
-// request, which is deliberate but would be invisible: this test is what
-// makes web/scripts/prerender.ts dropping or reshaping the element a
-// failing check instead of a quietly emptier statistic. It calls
-// webapp.TitleOf itself, the exact function internal/webapp reads a page's
-// title from, so the two can never drift apart; TitleOf returns an empty
-// string for a missing title, an unclosed tag and an empty title alike, so
-// this test reports one combined failure rather than reimplementing the
-// cut to tell those cases apart.
-func TestPrerenderedPagesCarryATitle(t *testing.T) {
-	table, err := routes.Load()
-	if err != nil {
-		t.Fatalf("routes.Load() error = %v", err)
-	}
-	sub, err := fs.Sub(prerenderedFS, "prerendered")
-	if err != nil {
-		t.Fatalf("fs.Sub(prerenderedFS, \"prerendered\") error = %v", err)
-	}
-	localeDirs, err := fs.ReadDir(sub, ".")
-	if err != nil {
-		t.Fatalf("fs.ReadDir(prerendered) error = %v", err)
-	}
-
-	for _, entry := range localeDirs {
-		if !entry.IsDir() {
-			continue
-		}
-		locale := entry.Name()
-		for _, r := range table {
-			name := locale + "/" + r.File
-			data, err := fs.ReadFile(sub, name)
-			if err != nil {
-				// Already reported, per route and locale, by
-				// TestPrerenderedOutputMatchesRouteTable.
-				continue
-			}
-			if webapp.TitleOf(data) == "" {
-				t.Errorf("%s has no usable <title> element for the page view to report", name)
 			}
 		}
 	}

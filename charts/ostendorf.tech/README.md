@@ -371,8 +371,8 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `config.adminListenAddr` | govue's admin listener address (`ADMIN_ADDR`); must match `service.adminPort` | `:8081` |
 | `config.trustedProxyCidrs` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |
 | `config.feedRefreshInterval` | How often the website asks the feed service for the current post list | `5m` |
-| `config.umamiUrl` | Base URL of the Umami that page views are reported to, empty counts nothing | `""` |
-| `config.umamiWebsiteId` | Lowercase UUID of the website in Umami, set together with `config.umamiUrl` | `""` |
+| `config.umamiUrl` | `UMAMI_URL`: base URL of the Umami that page views are reported to, empty counts nothing. Not a secret. Plain `http` only for localhost or a name inside the cluster. Needs `config.trustedProxyCidrs` behind an Ingress or Gateway, or nothing is counted | `""` |
+| `config.umamiWebsiteId` | `UMAMI_WEBSITE_ID`: UUID of the website in Umami, set together with `config.umamiUrl`, one alone stops the start. Not a secret | `""` |
 | `existingSecret.name` | Name of the existing `Secret` | `""` (required) |
 | `feed.enabled` | Create the feed service's `Deployment`, `Service`, `ServiceAccount` and `NetworkPolicy`; see "Feed service" above | `false` |
 | `feed.image.repository` | Feed service container image, published by the `feed-image` job; see "Feed service" above | `ghcr.io/ostendorf-cloud/ostendorf.tech-feed` |
