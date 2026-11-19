@@ -57,6 +57,19 @@ describe('legal pages', () => {
       }
     })
 
+    it('names own hardware, no hosting provider and states the counting plainly', async () => {
+      const { container } = await renderPage(locale, 'privacy')
+      const text = (container.textContent ?? '').replace(/\s+/g, ' ')
+
+      expect(text).toContain(locale === 'de' ? 'eigener Hardware' : 'own hardware')
+      expect(text).toContain(locale === 'de' ? 'nach 30 Tagen' : 'after 30 days')
+      expect(text).toContain(locale === 'de' ? 'nach 14 Monaten' : 'after 14 months')
+      expect(text).not.toMatch(/hetzner|gunzenhausen|rechenzentrum|data centre/i)
+      expect(text).not.toMatch(
+        /wenn die statistik|sofern die statistik|eingeschaltet|if set up|switched on|when the statistics are/i,
+      )
+    })
+
     it('has no consumer dispute resolution section in the imprint', async () => {
       const { container } = await renderPage(locale, 'imprint')
       const text = container.textContent ?? ''

@@ -46,11 +46,16 @@ Confirmed and left unchanged, because nothing was wrong:
 
 ## Resolved by the owner
 
-- **Hosting and the Hetzner backup address.** The owner confirmed that the hosting section's "in
-  unseren eigenen Räumlichkeiten" (our own premises) statement and the Hetzner Online GmbH backup
-  address for Umami and the mail server are correct as they stand. No change needed in either
-  page. This closes the two earlier findings about hosting location and the backup address; the
-  owner owes nothing further here.
+- **Hosting.** The owner stated (2026-11-19) that the site runs on the owner's own hardware in
+  Germany, at the owner's home. The privacy policy says so in both languages ("eigener Hardware" /
+  "own hardware"), and names no hosting provider and no processor for hosting. This replaces the
+  earlier confirmation of the "own premises" wording and the Hetzner Online GmbH address, which
+  are gone from the page. The contact form text keeps only "we operate the mail server
+  ourselves"; where that server runs is not stated.
+- **Retention and legal basis.** The owner stated: access logs 30 days, Umami statistics 14
+  months, backups 15 days, Art. 6(1)(f) GDPR for logs and counting. The page says exactly that. Umami counting is
+  stated as fact, without a "when switched on" hedge, because the site counts page views in
+  production.
 - **English privacy policy and AGB.** Both now carry a full English translation, replacing the
   earlier stub that only pointed back to the German version. See "Translated pages" below.
 - **General, site-wide rate limiting.** The owner asked for it to be mentioned. It is now
@@ -182,7 +187,7 @@ the section in both languages of `PrivacyView.vue` to list exactly, and only, wh
 
 - Read `middleware/accesslog.go` in `govue` and `internal/webapp/webapp.go` on `feat/go-live`
   directly. `AccessLog.log` writes: the request method, `Route(r)` (the matched net/http mux
-  *pattern*, never the raw path), the HTTP status, the byte count, the duration, and, because
+  _pattern_, never the raw path), the HTTP status, the byte count, the duration, and, because
   `internal/webapp/webapp.go` constructs `middleware.AccessLog{ClientIP: clientIPs}` without
   setting `UserAgent`, the resolved client address but never the user agent. `RequestID`
   middleware additionally attaches a per-request id to the same log line.
@@ -193,7 +198,7 @@ the section in both languages of `PrivacyView.vue` to list exactly, and only, wh
   happens inside that one handler, never as further mux patterns) — the home page, the imprint,
   the privacy policy, the AGB and the 404 page all produce the identical logged value. The
   browser's user agent is not logged at all.
-- The legal basis and retention sentences were left exactly as they were, since the 30 day
+- The legal basis and retention sentences were left exactly as they were, since the log
   retention is already recorded above as a standing operational requirement rather than something
   this section needed to restate.
 

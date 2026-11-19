@@ -103,10 +103,10 @@ const germanHref = computed(
 
       <h3 class="text-lg font-semibold">Hosting auf eigenen Servern</h3>
       <p>
-        Wir hosten die Inhalte unserer Website selbst. Die Website läuft auf eigenen Servern, die
-        wir in unseren eigenen Räumlichkeiten in Deutschland betreiben. Einen externen
-        Hosting-Anbieter setzen wir für die Website nicht ein; die beim Besuch der Website
-        anfallenden Daten (siehe „Server-Log-Dateien“) werden auf diesen Servern verarbeitet.
+        Wir hosten die Inhalte unserer Website selbst. Die Website wird auf eigener Hardware in
+        Deutschland betrieben. Einen Hosting-Anbieter und einen Auftragsverarbeiter für das Hosting
+        gibt es nicht; die beim Besuch der Website anfallenden Daten (siehe „Server-Log-Dateien“)
+        werden auf dieser Hardware verarbeitet.
       </p>
       <p>
         Der Betrieb erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Wir haben ein berechtigtes
@@ -382,10 +382,10 @@ const germanHref = computed(
         hierzu müssen die Server-Log-Files erfasst werden.
       </p>
       <p>
-        Die Log-Dateien werden nur für einen begrenzten Zeitraum aufbewahrt und spätestens nach 30
-        Tagen automatisch gelöscht. Log-Dateien, deren weitere Aufbewahrung zu Beweiszwecken
-        erforderlich ist, sind bis zur endgültigen Klärung des jeweiligen Vorfalls von der Löschung
-        ausgenommen.
+        Die Log-Dateien (Zugriffsprotokolle der Anwendung und des Ingress) werden nur für einen
+        begrenzten Zeitraum aufbewahrt und spätestens nach 30 Tagen automatisch gelöscht.
+        Log-Dateien, deren weitere Aufbewahrung zu Beweiszwecken erforderlich ist, sind bis zur
+        endgültigen Klärung des jeweiligen Vorfalls von der Löschung ausgenommen.
       </p>
 
       <h3 class="text-lg font-semibold">Ratenbegrenzung</h3>
@@ -418,10 +418,9 @@ const germanHref = computed(
       <p>
         Um zu verstehen, welche Inhalte unserer Website gelesen werden und wie Besucher zu uns
         finden, erstellen wir eine Besucherstatistik mit der Open-Source-Software Umami. Umami
-        betreiben wir selbst auf unseren eigenen Servern in Deutschland (siehe „Hosting auf eigenen
-        Servern“). Sicherungskopien der Statistik-Datenbank speichern wir bei der Hetzner Online
-        GmbH, Industriestr. 25, 91710 Gunzenhausen, in einem Rechenzentrum in Deutschland; darüber
-        hinaus werden die Daten nicht an Dritte übermittelt.
+        betreiben wir selbst auf eigener Hardware in Deutschland (siehe „Hosting auf eigenen
+        Servern“). Unsere Website zählt jeden Seitenaufruf auf dem Server mit Umami; die Daten
+        werden nicht an Dritte übermittelt.
       </p>
       <p>
         Umami läuft nicht in Ihrem Browser: Es wird kein Skript geladen, kein Cookie gesetzt und
@@ -480,9 +479,7 @@ const germanHref = computed(
       <p>
         Ihre Angaben werden von unserem Webserver nicht in einer Datenbank gespeichert, sondern als
         E-Mail über unseren eigenen Mailserver an unser Postfach gesendet. Den Mailserver betreiben
-        wir selbst auf einem von uns gemieteten Server der Hetzner Online GmbH, Industriestr. 25,
-        91710 Gunzenhausen, in einem Rechenzentrum in Deutschland. Die Übertragung vom Webserver zum
-        Mailserver erfolgt verschlüsselt.
+        wir selbst. Die Übertragung vom Webserver zum Mailserver erfolgt verschlüsselt.
       </p>
       <p>
         Zum Schutz vor Spam löst Ihr Browser beim Ausfüllen des Formulars eine kleine Rechenaufgabe
@@ -694,10 +691,9 @@ const germanHref = computed(
 
       <h3 class="text-lg font-semibold">Hosting on our own servers</h3>
       <p>
-        We host the content of our website ourselves. The website runs on our own servers, which we
-        operate on our own premises in Germany. We do not use an external hosting provider for the
-        website; the data generated when the website is visited (see "Server log files") is
-        processed on these servers.
+        We host the content of our website ourselves. The website is operated on our own hardware in
+        Germany. There is no hosting provider and no processor for hosting; the data generated when
+        the website is visited (see "Server log files") is processed on this hardware.
       </p>
       <p>
         This is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate interest in
@@ -959,9 +955,10 @@ const germanHref = computed(
         this purpose.
       </p>
       <p>
-        The log files are retained for a limited period only and are automatically deleted after 30
-        days at the latest. Log files whose further retention is required for evidentiary purposes
-        are excluded from deletion until the incident in question has been finally clarified.
+        The log files (the access logs of the application and of the ingress) are retained for a
+        limited period only and are automatically deleted after 30 days at the latest. Log files
+        whose further retention is required for evidentiary purposes are excluded from deletion
+        until the incident in question has been finally clarified.
       </p>
 
       <h3 class="text-lg font-semibold">Rate limiting</h3>
@@ -991,9 +988,8 @@ const germanHref = computed(
       <p>
         To understand which content on our website is read and how visitors find us, we compile
         visitor statistics using the open-source software Umami. We operate Umami ourselves on our
-        own servers in Germany (see "Hosting on our own servers"). We store backup copies of the
-        statistics database with Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, in a
-        data centre in Germany; beyond this, the data is not transmitted to third parties.
+        own hardware in Germany (see "Hosting on our own servers"). Our website counts every page
+        view on the server with Umami; the data is not transmitted to third parties.
       </p>
       <p>
         Umami does not run in your browser: no script is loaded, no cookie is set, and nothing is
@@ -1051,9 +1047,8 @@ const germanHref = computed(
       </p>
       <p>
         Your details are not stored by our web server in a database, but sent as an email via our
-        own mail server to our mailbox. We operate the mail server ourselves on a server we rent
-        from Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, in a data centre in Germany.
-        Transmission from the web server to the mail server is encrypted.
+        own mail server to our mailbox. We operate the mail server ourselves. Transmission from the
+        web server to the mail server is encrypted.
       </p>
       <p>
         To protect against spam, your browser solves a small computational task (a so-called proof
