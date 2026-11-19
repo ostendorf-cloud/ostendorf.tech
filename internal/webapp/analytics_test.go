@@ -339,6 +339,47 @@ func TestTrustedProxyDecidesWhichAddressIsCounted(t *testing.T) {
 	}
 }
 
+func TestHostnameSentToUmamiHasNoPort(t *testing.T) {
+	fake := &fakeUmami{}
+	app := analyticsApp(t, fake, map[string]string{"SITE_URL": "http://localhost:8080"})
+	visit(t, app.Handler(), http.MethodGet, "/de/", nil)
+	settle(t, app)
+	got := reportedViews(t, fake.bodies())
+	if len(got) != 1 || got[0].Hostname != "localhost" {
+		t.Fatalf("Umami received %v, want one view with hostname localhost", fake.bodies())
+	}
+}
+
+// droppedViews reads the counter of dropped views from /metrics.
+func droppedViews(t *testing.T, app *App) string {
+	t.Helper()
+	rec := visit(t, app.AdminHandler(), http.MethodGet, "/metrics", nil)
+	for _, line := range strings.Split(rec.Body.String(), "\n") {
+		if v, ok := strings.CutPrefix(line, viewsDroppedMetric+" "); ok {
+			return v
+		}
+	}
+	return ""
+}
+
+func TestDroppedViewsAreCounted(t *testing.T) {
+	fake := &fakeUmami{block: make(chan struct{})}
+	app := analyticsApp(t, fake, map[string]string{"UMAMI_QUEUE_SIZE": "1"})
+	h := app.Handler()
+	if got := droppedViews(t, app); got != "" && got != "0" {
+		t.Fatalf("dropped counter before any view = %q, want 0", got)
+	}
+	for range 20 {
+		visit(t, h, http.MethodGet, "/de/", nil)
+	}
+	if got := droppedViews(t, app); got == "" || got == "0" {
+		t.Errorf("dropped counter = %q after overflowing the queue, want it above 0", got)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	_ = app.Close(ctx)
+}
+
 // TestSlowUmamiNeverDelaysAResponse blocks every post to Umami and checks
 // that responses still come back at once and unchanged.
 func TestSlowUmamiNeverDelaysAResponse(t *testing.T) {

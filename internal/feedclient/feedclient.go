@@ -34,9 +34,8 @@ const (
 	// than internal/instagram.Client's 15 second timeout to the real Graph
 	// API: an unreachable feed service must fail fast rather than hold up a
 	// sync cycle, so the last good cache stays in place and the next cycle
-	// tries again. Applied the same way internal/analytics.SendTimeout
-	// bounds that client's own calls: as the one http.Client's Timeout,
-	// covering connect, any redirect and reading the whole response.
+	// tries again. Applied as the one http.Client's Timeout, covering
+	// connect, any redirect and reading the whole response.
 	RequestTimeout = 5 * time.Second
 
 	maxPostsBytes = 1 << 20

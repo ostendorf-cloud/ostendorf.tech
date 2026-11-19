@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -76,7 +77,18 @@ func run() error {
 	// now, within a bound, on a fresh context: ctx has ended already.
 	closeCtx, cancel := context.WithTimeout(context.Background(), viewsCloseTimeout)
 	defer cancel()
-	return errors.Join(runErr, app.Close(closeCtx))
+	return errors.Join(runErr, closeResult(logger, app.Close(closeCtx)))
+}
+
+// closeResult turns a missed shutdown deadline into a warning: views that
+// did not reach Umami in time are lost, which is no failure, and a slow
+// Umami must not turn a normal SIGTERM into exit 1. Other errors pass.
+func closeResult(logger *slog.Logger, err error) error {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		logger.Warn("page views still queued at shutdown were not sent", "error", err)
+		return nil
+	}
+	return err
 }
 
 // viewsCloseTimeout bounds how long shutdown waits for queued page views.

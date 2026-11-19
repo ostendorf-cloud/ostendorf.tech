@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -11,6 +15,34 @@ import (
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/webapp"
 )
+
+func TestCloseResult(t *testing.T) {
+	other := errors.New("boom")
+	tests := map[string]struct {
+		err      error
+		want     error
+		wantWarn bool
+	}{
+		"nil":               {},
+		"deadline exceeded": {err: context.DeadlineExceeded, wantWarn: true},
+		"canceled":          {err: context.Canceled, wantWarn: true},
+		"wrapped deadline":  {err: fmt.Errorf("close: %w", context.DeadlineExceeded), wantWarn: true},
+		"other error":       {err: other, want: other},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logger := slog.New(slog.NewJSONHandler(&buf, nil))
+			got := closeResult(logger, tc.err)
+			if !errors.Is(got, tc.want) || (tc.want == nil && got != nil) {
+				t.Errorf("closeResult() = %v, want %v", got, tc.want)
+			}
+			if warned := strings.Contains(buf.String(), `"level":"WARN"`); warned != tc.wantWarn {
+				t.Errorf("warn logged = %v, want %v (log %q)", warned, tc.wantWarn, buf.String())
+			}
+		})
+	}
+}
 
 // testCSRFKey is a 32 byte key, hex encoded: 64 hex characters, long
 // enough for config.Load's CSRF_KEY, which has no usable default.
