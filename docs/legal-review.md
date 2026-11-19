@@ -308,7 +308,8 @@ four points changed as a result, the cookie point; the other three held up uncha
   unverified against real code, consistent with the standing operational requirement above.
   Update: the hookup has since landed as govue's `analytics` package (issue #87, which
   removed the site's own `internal/analytics`), and the Umami section's description of what
-  is counted was changed to match it: route pattern, referrer origin and address shortened
+  is counted was changed to match it: route pattern, referrer origin (protocol, domain and
+  port where present) and address shortened
   to /24 or /48 instead of the path, the referrer without parameters and the full address.
   The page title is no longer sent either.
 - The Instagram feed likewise does not exist on `feat/go-live` yet (also a later milestone); the

@@ -435,8 +435,8 @@ const germanHref = computed(
           angehängte Parameter (ohne Seitentitel)
         </li>
         <li>
-          Herkunft der Referrer URL (Protokoll und Domain, ohne Pfad und Parameter), sofern Sie von
-          einer anderen Website kommen und Ihr Browser sie übermittelt
+          Herkunft der Referrer URL (Protokoll, Domain und gegebenenfalls Port, ohne Pfad und
+          Parameter), sofern Sie von einer anderen Website kommen und Ihr Browser sie übermittelt
         </li>
         <li>bevorzugte Sprache Ihres Browsers</li>
         <li>Browsertyp und Browserversion sowie verwendetes Betriebssystem (User-Agent)</li>
@@ -1007,8 +1007,8 @@ const germanHref = computed(
           without any attached parameters (without the page title)
         </li>
         <li>
-          the origin of the referrer URL (protocol and domain, without path and parameters), where
-          you come from another website and your browser transmits it
+          the origin of the referrer URL (protocol, domain and, where present, port, without path
+          and parameters), where you come from another website and your browser transmits it
         </li>
         <li>your browser's preferred language</li>
         <li>browser type and version, and operating system used (user agent)</li>
