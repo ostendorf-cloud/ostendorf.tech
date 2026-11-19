@@ -372,7 +372,7 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS, opts .
 func logViewsStatus(logger *slog.Logger, cfg config.Config, views *analytics.Client) {
 	logger.Info("page view counting", "enabled", views.Enabled())
 	if views.Enabled() && len(cfg.TrustedProxies) == 0 {
-		logger.Warn("page view counting is on but TRUSTED_PROXY_CIDRS is empty: behind a proxy no view is counted")
+		logger.Warn("page view counting is on but TRUSTED_PROXIES is empty: behind a proxy no view is counted")
 	}
 }
 

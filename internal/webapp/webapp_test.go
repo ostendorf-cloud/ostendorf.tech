@@ -674,7 +674,7 @@ func TestAppContactCrossOriginPostWithValidSessionAndTokenStillRefused(t *testin
 	}
 }
 
-// TestAppClientIPWiringHonoursTrustedProxy proves TRUSTED_PROXY_CIDRS
+// TestAppClientIPWiringHonoursTrustedProxy proves TRUSTED_PROXIES
 // actually changes what the rate limiter keys on, not only that config.Load
 // parses it (internal/config's own tests already cover that): a request
 // relayed through a trusted proxy is attributed to the address it names in
@@ -682,9 +682,9 @@ func TestAppContactCrossOriginPostWithValidSessionAndTokenStillRefused(t *testin
 // behind the same proxy get two distinct buckets.
 func TestAppClientIPWiringHonoursTrustedProxy(t *testing.T) {
 	cfg := testConfig(t, map[string]string{
-		"TRUSTED_PROXY_CIDRS": "203.0.113.0/24",
-		"RATE_LIMIT_BURST":    "1",
-		"RATE_LIMIT_PER":      "1m",
+		"TRUSTED_PROXIES":  "203.0.113.0/24",
+		"RATE_LIMIT_BURST": "1",
+		"RATE_LIMIT_PER":   "1m",
 	})
 	dist, prerendered := testFS()
 	app, err := New(cfg, discardLogger(), dist, prerendered)

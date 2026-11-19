@@ -55,7 +55,7 @@ listener (`ADMIN_ADDR`), never on this public one; see the Configuration table b
 | `ADMIN_ADDR` | Address govue's admin listener listens on: `/healthz`, `/readyz` and `/metrics` | `:8081` | no |
 | `SITE_URL` | The site's own canonical origin, used for SEO tags and the sitemap | `https://ostendorf.tech` | no |
 | `LOG_LEVEL` | `debug`, `info`, `warn` or `error` | `info` | no |
-| `TRUSTED_PROXY_CIDRS` | Comma separated CIDRs or addresses trusted to set `X-Forwarded-For` | none | no |
+| `TRUSTED_PROXIES` | Comma separated CIDRs or addresses trusted to set `X-Forwarded-For` | none | no |
 | `ALLOW_PLAIN_HTTP` | Drops the session cookie's `Secure` attribute, for a plain HTTP dev run | `false` | no |
 | `RATE_LIMIT_BURST` | Requests one client address may make before waiting | `120` | no |
 | `RATE_LIMIT_PER` | The burst's refill period | `1m` | no |
@@ -101,7 +101,7 @@ page (never the path or a query string), the origin of the referrer, the browser
 language, the user agent and the client address shortened to its /24 (IPv4) or /48
 (IPv6). It leaves out Do Not Track, Global Privacy Control, prefetch, bots, private
 client addresses, redirects, errors, assets and the API. Behind a proxy it needs
-`TRUSTED_PROXY_CIDRS`: without it every request comes from the proxy's private
+`TRUSTED_PROXIES`: without it every request comes from the proxy's private
 address and nothing is counted (the startup log says so). The variable names did not
 change when the site moved to govue's package, so an existing deployment keeps working.
 Two things are stricter than before: plain `http` is accepted only for localhost or a
@@ -134,7 +134,7 @@ key verifying a little longer: a leaked `CHALLENGE_KEY` is dropped at once, with
 `CHALLENGE_KEY_PREVIOUS` for it, accepting up to ten minutes of broken challenges rather than
 keeping the leaked key alive a moment longer than replacing it takes.
 
-Behind any reverse proxy or ingress, leaving `TRUSTED_PROXY_CIDRS` unset means every
+Behind any reverse proxy or ingress, leaving `TRUSTED_PROXIES` unset means every
 request is attributed to the proxy's own address, not the visitor's. Every rate limit
 then collapses into one shared bucket for the whole site: about 20 page loads a minute
 site-wide at the documented default, and the contact form blocked for every visitor for

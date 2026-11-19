@@ -90,7 +90,8 @@ The global baseline already applies here and is not repeated below.
   site has no analytics code of its own. `internal/config` reads it through
   `analytics.LoadConfig` (`UMAMI_URL`, `UMAMI_WEBSITE_ID`, `UMAMI_TIMEOUT`,
   `UMAMI_QUEUE_SIZE`), and `internal/webapp`'s `New` builds the client with the trusted
-  proxy resolver, `FullIP` off and the `analytics_views_dropped_total` counter, and
+  proxy resolver (`TRUSTED_PROXIES`, chart value `config.trustedProxies`, the same names
+  on every site), `FullIP` off and the `analytics_views_dropped_total` counter, and
   `Close` (called by `cmd/website` after the servers stopped, within 5 seconds) sends
   what is queued. The client's `Middleware` wraps the mux directly in `buildHandler`:
   it reads the route pattern the mux sets, so no middleware that replaces the request

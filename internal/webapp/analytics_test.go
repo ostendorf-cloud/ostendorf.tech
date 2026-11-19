@@ -291,13 +291,13 @@ func TestTrustedProxyDecidesWhichAddressIsCounted(t *testing.T) {
 		wantIP     string // empty: not counted
 	}{
 		"trusted proxy: the forwarded visitor is counted, masked": {
-			env: map[string]string{"TRUSTED_PROXY_CIDRS": trustedNet}, remoteAddr: proxyAddr, xff: forwarded, wantIP: "198.51.100.0",
+			env: map[string]string{"TRUSTED_PROXIES": trustedNet}, remoteAddr: proxyAddr, xff: forwarded, wantIP: "198.51.100.0",
 		},
 		"untrusted peer cannot forge the address": {
-			env: map[string]string{"TRUSTED_PROXY_CIDRS": trustedNet}, remoteAddr: peerAddr, xff: forwarded, wantIP: "203.0.113.0",
+			env: map[string]string{"TRUSTED_PROXIES": trustedNet}, remoteAddr: peerAddr, xff: forwarded, wantIP: "203.0.113.0",
 		},
 		"trusted proxy with no header: the proxy is no visitor": {
-			env: map[string]string{"TRUSTED_PROXY_CIDRS": trustedNet}, remoteAddr: proxyAddr,
+			env: map[string]string{"TRUSTED_PROXIES": trustedNet}, remoteAddr: proxyAddr,
 		},
 		"no trusted proxy: a private peer counts nothing": {
 			remoteAddr: proxyAddr, xff: forwarded,
@@ -306,7 +306,7 @@ func TestTrustedProxyDecidesWhichAddressIsCounted(t *testing.T) {
 			remoteAddr: peerAddr, xff: forwarded, wantIP: "203.0.113.0",
 		},
 		"forwarded private address counts nothing": {
-			env: map[string]string{"TRUSTED_PROXY_CIDRS": trustedNet}, remoteAddr: proxyAddr, xff: "192.168.1.5",
+			env: map[string]string{"TRUSTED_PROXIES": trustedNet}, remoteAddr: proxyAddr, xff: "192.168.1.5",
 		},
 	}
 	for name, tc := range tests {

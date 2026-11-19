@@ -228,8 +228,8 @@ func Load(getenv func(string) string) (Config, error) {
 	fail(wrap("LOG_LEVEL", err))
 	cfg.LogLevel = level
 
-	prefixes, err := clientip.ParseCIDRs(resolved("TRUSTED_PROXY_CIDRS"))
-	fail(wrap("TRUSTED_PROXY_CIDRS", err))
+	prefixes, err := clientip.ParseCIDRs(resolved("TRUSTED_PROXIES"))
+	fail(wrap("TRUSTED_PROXIES", err))
 	cfg.TrustedProxies = prefixes
 
 	cfg.ContactTo, err = mail.ParseAddress(loader.String("CONTACT_TO", DefaultContactTo))

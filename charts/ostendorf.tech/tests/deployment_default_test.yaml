@@ -123,13 +123,13 @@ tests:
           content:
             name: UMAMI_WEBSITE_ID
 
-  - it: omits TRUSTED_PROXY_CIDRS when not configured
+  - it: omits TRUSTED_PROXIES when not configured
     template: templates/deployment.yaml
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: TRUSTED_PROXY_CIDRS
+            name: TRUSTED_PROXIES
 
   - it: never creates a Secret from plaintext values
     template: templates/deployment.yaml

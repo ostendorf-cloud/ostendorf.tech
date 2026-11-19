@@ -100,19 +100,19 @@ func TestLoadDefaults(t *testing.T) {
 
 func TestLoadOverrides(t *testing.T) {
 	cfg, err := Load(env(withCSRFKey(map[string]string{
-		"LISTEN_ADDR":         ":9090",
-		"ADMIN_ADDR":          ":9091",
-		"SITE_URL":            "https://example.test",
-		"LOG_LEVEL":           "debug",
-		"TRUSTED_PROXY_CIDRS": "10.0.0.0/8, 192.168.1.1",
-		"RATE_LIMIT_BURST":    "30",
-		"RATE_LIMIT_PER":      "30s",
-		"ALLOW_PLAIN_HTTP":    "true",
-		"SMTP_ADDR":           "smtp.example.test:587",
-		"SMTP_USERNAME":       "no-reply@example.test",
-		"SMTP_PASSWORD":       "s3cret",
-		"CONTACT_TO":          "someone@example.test",
-		"CONTACT_FROM":        "Example <no-reply@example.test>",
+		"LISTEN_ADDR":      ":9090",
+		"ADMIN_ADDR":       ":9091",
+		"SITE_URL":         "https://example.test",
+		"LOG_LEVEL":        "debug",
+		"TRUSTED_PROXIES":  "10.0.0.0/8, 192.168.1.1",
+		"RATE_LIMIT_BURST": "30",
+		"RATE_LIMIT_PER":   "30s",
+		"ALLOW_PLAIN_HTTP": "true",
+		"SMTP_ADDR":        "smtp.example.test:587",
+		"SMTP_USERNAME":    "no-reply@example.test",
+		"SMTP_PASSWORD":    "s3cret",
+		"CONTACT_TO":       "someone@example.test",
+		"CONTACT_FROM":     "Example <no-reply@example.test>",
 	})))
 	if err != nil {
 		t.Fatalf("Load() returned an unexpected error: %v", err)
@@ -338,8 +338,8 @@ func TestLoadRejectsEachInvalidField(t *testing.T) {
 			want: "LOG_LEVEL",
 		},
 		"invalid trusted proxy cidr": {
-			env:  map[string]string{"TRUSTED_PROXY_CIDRS": "not-a-cidr"},
-			want: "TRUSTED_PROXY_CIDRS",
+			env:  map[string]string{"TRUSTED_PROXIES": "not-a-cidr"},
+			want: "TRUSTED_PROXIES",
 		},
 		"rate limit burst out of range": {
 			env:  map[string]string{"RATE_LIMIT_BURST": "0"},

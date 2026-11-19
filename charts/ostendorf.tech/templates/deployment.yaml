@@ -26,8 +26,8 @@ spec:
   {{- if gt (.Values.replicaCount | int) 1 }}
   {{ fail "replicaCount must stay at 1: internal/webapp/session.go keeps the anonymous session, and the CSRF token derived from it, in govue's in-process session.MemoryStore. A second replica can answer a visitor's GET on one pod and their contact form POST on another pod that never saw that session: requireSession then refuses that POST with 403, correctly from that pod's point of view but wrongly from the visitor's, since their session is real, just on the other pod. This breaks the contact form for real visitors; it is an availability problem, not a security hole. Raise replicaCount only after moving to a shared session store; see AGENTS.md." }}
   {{- end }}
-  {{- if and .Values.ingress.enabled (not .Values.config.trustedProxyCidrs) }}
-  {{ fail "config.trustedProxyCidrs must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md." }}
+  {{- if and .Values.ingress.enabled (not .Values.config.trustedProxies) }}
+  {{ fail "config.trustedProxies must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md." }}
   {{- end }}
   replicas: {{ .Values.replicaCount }}
   # Recreate, not the default RollingUpdate: a rolling update's maxSurge
@@ -86,9 +86,9 @@ spec:
               value: {{ .Values.config.siteUrl | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.config.logLevel | quote }}
-            {{- if .Values.config.trustedProxyCidrs }}
-            - name: TRUSTED_PROXY_CIDRS
-              value: {{ .Values.config.trustedProxyCidrs | quote }}
+            {{- if .Values.config.trustedProxies }}
+            - name: TRUSTED_PROXIES
+              value: {{ .Values.config.trustedProxies | quote }}
             {{- end }}
             - name: ALLOW_PLAIN_HTTP
               value: {{ .Values.config.allowPlainHttp | quote }}

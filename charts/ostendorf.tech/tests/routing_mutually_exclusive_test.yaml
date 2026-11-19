@@ -5,7 +5,7 @@ set:
   existingSecret:
     name: ostendorf-tech-secrets
   config:
-    trustedProxyCidrs: "10.0.0.0/8"
+    trustedProxies: "10.0.0.0/8"
   ingress:
     enabled: true
   httpRoute:

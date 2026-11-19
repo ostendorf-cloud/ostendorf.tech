@@ -55,9 +55,9 @@ chart="charts/ostendorf.tech"
 baseline="existingSecret.name=ostendorf-tech-secrets"
 
 # The two external routing combinations, each valid on its own: ingress enabled with its
-# own required trustedProxyCidrs guard satisfied, httpRoute enabled with both of its own
+# own required trustedProxies guard satisfied, httpRoute enabled with both of its own
 # required parentRefs fields set.
-ingress_valid="config.trustedProxyCidrs=10.0.0.0/8,ingress.enabled=true,ingress.className=nginx"
+ingress_valid="config.trustedProxies=10.0.0.0/8,ingress.enabled=true,ingress.className=nginx"
 ingress_valid="${ingress_valid},ingress.hosts[0].host=ostendorf.tech"
 ingress_valid="${ingress_valid},ingress.hosts[0].paths[0].path=/,ingress.hosts[0].paths[0].pathType=Prefix"
 httproute_valid="httpRoute.enabled=true,httpRoute.hostnames[0]=ostendorf.tech"
@@ -125,7 +125,7 @@ if [ "$mode" = "lint" ]; then
   fail_names=(
     "both ingress.enabled and httpRoute.enabled true"
     "replicaCount above 1"
-    "ingress.enabled true with config.trustedProxyCidrs left empty"
+    "ingress.enabled true with config.trustedProxies left empty"
     "httpRoute.enabled true with parentRefs.name left empty"
     "httpRoute.enabled true with parentRefs.namespace left empty"
     "existingSecret.name left empty"
@@ -147,7 +147,7 @@ if [ "$mode" = "lint" ]; then
   fail_messages=(
     "ingress.enabled and httpRoute.enabled cannot both be true: pick one external route and turn the other off."
     "replicaCount must stay at 1: internal/webapp/session.go keeps the anonymous session, and the CSRF token derived from it, in govue's in-process session.MemoryStore. A second replica can answer a visitor's GET on one pod and their contact form POST on another pod that never saw that session: requireSession then refuses that POST with 403, correctly from that pod's point of view but wrongly from the visitor's, since their session is real, just on the other pod. This breaks the contact form for real visitors; it is an availability problem, not a security hole. Raise replicaCount only after moving to a shared session store; see AGENTS.md."
-    "config.trustedProxyCidrs must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md."
+    "config.trustedProxies must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md."
     "httpRoute.parentRefs.name is required when httpRoute.enabled is true"
     "httpRoute.parentRefs.namespace is required when httpRoute.enabled is true: the Gateway this HTTPRoute attaches to usually lives in a different namespace than this release"
     "existingSecret.name is required: set it to the name of an existing Secret carrying CSRF_KEY, which the application needs to start and has no default."

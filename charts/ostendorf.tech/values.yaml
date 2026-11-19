@@ -178,7 +178,7 @@ config:
   # templates/deployment.yaml rejects an install or template render that
   # leaves this empty while ingress.enabled is true. Set it to the ingress
   # controller's pod or Service CIDR; see README.md.
-  trustedProxyCidrs: ""
+  trustedProxies: ""
   allowPlainHttp: false
   rateLimitBurst: 120
   rateLimitPer: "1m"
@@ -211,7 +211,7 @@ config:
   # umamiWebsiteId is the UUID Umami shows for the website, and umamiUrl
   # its own base URL, typically the in-cluster Service. Plain http is
   # accepted only for localhost or a name inside the cluster.
-  # Behind an Ingress or a Gateway set trustedProxyCidrs above too: without
+  # Behind an Ingress or a Gateway set trustedProxies above too: without
   # it every request comes from the proxy, whose private address is never
   # counted, so nothing is counted. The client address is reduced to its /24
   # (IPv4) or /48 (IPv6) before it is sent.
