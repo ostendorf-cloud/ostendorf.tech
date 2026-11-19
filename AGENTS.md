@@ -32,8 +32,10 @@ The global baseline already applies here and is not repeated below.
   both `routes_test.go` and `routeTable.test.ts` read, so a fixture either side adds is
   checked by both validators without touching the other test file.
 - `internal/pow` issues and verifies the contact form's proof of work challenge, ported
-  from old_simon-ostendorf.de's `internal/pow` unchanged: the algorithm is a contract
-  with the browser worker that solves it.
+  from old_simon-ostendorf.de's `internal/pow`: the algorithm is a contract with the
+  browser worker that solves it. The salt is `<nonce>?expires=<unix>&issued=<unix>&`,
+  ends with a fixed `&` that the parser requires, and the hash input is the salt followed
+  by the number in decimal. The worker treats the salt as an opaque string.
 - `internal/contact` validates a contact submission, builds the mail and sends it over
   SMTP, ported from old_simon-ostendorf.de's `internal/contact` with one change: a field
   error carries a stable code instead of a German message, so `internal/webapp` can
