@@ -53,9 +53,9 @@ Confirmed and left unchanged, because nothing was wrong:
   are gone from the page. The contact form text keeps only "we operate the mail server
   ourselves"; where that server runs is not stated.
 - **Retention and legal basis.** The owner stated: access logs 30 days, Umami statistics 14
-  months, backups 15 days, Art. 6(1)(f) GDPR for logs and counting. The page says exactly that. Umami counting is
-  stated as fact, without a "when switched on" hedge, because the site counts page views in
-  production.
+  months, backups 15 days, Art. 6(1)(f) GDPR for logs and counting. The page says exactly
+  that. Umami counting is stated as fact, without a "when switched on" hedge, because the
+  site counts page views in production.
 - **English privacy policy and AGB.** Both now carry a full English translation, replacing the
   earlier stub that only pointed back to the German version. See "Translated pages" below.
 - **General, site-wide rate limiting.** The owner asked for it to be mentioned. It is now

@@ -89,7 +89,8 @@ them is refused at startup rather than silently counting nothing.
 
 The Impressionen section and the visitor statistic are both off until configured and
 both run server side only. The production site counts page views with Umami, which the
-owner runs on their own hardware in Germany; the privacy policy states this plainly. Without `FEED_SERVICE_URL` no cache is loaded and the section
+owner runs on their own hardware in Germany; the privacy policy states this plainly.
+Without `FEED_SERVICE_URL` no cache is loaded and the section
 is not rendered; the rest of the page is unaffected, and a feed service that is
 unreachable or empty never changes what a visitor sees, the same way an unconfigured URL
 does. The posts and their pictures are fetched by this server, from the feed service, and
