@@ -27,7 +27,7 @@ const germanHref = computed(
         Kontaktformulars (siehe Abschnitt „Cookies“), nutzt aber keine Tracking- oder Werbedienste
         und bindet keine Inhalte von Drittanbietern ein. Ihr Browser lädt alle Inhalte
         ausschließlich von unserem eigenen Server. Eine Besucherstatistik erstellen wir selbst auf
-        unseren eigenen Servern, ohne Skript in Ihrem Browser und ohne sonst etwas auf Ihrem
+        eigener Hardware in Deutschland, ohne Skript in Ihrem Browser und ohne sonst etwas auf Ihrem
         Endgerät zu speichern.
       </p>
 
@@ -92,16 +92,16 @@ const germanHref = computed(
       <h3 class="text-lg font-semibold">Analyse-Tools und Tools von Drittanbietern</h3>
       <p>
         Beim Besuch dieser Website werden die aufgerufenen Seiten statistisch ausgewertet. Das
-        geschieht mit der Open-Source-Software Umami, die wir selbst auf unseren eigenen Servern
-        betreiben; es werden dafür keine Cookies gesetzt, kein Skript in Ihrem Browser ausgeführt
-        und keine Daten an Dritte übermittelt. Tracking- oder Werbedienste und Tools von
+        geschieht mit der Open-Source-Software Umami, die wir selbst auf eigener Hardware in
+        Deutschland betreiben; es werden dafür keine Cookies gesetzt, kein Skript in Ihrem Browser
+        ausgeführt und keine Daten an Dritte übermittelt. Tracking- oder Werbedienste und Tools von
         Drittanbietern setzen wir nicht ein. Details finden Sie im Abschnitt „Besucherstatistik mit
         Umami“.
       </p>
 
       <h2 class="text-xl font-semibold">2. Hosting</h2>
 
-      <h3 class="text-lg font-semibold">Hosting auf eigenen Servern</h3>
+      <h3 class="text-lg font-semibold">Hosting auf eigener Hardware</h3>
       <p>
         Wir hosten die Inhalte unserer Website selbst. Die Website wird auf eigener Hardware in
         Deutschland betrieben. Einen Hosting-Anbieter und einen Auftragsverarbeiter für das Hosting
@@ -438,15 +438,15 @@ const germanHref = computed(
       <p>
         Um zu verstehen, welche Inhalte unserer Website gelesen werden und wie Besucher zu uns
         finden, erstellen wir eine Besucherstatistik mit der Open-Source-Software Umami. Umami
-        betreiben wir selbst auf eigener Hardware in Deutschland (siehe „Hosting auf eigenen
-        Servern“). Unsere Website zählt jeden Seitenaufruf auf dem Server mit Umami; die Daten
-        werden nicht an Dritte übermittelt.
+        betreiben wir selbst auf eigener Hardware in Deutschland (siehe „Hosting auf eigener
+        Hardware“). Unsere Website zählt Seitenaufrufe auf dem Server mit Umami; die Daten werden
+        nicht an Dritte übermittelt.
       </p>
       <p>
         Umami läuft nicht in Ihrem Browser: Es wird kein Skript geladen, kein Cookie gesetzt und
         nichts auf Ihrem Endgerät gespeichert oder ausgelesen. Stattdessen meldet unser Webserver
-        jeden Aufruf einer Seite an Umami, mit den Angaben, die Ihr Browser beim Aufruf ohnehin an
-        uns übermittelt:
+        Aufrufe einer Seite an Umami, mit den Angaben, die Ihr Browser beim Aufruf ohnehin an uns
+        übermittelt:
       </p>
       <ul class="list-disc pl-6">
         <li>
@@ -468,10 +468,10 @@ const germanHref = computed(
         Aus der gekürzten IP-Adresse ermittelt Umami Land, Region und Stadt. Aus gekürzter
         IP-Adresse, User-Agent, einem geheimen Schlüssel und dem laufenden Monat bildet Umami eine
         pseudonyme Kennung, um die Seitenaufrufe eines Besuchs zusammenzufassen; die Kennung
-        wechselt deshalb jeden Monat. Die IP-Adresse und den vollständigen User-Agent speichert
-        Umami nicht, sondern nur die daraus abgeleiteten Angaben (Land, Region, Stadt, Browser,
-        Betriebssystem) zusammen mit der pseudonymen Kennung. Eine Zusammenführung mit anderen Daten
-        oder eine Identifizierung einzelner Besucher findet nicht statt.
+        wechselt jeden Monat. Die IP-Adresse und den vollständigen User-Agent speichert Umami nicht,
+        sondern nur die daraus abgeleiteten Angaben (Land, Region, Stadt, Browser, Betriebssystem)
+        zusammen mit der pseudonymen Kennung. Eine Zusammenführung mit anderen Daten oder eine
+        Identifizierung einzelner Besucher findet nicht statt.
       </p>
       <p>
         Die Statistikdaten werden nach 14 Monaten automatisch gelöscht. In den Sicherungskopien der
@@ -643,8 +643,8 @@ const germanHref = computed(
         A brief summary up front: this website sets a single, purely technical cookie to protect the
         contact form (see the "Cookies" section), but no tracking or advertising services, and does
         not embed third-party content. Your browser loads everything exclusively from our own
-        server. We compile visitor statistics ourselves, on our own servers, without any script
-        running in your browser and without storing anything else on your device.
+        server. We compile visitor statistics ourselves, on our own hardware in Germany, without any
+        script running in your browser and without storing anything else on your device.
       </p>
 
       <h2 class="text-xl font-semibold">1. Data protection at a glance</h2>
@@ -703,15 +703,15 @@ const germanHref = computed(
       <h3 class="text-lg font-semibold">Analytics tools and third-party tools</h3>
       <p>
         When you visit this website, the pages accessed are evaluated statistically. This is done
-        using the open-source software Umami, which we operate ourselves on our own servers; no
-        cookies are set for this purpose, no script runs in your browser, and no data is transmitted
-        to third parties. We do not use tracking or advertising services, or tools from third-party
-        providers. Details can be found in the section "Visitor statistics with Umami".
+        using the open-source software Umami, which we operate ourselves on our own hardware in
+        Germany; no cookies are set for this purpose, no script runs in your browser, and no data is
+        transmitted to third parties. We do not use tracking or advertising services, or tools from
+        third-party providers. Details can be found in the section "Visitor statistics with Umami".
       </p>
 
       <h2 class="text-xl font-semibold">2. Hosting</h2>
 
-      <h3 class="text-lg font-semibold">Hosting on our own servers</h3>
+      <h3 class="text-lg font-semibold">Hosting on our own hardware</h3>
       <p>
         We host the content of our website ourselves. The website is operated on our own hardware in
         Germany. There is no hosting provider and no processor for hosting; the data generated when
@@ -1029,14 +1029,13 @@ const germanHref = computed(
       <p>
         To understand which content on our website is read and how visitors find us, we compile
         visitor statistics using the open-source software Umami. We operate Umami ourselves on our
-        own hardware in Germany (see "Hosting on our own servers"). Our website counts every page
-        view on the server with Umami; the data is not transmitted to third parties.
+        own hardware in Germany (see "Hosting on our own hardware"). Our website counts page views
+        on the server with Umami; the data is not transmitted to third parties.
       </p>
       <p>
         Umami does not run in your browser: no script is loaded, no cookie is set, and nothing is
-        stored on or read from your device. Instead, our web server reports every page request to
-        Umami, using the information your browser transmits to us in any case when making the
-        request:
+        stored on or read from your device. Instead, our web server reports page requests to Umami,
+        using the information your browser transmits to us in any case when making the request:
       </p>
       <ul class="list-disc pl-6">
         <li>
@@ -1057,11 +1056,11 @@ const germanHref = computed(
       <p>
         Umami derives the country, region and city from the shortened IP address. From the shortened
         IP address, the user agent, a secret key and the current month, Umami forms a pseudonymous
-        identifier to group together the page views of one visit; the identifier therefore changes
-        every month. Umami does not store the IP address or the full user agent, only the
-        information derived from them (country, region, city, browser, operating system) together
-        with the pseudonymous identifier. No merging with other data, and no identification of
-        individual visitors, takes place.
+        identifier to group together the page views of one visit; the identifier changes every
+        month. Umami does not store the IP address or the full user agent, only the information
+        derived from them (country, region, city, browser, operating system) together with the
+        pseudonymous identifier. No merging with other data, and no identification of individual
+        visitors, takes place.
       </p>
       <p>
         The statistics data is automatically deleted after 14 months. In the backup copies of the

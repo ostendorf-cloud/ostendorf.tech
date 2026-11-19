@@ -47,7 +47,7 @@ Confirmed and left unchanged, because nothing was wrong:
 ## Resolved by the owner
 
 - **Hosting.** The owner stated (2026-11-19) that the site runs on the owner's own hardware in
-  Germany, at the owner's home. The privacy policy says so in both languages ("eigener Hardware" /
+  Germany. The privacy policy says so in both languages ("eigener Hardware" /
   "own hardware"), and names no hosting provider and no processor for hosting. This replaces the
   earlier confirmation of the "own premises" wording and the Hetzner Online GmbH address, which
   are gone from the page. The contact form text keeps only "we operate the mail server
@@ -209,9 +209,9 @@ the section in both languages of `PrivacyView.vue` to list exactly, and only, wh
   happens inside that one handler, never as further mux patterns) — the home page, the imprint,
   the privacy policy, the AGB and the 404 page all produce the identical logged value. The
   browser's user agent is not logged at all.
-- The legal basis and retention sentences were left exactly as they were, since the log
-  retention is already recorded above as a standing operational requirement rather than something
-  this section needed to restate.
+- When this finding was closed, the legal basis and retention sentences were left as they were.
+  They were later revised: see "Retention and legal basis" under "Resolved by the owner" for the
+  current state (30 days for both logs, up to 15 days for backups, Art. 6(1)(f) GDPR).
 
 This closes the finding.
 
