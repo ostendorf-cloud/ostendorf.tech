@@ -331,5 +331,6 @@ four points changed as a result, the cookie point; the other three held up uncha
 - The Instagram feed likewise does not exist on `feat/go-live` yet (also a later milestone); the
   privacy text's Instagram section remains forward-looking, based on `old_simon-ostendorf.de`'s
   `internal/instagram/client.go` and `feed.go`, and needs re-checking once that code lands.
-- The site is not cookie-free. `feat/go-live` sets one real cookie, on every page view, for the
-  reason and with the attributes described above; the privacy policy no longer claims otherwise.
+- The site is not cookie-free. `feat/go-live` sets one real cookie, only once the contact form
+  requests its task from the server, for the reason and with the attributes described above;
+  the privacy policy no longer claims otherwise.
