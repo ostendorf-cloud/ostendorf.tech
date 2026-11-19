@@ -53,9 +53,20 @@ Confirmed and left unchanged, because nothing was wrong:
   are gone from the page. The contact form text keeps only "we operate the mail server
   ourselves"; where that server runs is not stated.
 - **Retention and legal basis.** The owner stated: access logs 30 days, Umami statistics 14
-  months, backups 15 days, Art. 6(1)(f) GDPR for logs and counting. The page says exactly
-  that. Umami counting is stated as fact, without a "when switched on" hedge, because the
-  site counts page views in production.
+  months, backups up to 15 days, Art. 6(1)(f) GDPR for logs and counting. The page says exactly
+  that. It lists the application access log (method, route pattern, status, bytes, duration,
+  client IP; no user agent, no referrer) and the ingress access log separately, each with the 30
+  day retention. The ingress fields (IP address, time, request line, status and bytes, user
+  agent, referrer) come from the old simon-ostendorf.de privacy template. The exception for log
+  files kept as evidence "bis zur endgültigen Klärung des jeweiligen Vorfalls" is unchanged and
+  is a legal judgement for the owner, as it sits next to the 30 day maximum. The page now says
+  it is the only exception to the 30 days. It also states one purpose sentence each for logs
+  (operation, error analysis, abuse defence) and counting (understand how the site is used), plus
+  one sentence that the interest was weighed against visitor rights and the data is minimal. By
+  owner decision it adds no recipients, third country or data protection officer sentence. Umami
+  counting is
+  stated as fact, without a "when switched on" hedge, because the site counts page views in
+  production.
 - **English privacy policy and AGB.** Both now carry a full English translation, replacing the
   earlier stub that only pointed back to the German version. See "Translated pages" below.
 - **General, site-wide rate limiting.** The owner asked for it to be mentioned. It is now
