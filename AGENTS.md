@@ -102,7 +102,18 @@ The global baseline already applies here and is not repeated below.
   health, readiness and metrics, reached only from inside the cluster, never through the
   chart's own Ingress. `pages.go` is the catch-all document handler:
   the locale redirect at `/`, trailing slash canonicalisation, and serving the matching
-  prerendered file or a locale's own 404 page. `pages.go`'s own `routeFiles` is built
+  prerendered file or a locale's own 404 page. Every route except the home page is a
+  legal page and is served at govue's exact `/<code>/<page>` with no trailing slash
+  (`/de/imprint`, not `/de/imprint/`); the old trailing slash form and the former
+  `/<code>/agb/` path redirect with 301. `language.HandleLegal` (mounted in `webapp.go`
+  outside the route chain, with `Terms` on) adds `/imprint`, `/privacy`, `/terms` and the
+  German aliases `/impressum`, `/datenschutz`, `/datenschutzerklaerung`, `/agb`, which
+  answer 302 and are never counted as page views. `web/scripts/prerender.ts` also writes
+  a govue `sitemap.xml` into `prerendered/`, and `pnpm run prerender` ends with
+  `govue-check-legal --require-terms` over that directory, so a page without the footer
+  links or a missing legal page fails the build. The sitemap the server answers is the Go
+  one; `cmd/website`'s `TestRuntimeSitemapMatchesPrerenderedSitemap` keeps both on the
+  same paths. `pages.go`'s own `routeFiles` is built
   from `internal/routes`' embedded table, not hand written, so the page handler, the
   per-page mux registration and `sitemap.go`'s `/robots.txt`/`/sitemap.xml` (which reads
   that same `routeFiles`/`locales`) all answer from one list. That a page added to

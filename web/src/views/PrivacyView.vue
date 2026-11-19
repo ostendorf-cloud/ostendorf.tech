@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { GovuePage } from '@ostendorf-cloud/govue'
+import { GovueLegalPage } from '@ostendorf-cloud/govue'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,7 +14,13 @@ const germanHref = computed(
 </script>
 
 <template>
-  <GovuePage width="reading" :title="t('legal.privacy.title')">
+  <!-- The site's own skip link and language switch are in App.vue and the header. -->
+  <GovueLegalPage
+    page="privacy"
+    :title="t('legal.privacy.title')"
+    :skip-link="false"
+    :language-switch="false"
+  >
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
       <p class="text-text-muted">
         Kurz vorab: Diese Website setzt ein einziges, rein technisches Cookie zum Schutz des
@@ -1157,5 +1163,5 @@ const germanHref = computed(
         servers; WhatsApp's privacy policy applies to this.
       </p>
     </div>
-  </GovuePage>
+  </GovueLegalPage>
 </template>

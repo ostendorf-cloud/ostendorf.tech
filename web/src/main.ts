@@ -1,6 +1,6 @@
 import { createSSRApp } from 'vue'
 import { createWebHistory } from 'vue-router'
-import { useTheme } from '@ostendorf-cloud/govue'
+import { createGovueI18n, useTheme } from '@ostendorf-cloud/govue'
 
 import App from './App.vue'
 import { createAppI18n, detectPreferredLocale, isLocale } from './i18n'
@@ -31,6 +31,11 @@ attachLocaleSync(router, i18n.global.locale)
 const app = createSSRApp(App)
 app.use(router)
 app.use(i18n)
+// govue's language layer shares the site's own vue-i18n instance: it adds
+// the govue catalogues (the footer's legal link labels, the legal page
+// shell) and tells those components the active language. The route's own
+// :locale still decides the locale, see attachLocaleSync.
+app.use(createGovueI18n({ i18n, locale: initialLocale }))
 
 // router.isReady() resolves after the initial navigation, including the
 // async route components above, which is what the hydration this app

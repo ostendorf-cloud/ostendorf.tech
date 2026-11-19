@@ -18,7 +18,7 @@ func TestLoadParsesTheCheckedInRouteTable(t *testing.T) {
 		{Name: "home", Slug: "", File: "index.html"},
 		{Name: "imprint", Slug: "imprint", File: "imprint/index.html"},
 		{Name: "privacy", Slug: "privacy", File: "privacy/index.html"},
-		{Name: "agb", Slug: "agb", File: "agb/index.html"},
+		{Name: "terms", Slug: "terms", File: "terms/index.html"},
 	}
 	if len(table) != len(want) {
 		t.Fatalf("Load() returned %d routes, want %d: %+v", len(table), len(want), table)

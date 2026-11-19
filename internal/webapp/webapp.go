@@ -24,6 +24,7 @@ import (
 	"github.com/ostendorf-cloud/govue/clientip"
 	"github.com/ostendorf-cloud/govue/csrf"
 	"github.com/ostendorf-cloud/govue/health"
+	"github.com/ostendorf-cloud/govue/language"
 	"github.com/ostendorf-cloud/govue/metrics"
 	"github.com/ostendorf-cloud/govue/middleware"
 	"github.com/ostendorf-cloud/govue/ratelimit"
@@ -316,7 +317,11 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS) (*App,
 		return nil, fmt.Errorf("webapp: build app: %w", err)
 	}
 
-	a.handler = a.buildHandler(httpMetrics)
+	handler, err := a.buildHandler(httpMetrics)
+	if err != nil {
+		return nil, fmt.Errorf("webapp: build app: %w", err)
+	}
+	a.handler = handler
 	return a, nil
 }
 
@@ -414,7 +419,7 @@ func (a *App) AdminHandler() http.Handler {
 // one route chain applied to every handler the mux dispatches to. See
 // docs/concepts/govue.md in govue for why a single flat chain cannot get
 // both the access log and a self-answering middleware right at once.
-func (a *App) buildHandler(httpMetrics *metrics.HTTP) http.Handler {
+func (a *App) buildHandler(httpMetrics *metrics.HTTP) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	// route is the per-handler chain every page and bare resource gets: the
@@ -469,6 +474,18 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP) http.Handler {
 	mux.Handle("/api/", route(api.NotFoundHandler()))
 
 	registerRoutes(mux, a.pages, route, a.trackPageView)
+
+	// govue's legal routes: /imprint, /privacy and /terms to the page in the
+	// visitor's language, and the German aliases /impressum, /datenschutz,
+	// /datenschutzerklaerung and /agb to the German page. They answer a bare
+	// 302 and need no session and no CSRF check, so they sit outside the
+	// route chain, as govue's example does; the outer chain still applies.
+	// They never reach trackPageView, so no alias is counted as a page view.
+	// The site has terms (the AGB page), hence Terms.
+	if err := language.HandleLegal(mux, legalConfig(), nil); err != nil {
+		return nil, fmt.Errorf("legal routes: %w", err)
+	}
+
 	mux.Handle("/", route(a.pages.pageHandler()))
 
 	return middleware.Chain(mux,
@@ -477,5 +494,15 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP) http.Handler {
 		a.security.Middleware,
 		httpMetrics.Middleware,
 		a.accessLog.Middleware,
-	)
+	), nil
+}
+
+// legalConfig is the language configuration of the legal routes: the two
+// locales the site serves, German first as the default, and govue's
+// default language cookie. Terms is on because the site has an AGB page.
+func legalConfig() language.LegalConfig {
+	return language.LegalConfig{
+		Config: language.Config{Languages: locales, Default: defaultLocale},
+		Terms:  true,
+	}
 }

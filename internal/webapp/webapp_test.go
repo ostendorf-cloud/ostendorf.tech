@@ -247,9 +247,9 @@ func TestAppSitemapListsEveryRouteOfEveryLocaleWithAlternates(t *testing.T) {
 	for _, want := range []string{
 		"<loc>https://ostendorf.tech/de/</loc>",
 		"<loc>https://ostendorf.tech/en/</loc>",
-		"<loc>https://ostendorf.tech/de/imprint/</loc>",
-		"<loc>https://ostendorf.tech/en/privacy/</loc>",
-		"<loc>https://ostendorf.tech/de/agb/</loc>",
+		"<loc>https://ostendorf.tech/de/imprint</loc>",
+		"<loc>https://ostendorf.tech/en/privacy</loc>",
+		"<loc>https://ostendorf.tech/de/terms</loc>",
 		`hreflang="en" href="https://ostendorf.tech/en/"`,
 		`hreflang="x-default" href="https://ostendorf.tech/de/"`,
 	} {

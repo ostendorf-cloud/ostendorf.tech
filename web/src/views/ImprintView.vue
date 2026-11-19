@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { GovuePage } from '@ostendorf-cloud/govue'
+import { GovueLegalPage } from '@ostendorf-cloud/govue'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,7 +14,13 @@ const germanHref = computed(
 </script>
 
 <template>
-  <GovuePage width="reading" :title="t('legal.imprint.title')">
+  <!-- The site's own skip link and language switch are in App.vue and the header. -->
+  <GovueLegalPage
+    page="imprint"
+    :title="t('legal.imprint.title')"
+    :skip-link="false"
+    :language-switch="false"
+  >
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
       <p>
         Simon Ostendorf<br />
@@ -35,12 +41,6 @@ const germanHref = computed(
 
       <h2 class="text-xl font-semibold">Umsatzsteuer-ID</h2>
       <p>Umsatzsteuer-Identifikationsnummer gemäß §27a Umsatzsteuergesetz: DE362164357</p>
-
-      <h2 class="text-xl font-semibold">Verbraucherstreitbeilegung</h2>
-      <p>
-        Wir sind weder verpflichtet noch bereit, an einem Streitbeilegungsverfahren vor einer
-        Verbraucherschlichtungsstelle teilzunehmen.
-      </p>
     </div>
 
     <div v-else class="flex flex-col gap-4 text-text">
@@ -70,12 +70,6 @@ const germanHref = computed(
 
       <h2 class="text-xl font-semibold">VAT ID</h2>
       <p>VAT identification number per Section 27a of the German VAT Act: DE362164357</p>
-
-      <h2 class="text-xl font-semibold">Consumer dispute resolution</h2>
-      <p>
-        We are neither obliged nor willing to take part in dispute resolution proceedings before a
-        consumer arbitration board.
-      </p>
     </div>
-  </GovuePage>
+  </GovueLegalPage>
 </template>

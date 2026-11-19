@@ -16,17 +16,19 @@ import { fileURLToPath } from 'node:url'
 import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { createMemoryHistory } from 'vue-router'
-import { useTheme } from '@ostendorf-cloud/govue'
+import { createGovueI18n, sitemapXml, useTheme } from '@ostendorf-cloud/govue'
 
 import App from '../src/App.vue'
 import { createAppI18n, SUPPORTED_LOCALES, type Locale } from '../src/i18n'
 import { HERO_SIZES } from '../src/lib/heroImage'
+import { siteRouteDefs } from '../src/lib/legal'
 import { routeTable } from '../src/lib/routeTable'
 import {
   canonical,
   fullTitle,
   hreflangAlternates,
   NOT_FOUND,
+  SITE_URL,
   ogLocale,
   pageMeta,
   type PageRoute,
@@ -224,6 +226,9 @@ async function renderBody(locale: Locale, routerName: string): Promise<string> {
   const app = createSSRApp(App)
   app.use(router)
   app.use(i18n)
+  // The same language layer main.ts installs, so the footer's legal links
+  // and the legal page shell render in this page's language.
+  app.use(createGovueI18n({ i18n, locale }))
 
   await router.push({ name: routerName, params: { locale } })
   await router.isReady()
@@ -328,6 +333,16 @@ async function main(): Promise<void> {
       console.log(`wrote ${target}`)
     }
   }
+
+  // The input of govue-check-legal, which reads sitemap.xml next to the
+  // locale directories. It is govue's own sitemap of the same public routes.
+  // The one the server answers at /sitemap.xml is built in Go from the
+  // configured SITE_URL (internal/webapp/sitemap.go) and is not this file;
+  // cmd/website's TestRuntimeSitemapMatchesPrerenderedSitemap proves the
+  // two list the same paths.
+  const sitemap = join(outDir, 'sitemap.xml')
+  await writeFile(sitemap, sitemapXml(siteRouteDefs, SITE_URL), 'utf-8')
+  console.log(`wrote ${sitemap}`)
 }
 
 main().catch((error: unknown) => {

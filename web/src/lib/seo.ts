@@ -30,8 +30,9 @@ const slugs: Record<string, string> = Object.fromEntries(
 )
 slugs[NOT_FOUND] = ''
 
-/** path is the absolute path of route in locale, always starting and
- *  ending with a slash. */
+/** path is the absolute path of route in locale, starting with a slash.
+ *  The home page ends in one, every other page does not: that is govue's
+ *  legal path /<code>/<page>, exactly what the server registers. */
 export function path(locale: Locale, route: PageRoute): string {
   return `/${locale}/${slugs[route]}`
 }
@@ -72,7 +73,7 @@ export const titleKeys: Record<string, string> = {
   home: 'home.meta.title',
   imprint: 'legal.imprint.title',
   privacy: 'legal.privacy.title',
-  agb: 'legal.agb.title',
+  terms: 'legal.agb.title',
   notFound: 'notFound.title',
 }
 
@@ -80,7 +81,7 @@ export const descriptionKeys: Record<string, string> = {
   home: 'home.meta.description',
   imprint: 'legal.imprint.metaDescription',
   privacy: 'legal.privacy.metaDescription',
-  agb: 'legal.agb.metaDescription',
+  terms: 'legal.agb.metaDescription',
   notFound: 'notFound.lead',
 }
 

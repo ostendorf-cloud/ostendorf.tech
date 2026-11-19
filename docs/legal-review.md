@@ -17,6 +17,13 @@ marked below where `feat/go-live`'s actual code turned out to differ from it.
 Fixed directly, not listed here: the dispute resolution statement in the imprint (section 36
 VSBG), applied in German and English.
 
+Superseded later: the imprint no longer carries any dispute resolution section, German or
+English. The owner decided that no site of the organisation states one, and the pages moved onto
+govue's legal routes (`GovueLegalPage`, `language.HandleLegal`, `govue-check-legal`) without any
+other change to the imprint, privacy or AGB text. The pages are now served at the exact paths
+`/de/imprint`, `/en/imprint`, `/de/privacy`, `/en/privacy`, `/de/terms` and `/en/terms`; the
+former AGB path `/<code>/agb/` redirects to the terms page.
+
 Confirmed and left unchanged, because nothing was wrong:
 
 - Neither page cites section 5 TMG or section 5 DDG, so there is no statute reference to update.

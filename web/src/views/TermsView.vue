@@ -2,17 +2,23 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { GovuePage } from '@ostendorf-cloud/govue'
+import { GovueLegalPage } from '@ostendorf-cloud/govue'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
-const germanHref = computed(() => router.resolve({ name: 'agb', params: { locale: 'de' } }).href)
+const germanHref = computed(() => router.resolve({ name: 'terms', params: { locale: 'de' } }).href)
 </script>
 
 <template>
-  <GovuePage width="reading" :title="t('legal.agb.title')">
+  <!-- The site's own skip link and language switch are in App.vue and the header. -->
+  <GovueLegalPage
+    page="terms"
+    :title="t('legal.agb.title')"
+    :skip-link="false"
+    :language-switch="false"
+  >
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
       <h2 class="text-xl font-semibold">§ 1 Geltungsbereich</h2>
       <p>
@@ -345,5 +351,5 @@ const germanHref = computed(() => router.resolve({ name: 'agb', params: { locale
       </p>
       <p>There are no oral side agreements. Amendments and additions require written form.</p>
     </div>
-  </GovuePage>
+  </GovueLegalPage>
 </template>
