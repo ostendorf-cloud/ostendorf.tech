@@ -5,9 +5,9 @@ import { solve } from './pow-solve'
 // The same salt, number and resulting digest internal/pow's vector_test.go
 // pins on the Go side, so both implementations are checked against one
 // shared, known answer rather than only against each other.
-const knownSalt = '00112233445566778899aabb?expires=1790000000&issued=1789998200'
+const knownSalt = '00112233445566778899aabb?expires=1790000000&issued=1789998200&'
 const knownNumber = 4242
-const knownChallenge = '1f5e37a25a70f955cff381b03a1d9937bbe9471796bb25f057d1d795403035ab'
+const knownChallenge = '0a07febdfddcf8cff1953cbe2187efd37439e2d4bf0d78e7ed16fb4e58fdf810'
 
 describe('solve', () => {
   it('finds the known vector shared with the Go server', async () => {

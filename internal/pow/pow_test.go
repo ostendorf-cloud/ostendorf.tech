@@ -2,6 +2,7 @@ package pow
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -31,12 +32,86 @@ func solve(t *testing.T, c Challenge) Solution {
 func TestKnownVector(t *testing.T) {
 	t.Parallel()
 
-	salt := "00112233445566778899aabb?expires=1790000000&issued=1789998200"
-	if got := Hash(salt, 4242); got != knownChallenge {
+	if got := Hash(knownSalt, 4242); got != knownChallenge {
 		t.Errorf("Hash = %s, want %s", got, knownChallenge)
 	}
 	if got := Sign([]byte("test-key"), knownChallenge); got != knownSignature {
 		t.Errorf("Sign = %s, want %s", got, knownSignature)
+	}
+	if got := formatSalt([]byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb}, 1790000000, 1789998200); got != knownSalt {
+		t.Errorf("formatSalt = %s, want %s", got, knownSalt)
+	}
+	expires, issued, err := saltTimes(knownSalt)
+	if err != nil || expires.Unix() != 1790000000 || issued.Unix() != 1789998200 {
+		t.Errorf("saltTimes = %v, %v, %v", expires, issued, err)
+	}
+}
+
+func TestCreatedSaltShape(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+	c, err := newTestService(&now).Create(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(c.Salt, "&") || strings.HasSuffix(c.Salt, "&&") {
+		t.Errorf("salt %q does not end with exactly one separator", c.Salt)
+	}
+	if _, _, err := saltTimes(c.Salt); err != nil {
+		t.Errorf("created salt does not parse: %v", err)
+	}
+}
+
+// signedSolution builds a solution for an arbitrary salt that is correctly
+// hashed and signed, so only the salt shape decides the outcome.
+func signedSolution(salt string, number int64) Solution {
+	challenge := Hash(salt, number)
+	return Solution{Algorithm: Algorithm, Challenge: challenge, Number: number, Salt: salt, Signature: Sign(key, challenge)}
+}
+
+func TestSaltShape(t *testing.T) {
+	t.Parallel()
+
+	const nonce = "00112233445566778899aabb"
+	cases := []struct {
+		name string
+		salt string
+		ok   bool
+	}{
+		{"canonical", nonce + "?expires=1790000000&issued=1789998200&", true},
+		{"no trailing separator", nonce + "?expires=1790000000&issued=1789998200", false},
+		{"doubled trailing separator", nonce + "?expires=1790000000&issued=1789998200&&", false},
+		{"trailing text after separator", nonce + "?expires=1790000000&issued=1789998200&x", false},
+		{"no question mark", nonce + "&expires=1790000000&issued=1789998200&", false},
+		{"short nonce", "0011?expires=1790000000&issued=1789998200&", false},
+		{"upper case nonce", "00112233445566778899AABB?expires=1790000000&issued=1789998200&", false},
+		{"non hex nonce", "00112233445566778899aabz?expires=1790000000&issued=1789998200&", false},
+		{"swapped fields", nonce + "?issued=1789998200&expires=1790000000&", false},
+		{"missing issued", nonce + "?expires=1790000000&", false},
+		{"empty issued", nonce + "?expires=1790000000&issued=&", false},
+		{"leading zero", nonce + "?expires=1790000000&issued=01789998200&", false},
+		{"plus sign", nonce + "?expires=1790000000&issued=+1789998200&", false},
+		{"negative", nonce + "?expires=1790000000&issued=-1&", false},
+		{"non numeric", nonce + "?expires=abc&issued=1789998200&", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			now := time.Unix(1789998200, 0).Add(5 * time.Second)
+			s := newTestService(&now)
+			err := s.Verify([][]byte{key}, signedSolution(tc.salt, 7))
+			if tc.ok && err != nil {
+				t.Fatalf("err = %v, want nil", err)
+			}
+			if !tc.ok && !errors.Is(err, ErrInvalid) {
+				t.Fatalf("err = %v, want ErrInvalid", err)
+			}
+			if !tc.ok && s.UsedCount() != 0 {
+				t.Error("rejected solution was marked used")
+			}
+		})
 	}
 }
 

@@ -3,10 +3,13 @@
 // HMAC over the challenge proves that the server issued it. The salt carries
 // the expiry and the issue time, and the hash binds both to the challenge.
 //
-// Ported from old_simon-ostendorf.de's internal/pow, unchanged: the algorithm
-// and the wire shape are a contract with the browser worker that solves it,
-// and changing either here without changing the worker would just break the
-// form.
+// The salt is "<nonce>?expires=<unix>&issued=<unix>&": it ends with a fixed
+// "&" and the parser requires it. The hash input is the salt followed by the
+// number in decimal. This aligns the salt format with the shared pow package.
+//
+// Ported from old_simon-ostendorf.de's internal/pow: the algorithm and the
+// wire shape are a contract with the browser worker that solves it, which
+// treats the salt as an opaque string.
 package pow
 
 import (
@@ -18,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,6 +29,9 @@ import (
 
 // Algorithm is the only hash algorithm offered and accepted.
 const Algorithm = "SHA-256"
+
+// nonceLen is the random part of a salt, in bytes.
+const nonceLen = 12
 
 var (
 	// ErrInvalid covers a malformed payload, a wrong number and a bad signature.
@@ -109,7 +114,7 @@ func (s *Service) Create(key []byte) (Challenge, error) {
 	if len(key) == 0 {
 		return Challenge{}, errors.New("pow: no key")
 	}
-	var nonce [12]byte
+	var nonce [nonceLen]byte
 	if _, err := io.ReadFull(s.Rand, nonce[:]); err != nil {
 		return Challenge{}, fmt.Errorf("pow: salt: %w", err)
 	}
@@ -118,7 +123,7 @@ func (s *Service) Create(key []byte) (Challenge, error) {
 		return Challenge{}, fmt.Errorf("pow: number: %w", err)
 	}
 	now := s.Now()
-	salt := fmt.Sprintf("%x?expires=%d&issued=%d", nonce, now.Add(s.TTL).Unix(), now.Unix())
+	salt := formatSalt(nonce[:], now.Add(s.TTL).Unix(), now.Unix())
 	challenge := Hash(salt, n.Int64())
 	return Challenge{
 		Algorithm: Algorithm,
@@ -129,31 +134,53 @@ func (s *Service) Create(key []byte) (Challenge, error) {
 	}, nil
 }
 
-// saltTimes reads expires and issued from the salt's query part.
+// formatSalt is the one shape of a salt: a nonce, expires and issued, and a
+// fixed trailing "&" that ends the salt before the number in the hash input.
+func formatSalt(nonce []byte, expires, issued int64) string {
+	return fmt.Sprintf("%x?expires=%d&issued=%d&", nonce, expires, issued)
+}
+
+// saltTimes reads expires and issued from a salt of the shape formatSalt
+// writes: 24 lower case hex digits, "?expires=", a canonical decimal,
+// "&issued=", a canonical decimal and the trailing "&". It refuses anything else.
 func saltTimes(salt string) (expires, issued time.Time, err error) {
-	_, query, ok := strings.Cut(salt, "?")
+	nonce, query, ok := strings.Cut(salt, "?")
+	if !ok || len(nonce) != 2*nonceLen || !isLowerHex(nonce) {
+		return time.Time{}, time.Time{}, ErrInvalid
+	}
+	rest, ok := strings.CutPrefix(query, "expires=")
 	if !ok {
 		return time.Time{}, time.Time{}, ErrInvalid
 	}
-	params, err := url.ParseQuery(query)
-	if err != nil {
+	expText, issText, ok := strings.Cut(rest, "&issued=")
+	if !ok {
 		return time.Time{}, time.Time{}, ErrInvalid
 	}
-	exp, err1 := strconv.ParseInt(params.Get("expires"), 10, 64)
-	iss, err2 := strconv.ParseInt(params.Get("issued"), 10, 64)
-	if err1 != nil || err2 != nil {
+	issText, ok = strings.CutSuffix(issText, "&")
+	if !ok {
+		return time.Time{}, time.Time{}, ErrInvalid
+	}
+	exp, err1 := strconv.ParseInt(expText, 10, 64)
+	iss, err2 := strconv.ParseInt(issText, 10, 64)
+	if err1 != nil || err2 != nil ||
+		strconv.FormatInt(exp, 10) != expText || strconv.FormatInt(iss, 10) != issText ||
+		exp < 0 || iss < 0 {
 		return time.Time{}, time.Time{}, ErrInvalid
 	}
 	return time.Unix(exp, 0), time.Unix(iss, 0), nil
 }
 
-func isHex64(s string) bool {
-	if len(s) != 64 {
-		return false
+func isLowerHex(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
 	}
-	_, err := hex.DecodeString(s)
-	return err == nil
+	return true
 }
+
+func isHex64(s string) bool { return len(s) == 64 && isLowerHex(s) }
 
 // Verify checks sol against any of keys (the current key first, then older
 // ones during a rotation) and marks it used. It is called only after the
