@@ -7,7 +7,7 @@ import { createChallengeSolver } from './contactChallenge'
  *  challenge; nothing in this suite calls POST /contact. */
 function fakeClient(overrides: Partial<{ maxnumber: number; csrfToken: string }> = {}): ApiClient {
   const now = Math.floor(Date.now() / 1000)
-  const salt = `deadbeef?expires=${now + 600}&issued=${now}`
+  const salt = `00112233445566778899aabb?expires=${now + 600}&issued=${now}&`
   return {
     get: vi.fn().mockResolvedValue({
       algorithm: 'SHA-256',
