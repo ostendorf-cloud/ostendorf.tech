@@ -2,5 +2,5 @@
   { "name": "home", "slug": "", "file": "index.html" },
   { "name": "imprint", "slug": "imprint", "file": "imprint/index.html" },
   { "name": "privacy", "slug": "privacy", "file": "privacy/index.html" },
-  { "name": "agb", "slug": "agb", "file": "agb/index.html" }
+  { "name": "terms", "slug": "terms", "file": "terms/index.html" }
 ]

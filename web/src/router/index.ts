@@ -14,7 +14,7 @@ export const views: Record<string, () => Promise<unknown>> = {
   home: () => import('../views/HomeView.vue'),
   imprint: () => import('../views/ImprintView.vue'),
   privacy: () => import('../views/PrivacyView.vue'),
-  agb: () => import('../views/AgbView.vue'),
+  terms: () => import('../views/TermsView.vue'),
 }
 
 const notFoundView = () => import('../views/NotFoundView.vue')
@@ -27,9 +27,11 @@ const notFoundView = () => import('../views/NotFoundView.vue')
 export const NOT_FOUND_ROUTE_NAME = 'not-found'
 
 /** routePath is the router path pattern for slug, the home page's own
- *  empty slug included. */
-function routePath(slug: string): string {
-  return slug === '' ? '/:locale(de|en)/' : `/:locale(de|en)/${slug}/`
+ *  empty slug included. Only the home page ends in a slash: every other
+ *  route is a legal page, whose canonical path is govue's exact
+ *  /<code>/<page> (see web/src/lib/legal.ts). */
+export function routePath(slug: string): string {
+  return slug === '' ? '/:locale(de|en)/' : `/:locale(de|en)/${slug}`
 }
 
 /** pageRoutes builds one vue-router route per routes.json entry: adding a

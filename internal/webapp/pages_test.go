@@ -18,12 +18,12 @@ func testPageServer(t *testing.T) *pageServer {
 		"de/index.html":         &fstest.MapFile{Data: []byte("<html><body>Startseite</body></html>")},
 		"de/imprint/index.html": &fstest.MapFile{Data: []byte("<html><body>Impressum</body></html>")},
 		"de/privacy/index.html": &fstest.MapFile{Data: []byte("<html><body>Datenschutz</body></html>")},
-		"de/agb/index.html":     &fstest.MapFile{Data: []byte("<html><body>AGB</body></html>")},
+		"de/terms/index.html":   &fstest.MapFile{Data: []byte("<html><body>AGB</body></html>")},
 		"de/404.html":           &fstest.MapFile{Data: []byte("<html><body>Nicht gefunden</body></html>")},
 		"en/index.html":         &fstest.MapFile{Data: []byte("<html><body>Home</body></html>")},
 		"en/imprint/index.html": &fstest.MapFile{Data: []byte("<html><body>Imprint</body></html>")},
 		"en/privacy/index.html": &fstest.MapFile{Data: []byte("<html><body>Privacy</body></html>")},
-		"en/agb/index.html":     &fstest.MapFile{Data: []byte("<html><body>Terms</body></html>")},
+		"en/terms/index.html":   &fstest.MapFile{Data: []byte("<html><body>Terms</body></html>")},
 		"en/404.html":           &fstest.MapFile{Data: []byte("<html><body>Not found</body></html>")},
 	}
 	p, err := newPageServer(dist, prerendered)
@@ -62,13 +62,13 @@ func TestPageHandlerServesKnownRoutes(t *testing.T) {
 		wantPattern string
 	}{
 		"german home":     {"/de/", http.StatusOK, "Startseite", "GET /de/{$}"},
-		"german imprint":  {"/de/imprint/", http.StatusOK, "Impressum", "GET /de/imprint/{$}"},
-		"german privacy":  {"/de/privacy/", http.StatusOK, "Datenschutz", "GET /de/privacy/{$}"},
-		"german agb":      {"/de/agb/", http.StatusOK, "AGB", "GET /de/agb/{$}"},
+		"german imprint":  {"/de/imprint", http.StatusOK, "Impressum", "GET /de/imprint"},
+		"german privacy":  {"/de/privacy", http.StatusOK, "Datenschutz", "GET /de/privacy"},
+		"german terms":    {"/de/terms", http.StatusOK, "AGB", "GET /de/terms"},
 		"english home":    {"/en/", http.StatusOK, "Home", "GET /en/{$}"},
-		"english imprint": {"/en/imprint/", http.StatusOK, "Imprint", "GET /en/imprint/{$}"},
-		"english privacy": {"/en/privacy/", http.StatusOK, "Privacy", "GET /en/privacy/{$}"},
-		"english agb":     {"/en/agb/", http.StatusOK, "Terms", "GET /en/agb/{$}"},
+		"english imprint": {"/en/imprint", http.StatusOK, "Imprint", "GET /en/imprint"},
+		"english privacy": {"/en/privacy", http.StatusOK, "Privacy", "GET /en/privacy"},
+		"english terms":   {"/en/terms", http.StatusOK, "Terms", "GET /en/terms"},
 	}
 
 	for name, tc := range tests {
@@ -158,29 +158,64 @@ func TestPageHandlerRedirectsRoot(t *testing.T) {
 
 func TestPageHandlerCanonicalizesTrailingSlash(t *testing.T) {
 	p := testPageServer(t)
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/imprint", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/kontakt", nil)
 	rec := httptest.NewRecorder()
 	p.pageHandler().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusMovedPermanently {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMovedPermanently)
 	}
-	if got := rec.Header().Get("Location"); got != "/de/imprint/" {
-		t.Errorf("Location = %q, want /de/imprint/", got)
+	if got := rec.Header().Get("Location"); got != "/de/kontakt/" {
+		t.Errorf("Location = %q, want /de/kontakt/", got)
+	}
+}
+
+// TestLegalPagesRedirectTheirOldTrailingSlashForm pins the other direction:
+// the legal pages are served without a trailing slash, so the old form
+// redirects to it, and the former /agb/ path lands on the terms page.
+func TestLegalPagesRedirectTheirOldTrailingSlashForm(t *testing.T) {
+	p := testPageServer(t)
+	mux := testMux(t, p, nil)
+
+	tests := map[string]struct {
+		path         string
+		wantLocation string
+	}{
+		"imprint":              {"/de/imprint/", "/de/imprint"},
+		"privacy":              {"/en/privacy/", "/en/privacy"},
+		"terms":                {"/en/terms/", "/en/terms"},
+		"agb with slash":       {"/de/agb/", "/de/terms"},
+		"agb without slash":    {"/de/agb", "/de/terms"},
+		"query is kept":        {"/de/imprint/?utm_source=x", "/de/imprint?utm_source=x"},
+		"english agb legacy":   {"/en/agb/", "/en/terms"},
+		"german agb with data": {"/de/agb?a=b", "/de/terms?a=b"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusMovedPermanently {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusMovedPermanently)
+			}
+			if got := rec.Header().Get("Location"); got != tc.wantLocation {
+				t.Errorf("Location = %q, want %q", got, tc.wantLocation)
+			}
+		})
 	}
 }
 
 func TestPageHandlerCanonicalizesTrailingSlashPreservesQuery(t *testing.T) {
 	p := testPageServer(t)
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/imprint?utm_source=x", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/kontakt?utm_source=x", nil)
 	rec := httptest.NewRecorder()
 	p.pageHandler().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusMovedPermanently {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMovedPermanently)
 	}
-	if got := rec.Header().Get("Location"); got != "/de/imprint/?utm_source=x" {
-		t.Errorf("Location = %q, want /de/imprint/?utm_source=x", got)
+	if got := rec.Header().Get("Location"); got != "/de/kontakt/?utm_source=x" {
+		t.Errorf("Location = %q, want /de/kontakt/?utm_source=x", got)
 	}
 }
 
@@ -266,10 +301,10 @@ func titledPageServer(t *testing.T) *pageServer {
 		// No title at all: a page view still counts, with none.
 		"de/privacy/index.html": &fstest.MapFile{Data: []byte("<html><body>Datenschutz</body></html>")},
 		// Malformed: an opening tag that never closes.
-		"de/agb/index.html": &fstest.MapFile{Data: []byte("<html><head><title>AGB</head><body>AGB</body></html>")},
-		"de/404.html":       &fstest.MapFile{Data: []byte("<html><body>Nicht gefunden</body></html>")},
-		"en/index.html":     &fstest.MapFile{Data: []byte("<html><head><title>Simon Ostendorf &#8211; Event technology</title></head><body>Home</body></html>")},
-		"en/404.html":       &fstest.MapFile{Data: []byte("<html><body>Not found</body></html>")},
+		"de/terms/index.html": &fstest.MapFile{Data: []byte("<html><head><title>AGB</head><body>AGB</body></html>")},
+		"de/404.html":         &fstest.MapFile{Data: []byte("<html><body>Nicht gefunden</body></html>")},
+		"en/index.html":       &fstest.MapFile{Data: []byte("<html><head><title>Simon Ostendorf &#8211; Event technology</title></head><body>Home</body></html>")},
+		"en/404.html":         &fstest.MapFile{Data: []byte("<html><body>Not found</body></html>")},
 	}
 	p, err := newPageServer(dist, prerendered)
 	if err != nil {
@@ -291,7 +326,7 @@ func TestPageTitlesAreReadFromThePrerenderedHTML(t *testing.T) {
 		"plain title":               {"de/imprint/index.html", "Impressum – Simon Ostendorf"},
 		"english title":             {"en/index.html", "Simon Ostendorf – Event technology"},
 		"page without a title":      {"de/privacy/index.html", ""},
-		"unclosed title element":    {"de/agb/index.html", ""},
+		"unclosed title element":    {"de/terms/index.html", ""},
 		// Never prerendered at all in this fixture.
 		"missing file": {"en/imprint/index.html", ""},
 	}
@@ -310,7 +345,7 @@ func TestPageViewIsTrackedWithItsTitle(t *testing.T) {
 	tracker := &recordingTracker{}
 	mux := testMux(t, p, tracker.track)
 
-	for _, path := range []string{"/de/", "/de/imprint/", "/de/privacy/"} {
+	for _, path := range []string{"/de/", "/de/imprint", "/de/privacy"} {
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, req)
@@ -321,10 +356,10 @@ func TestPageViewIsTrackedWithItsTitle(t *testing.T) {
 
 	want := []trackedView{
 		{path: "/de/", title: "Simon Ostendorf – Veranstaltungstechnik"},
-		{path: "/de/imprint/", title: "Impressum – Simon Ostendorf"},
+		{path: "/de/imprint", title: "Impressum – Simon Ostendorf"},
 		// A page whose HTML carries no title is still a page view; only
 		// the title is missing, which Umami then leaves out.
-		{path: "/de/privacy/", title: ""},
+		{path: "/de/privacy", title: ""},
 	}
 	if len(tracker.views) != len(want) {
 		t.Fatalf("tracked %+v, want %+v", tracker.views, want)
@@ -345,10 +380,12 @@ func TestOnlyARealPageViewIsTracked(t *testing.T) {
 
 	for _, path := range []string{
 		"/",            // locale redirect
-		"/de/imprint",  // trailing slash redirect
+		"/de/kontakt",  // trailing slash redirect
+		"/de/imprint/", // legacy trailing slash redirect
+		"/de/agb/",     // legacy AGB redirect
 		"/de/kontakt/", // unknown route, 404
 		"/fr/",         // unknown locale, 404
-		"/en/imprint/", // known route whose file is missing, falls back to 404
+		"/en/imprint",  // known route whose file is missing, falls back to 404
 	} {
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 		mux.ServeHTTP(httptest.NewRecorder(), req)

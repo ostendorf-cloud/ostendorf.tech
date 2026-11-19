@@ -77,11 +77,33 @@ func routeSlugs() []string {
 // known locale avoids that ambiguity entirely, since "de" and "en" never
 // overlap with any other top-level route this mux serves, and still
 // yields one distinct, attributable pattern per page per locale.
+//
+// Only the home page keeps its trailing slash. Every other route is a
+// legal page, whose canonical path is govue's exact /<code>/<page> with no
+// trailing slash: govue's footer links, its sitemap entries and its build
+// check all use that form, and the check rejects a trailing slash because
+// the server answers exact patterns only.
 func routePattern(locale, slug string) string {
 	if slug == "" {
 		return "GET /" + locale + "/{$}"
 	}
-	return "GET /" + locale + "/" + slug + "/{$}"
+	return "GET /" + locale + "/" + slug
+}
+
+// legacyRedirects maps the old path of a page, relative to a locale, to its
+// current slug. The AGB page used to live at /<code>/agb/ and is the terms
+// page of govue's legal routes now.
+var legacyRedirects = map[string]string{"agb": "terms"}
+
+// redirectPermanently answers 301 to target, keeping the query string.
+func redirectPermanently(target string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		to := target
+		if r.URL.RawQuery != "" {
+			to += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, to, http.StatusMovedPermanently)
+	})
 }
 
 // registerRoutes registers one http.ServeMux pattern per known locale and
@@ -99,6 +121,15 @@ func registerRoutes(mux *http.ServeMux, p *pageServer, wrap func(http.Handler) h
 	for _, locale := range locales {
 		for _, slug := range routeSlugs() {
 			mux.Handle(routePattern(locale, slug), wrap(p.routeHandler(locale, slug, track)))
+			if slug != "" {
+				// The former trailing slash form of the page.
+				mux.Handle("GET /"+locale+"/"+slug+"/{$}", wrap(redirectPermanently("/"+locale+"/"+slug)))
+			}
+		}
+		for old, current := range legacyRedirects {
+			target := "/" + locale + "/" + current
+			mux.Handle("GET /"+locale+"/"+old, wrap(redirectPermanently(target)))
+			mux.Handle("GET /"+locale+"/"+old+"/{$}", wrap(redirectPermanently(target)))
 		}
 	}
 }

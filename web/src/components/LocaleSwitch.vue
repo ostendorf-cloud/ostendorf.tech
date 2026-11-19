@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { type Locale } from '../i18n'
+import { NOT_FOUND_ROUTE_NAME } from '../router'
 
 /** The other locale's version of the current route: same name, same
  *  params and hash, only :locale swapped, so switching never drops a
@@ -15,15 +16,17 @@ const { t } = useI18n()
 const otherLocale = computed<Locale>(() => (route.params.locale === 'de' ? 'en' : 'de'))
 // A repeatable param resolved with no entries, the not-found route's own
 // pathMatch for instance, drops the trailing slash the route pattern
-// otherwise always carries; restored here so the link is already
-// canonical instead of relying on the server's own redirect for it.
+// carries; restored here for that route only, so the link is already
+// canonical instead of relying on the server's own redirect for it. The
+// legal pages never end in a slash: govue's /<code>/<page> is the one
+// canonical path and the server answers a slash with a redirect.
 const target = computed(() => {
   const href = router.resolve({
     name: route.name ?? undefined,
     params: { ...route.params, locale: otherLocale.value },
     hash: route.hash,
   }).href
-  return href.endsWith('/') ? href : `${href}/`
+  return route.name === NOT_FOUND_ROUTE_NAME && !href.endsWith('/') ? `${href}/` : href
 })
 </script>
 
