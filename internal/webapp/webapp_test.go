@@ -77,9 +77,7 @@ func decodeError(t *testing.T, body []byte) (code, message string) {
 }
 
 func testFS() (dist, prerendered fstest.MapFS) {
-	dist = fstest.MapFS{
-		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('app')")},
-	}
+	dist = testDist()
 	prerendered = fstest.MapFS{
 		// de/index.html carries the theme-boot marker every real
 		// prerendered page does, so New's themeBootScriptHash finds
@@ -190,7 +188,7 @@ func TestAppRateLimitsExcessRequests(t *testing.T) {
 		"RATE_LIMIT_BURST": "1",
 		"RATE_LIMIT_PER":   "1m",
 	})
-	dist := fstest.MapFS{"assets/app.js": &fstest.MapFile{Data: []byte("x")}}
+	dist := testDist()
 	prerendered := fstest.MapFS{
 		"de/index.html": &fstest.MapFile{Data: []byte(`<html><head><script id="theme-boot">(function(){})();</script></head></html>`)},
 		"de/404.html":   &fstest.MapFile{Data: []byte("<html></html>")},
@@ -773,7 +771,7 @@ func TestAppAssetRateLimitStaysJSON(t *testing.T) {
 		"RATE_LIMIT_BURST": "1",
 		"RATE_LIMIT_PER":   "1m",
 	})
-	dist := fstest.MapFS{"assets/app.js": &fstest.MapFile{Data: []byte("x")}}
+	dist := testDist()
 	prerendered := fstest.MapFS{
 		"de/index.html": &fstest.MapFile{Data: []byte(`<html><head><script id="theme-boot">(function(){})();</script></head></html>`)},
 		"de/404.html":   &fstest.MapFile{Data: []byte("<html></html>")},

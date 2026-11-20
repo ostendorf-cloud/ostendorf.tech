@@ -485,6 +485,9 @@ func (a *App) buildHandler(httpMetrics *metrics.HTTP) (http.Handler, error) {
 	}
 
 	mux.Handle("GET /assets/", route(a.pages.assetHandler()))
+	for p := range publicFiles {
+		mux.Handle("GET "+p, route(a.pages.publicFileHandler(p)))
+	}
 	mux.Handle("GET /robots.txt", route(a.robotsHandler()))
 	mux.Handle("GET /sitemap.xml", route(a.sitemapHandler()))
 

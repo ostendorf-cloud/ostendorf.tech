@@ -11,9 +11,7 @@ import (
 
 func testPageServer(t *testing.T) *pageServer {
 	t.Helper()
-	dist := fstest.MapFS{
-		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('app')")},
-	}
+	dist := testDist()
 	prerendered := fstest.MapFS{
 		"de/index.html":         &fstest.MapFile{Data: []byte("<html><body>Startseite</body></html>")},
 		"de/imprint/index.html": &fstest.MapFile{Data: []byte("<html><body>Impressum</body></html>")},
