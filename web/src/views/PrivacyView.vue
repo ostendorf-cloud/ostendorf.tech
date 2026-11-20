@@ -27,7 +27,7 @@ const germanHref = computed(
         Kontaktformulars (siehe Abschnitt „Cookies“), nutzt aber keine Tracking- oder Werbedienste
         und bindet keine Inhalte von Drittanbietern ein. Ihr Browser lädt alle Inhalte
         ausschließlich von unserem eigenen Server. Eine Besucherstatistik erstellen wir selbst auf
-        unseren eigenen Servern, ohne Skript in Ihrem Browser und ohne sonst etwas auf Ihrem
+        eigener Hardware in Deutschland, ohne Skript in Ihrem Browser und ohne sonst etwas auf Ihrem
         Endgerät zu speichern.
       </p>
 
@@ -92,21 +92,21 @@ const germanHref = computed(
       <h3 class="text-lg font-semibold">Analyse-Tools und Tools von Drittanbietern</h3>
       <p>
         Beim Besuch dieser Website werden die aufgerufenen Seiten statistisch ausgewertet. Das
-        geschieht mit der Open-Source-Software Umami, die wir selbst auf unseren eigenen Servern
-        betreiben; es werden dafür keine Cookies gesetzt, kein Skript in Ihrem Browser ausgeführt
-        und keine Daten an Dritte übermittelt. Tracking- oder Werbedienste und Tools von
+        geschieht mit der Open-Source-Software Umami, die wir selbst auf eigener Hardware in
+        Deutschland betreiben; es werden dafür keine Cookies gesetzt, kein Skript in Ihrem Browser
+        ausgeführt und keine Daten an Dritte übermittelt. Tracking- oder Werbedienste und Tools von
         Drittanbietern setzen wir nicht ein. Details finden Sie im Abschnitt „Besucherstatistik mit
         Umami“.
       </p>
 
       <h2 class="text-xl font-semibold">2. Hosting</h2>
 
-      <h3 class="text-lg font-semibold">Hosting auf eigenen Servern</h3>
+      <h3 class="text-lg font-semibold">Hosting auf eigener Hardware</h3>
       <p>
-        Wir hosten die Inhalte unserer Website selbst. Die Website läuft auf eigenen Servern, die
-        wir in unseren eigenen Räumlichkeiten in Deutschland betreiben. Einen externen
-        Hosting-Anbieter setzen wir für die Website nicht ein; die beim Besuch der Website
-        anfallenden Daten (siehe „Server-Log-Dateien“) werden auf diesen Servern verarbeitet.
+        Wir hosten die Inhalte unserer Website selbst. Die Website wird auf eigener Hardware in
+        Deutschland betrieben. Einen Hosting-Anbieter und einen Auftragsverarbeiter für das Hosting
+        gibt es nicht; die beim Besuch der Website anfallenden Daten (siehe „Server-Log-Dateien“)
+        werden auf dieser Hardware verarbeitet.
       </p>
       <p>
         Der Betrieb erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Wir haben ein berechtigtes
@@ -349,8 +349,8 @@ const germanHref = computed(
 
       <h3 class="text-lg font-semibold">Server-Log-Dateien</h3>
       <p>
-        Bei jedem Aufruf dieser Website schreibt unser Webserver automatisch eine Protokollzeile.
-        Darin festgehalten werden:
+        Bei jedem Aufruf dieser Website schreibt unsere Anwendung (unser Webserver) automatisch eine
+        Protokollzeile, das Zugriffsprotokoll der Anwendung. Darin festgehalten werden:
       </p>
       <ul class="list-disc pl-6">
         <li>Zeitpunkt der Anfrage</li>
@@ -371,21 +371,41 @@ const germanHref = computed(
         <li>Bearbeitungsdauer der Anfrage</li>
       </ul>
       <p>
-        Nicht erfasst werden dabei der Browsertyp Ihres Geräts (User-Agent) und eine etwaige
-        Referrer-URL.
+        Nicht erfasst werden im Zugriffsprotokoll der Anwendung der Browsertyp Ihres Geräts
+        (User-Agent) und eine etwaige Referrer-URL.
       </p>
+      <p>
+        Zusätzlich erhebt und speichert der vorgeschaltete Ingress (der Reverse-Proxy, über den Ihre
+        Anfrage zu unserer Anwendung gelangt) automatisch Informationen in einem eigenen
+        Zugriffsprotokoll, die Ihr Browser an uns übermittelt. Dies sind:
+      </p>
+      <ul class="list-disc pl-6">
+        <li>IP-Adresse</li>
+        <li>Datum und Uhrzeit der Serveranfrage</li>
+        <li>
+          Anfragezeile (aufgerufene Seite bzw. Datei mit etwaigen Parametern, Anfragemethode und
+          Protokollversion)
+        </li>
+        <li>HTTP-Statuscode und übertragene Datenmenge</li>
+        <li>Browsertyp und Browserversion sowie verwendetes Betriebssystem (User-Agent)</li>
+        <li>Referrer URL, sofern Ihr Browser sie übermittelt</li>
+      </ul>
       <p>Eine Zusammenführung dieser Daten mit anderen Datenquellen wird nicht vorgenommen.</p>
       <p>
         Die Erfassung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Der
         Websitebetreiber hat ein berechtigtes Interesse an der technisch fehlerfreien Darstellung,
         der Sicherheit und der Optimierung seiner Website sowie an der Abwehr von Missbrauch –
-        hierzu müssen die Server-Log-Files erfasst werden.
+        hierzu müssen die Server-Log-Files erfasst werden. Wir verarbeiten die Log-Daten, um den
+        Betrieb der Website sicherzustellen, Fehler zu analysieren und Missbrauch abzuwehren. Dieses
+        Interesse haben wir gegen Ihre Rechte und Interessen abgewogen; die Daten werden auf das
+        dafür Erforderliche beschränkt.
       </p>
       <p>
-        Die Log-Dateien werden nur für einen begrenzten Zeitraum aufbewahrt und spätestens nach 30
-        Tagen automatisch gelöscht. Log-Dateien, deren weitere Aufbewahrung zu Beweiszwecken
-        erforderlich ist, sind bis zur endgültigen Klärung des jeweiligen Vorfalls von der Löschung
-        ausgenommen.
+        Beide Log-Dateien, das Zugriffsprotokoll der Anwendung und das des Ingress, werden nur für
+        einen begrenzten Zeitraum aufbewahrt und spätestens nach 30 Tagen automatisch gelöscht. Die
+        einzige Ausnahme von diesen 30 Tagen: Log-Dateien, deren weitere Aufbewahrung zu
+        Beweiszwecken erforderlich ist, sind bis zur endgültigen Klärung des jeweiligen Vorfalls von
+        der Löschung ausgenommen.
       </p>
 
       <h3 class="text-lg font-semibold">Ratenbegrenzung</h3>
@@ -418,16 +438,15 @@ const germanHref = computed(
       <p>
         Um zu verstehen, welche Inhalte unserer Website gelesen werden und wie Besucher zu uns
         finden, erstellen wir eine Besucherstatistik mit der Open-Source-Software Umami. Umami
-        betreiben wir selbst auf unseren eigenen Servern in Deutschland (siehe „Hosting auf eigenen
-        Servern“). Sicherungskopien der Statistik-Datenbank speichern wir bei der Hetzner Online
-        GmbH, Industriestr. 25, 91710 Gunzenhausen, in einem Rechenzentrum in Deutschland; darüber
-        hinaus werden die Daten nicht an Dritte übermittelt.
+        betreiben wir selbst auf eigener Hardware in Deutschland (siehe „Hosting auf eigener
+        Hardware“). Unsere Website zählt Seitenaufrufe auf dem Server mit Umami; die Daten werden
+        nicht an Dritte übermittelt.
       </p>
       <p>
         Umami läuft nicht in Ihrem Browser: Es wird kein Skript geladen, kein Cookie gesetzt und
         nichts auf Ihrem Endgerät gespeichert oder ausgelesen. Stattdessen meldet unser Webserver
-        jeden Aufruf einer Seite an Umami, mit den Angaben, die Ihr Browser beim Aufruf ohnehin an
-        uns übermittelt:
+        Aufrufe einer Seite an Umami, mit den Angaben, die Ihr Browser beim Aufruf ohnehin an uns
+        übermittelt:
       </p>
       <ul class="list-disc pl-6">
         <li>
@@ -449,14 +468,14 @@ const germanHref = computed(
         Aus der gekürzten IP-Adresse ermittelt Umami Land, Region und Stadt. Aus gekürzter
         IP-Adresse, User-Agent, einem geheimen Schlüssel und dem laufenden Monat bildet Umami eine
         pseudonyme Kennung, um die Seitenaufrufe eines Besuchs zusammenzufassen; die Kennung
-        wechselt deshalb jeden Monat. Die IP-Adresse und den vollständigen User-Agent speichert
-        Umami nicht, sondern nur die daraus abgeleiteten Angaben (Land, Region, Stadt, Browser,
-        Betriebssystem) zusammen mit der pseudonymen Kennung. Eine Zusammenführung mit anderen Daten
-        oder eine Identifizierung einzelner Besucher findet nicht statt.
+        wechselt jeden Monat. Die IP-Adresse und den vollständigen User-Agent speichert Umami nicht,
+        sondern nur die daraus abgeleiteten Angaben (Land, Region, Stadt, Browser, Betriebssystem)
+        zusammen mit der pseudonymen Kennung. Eine Zusammenführung mit anderen Daten oder eine
+        Identifizierung einzelner Besucher findet nicht statt.
       </p>
       <p>
         Die Statistikdaten werden nach 14 Monaten automatisch gelöscht. In den Sicherungskopien der
-        Datenbank bleiben sie danach in der Regel noch bis zu 15 Tage erhalten.
+        Datenbank bleiben sie danach noch bis zu 15 Tage erhalten.
       </p>
       <p>
         Nicht erfasst werden Aufrufe, bei denen Ihr Browser das Signal „Do Not Track“ (DNT) oder
@@ -465,9 +484,11 @@ const germanHref = computed(
       <p>
         Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Wir haben ein
         berechtigtes Interesse daran, die Nutzung unserer Website statistisch auszuwerten, um unser
-        Angebot zu verbessern, ohne dabei Daten unserer Besucher an Dritte weiterzugeben. Sie können
-        der Verarbeitung jederzeit widersprechen, indem Sie in Ihrem Browser „Do Not Track“ oder
-        „Global Privacy Control“ aktivieren, oder indem Sie uns kontaktieren.
+        Angebot zu verbessern, ohne dabei Daten unserer Besucher an Dritte weiterzugeben. Wir
+        zählen, um zu verstehen, wie die Website genutzt wird. Dieses Interesse haben wir gegen Ihre
+        Rechte und Interessen abgewogen; die Daten werden auf das dafür Erforderliche beschränkt.
+        Sie können der Verarbeitung jederzeit widersprechen, indem Sie in Ihrem Browser „Do Not
+        Track“ oder „Global Privacy Control“ aktivieren, oder indem Sie uns kontaktieren.
       </p>
 
       <h3 class="text-lg font-semibold">Kontaktformular</h3>
@@ -480,20 +501,18 @@ const germanHref = computed(
       <p>
         Ihre Angaben werden von unserem Webserver nicht in einer Datenbank gespeichert, sondern als
         E-Mail über unseren eigenen Mailserver an unser Postfach gesendet. Den Mailserver betreiben
-        wir selbst auf einem von uns gemieteten Server der Hetzner Online GmbH, Industriestr. 25,
-        91710 Gunzenhausen, in einem Rechenzentrum in Deutschland. Die Übertragung vom Webserver zum
-        Mailserver erfolgt verschlüsselt.
+        wir selbst. Die Übertragung vom Webserver zum Mailserver erfolgt verschlüsselt.
       </p>
       <p>
         Zum Schutz vor Spam löst Ihr Browser beim Ausfüllen des Formulars eine kleine Rechenaufgabe
         (sogenannter Proof of Work). Dazu ruft er bei unserem Server eine zufällige Aufgabe ab und
         sendet die Lösung zusammen mit dem Formular zurück. Dabei werden selbst keine weiteren
         Cookies gesetzt, keine weiteren Informationen in Ihrem Endgerät gespeichert und keine
-        Dienste von Drittanbietern eingebunden; das technische Sitzungs-Cookie, das beim Aufruf
-        jeder Seite dieser Website gesetzt wird (siehe Abschnitt „Cookies“), schützt dabei auch
-        dieses Formular vor Cross-Site-Request-Forgery. Um Missbrauch zu verhindern, verarbeitet
-        unser Server außerdem Ihre IP-Adresse kurzzeitig im Arbeitsspeicher, um die Zahl der
-        Anfragen je Adresse zu begrenzen; dafür wird sie nicht dauerhaft gespeichert.
+        Dienste von Drittanbietern eingebunden; das technische Sitzungs-Cookie, das erst gesetzt
+        wird, wenn das Formular die Aufgabe bei unserem Server abruft (siehe Abschnitt „Cookies“),
+        schützt dabei dieses Formular vor Cross-Site-Request-Forgery. Um Missbrauch zu verhindern,
+        verarbeitet unser Server außerdem Ihre IP-Adresse kurzzeitig im Arbeitsspeicher, um die Zahl
+        der Anfragen je Adresse zu begrenzen; dafür wird sie nicht dauerhaft gespeichert.
         Rechtsgrundlage hierfür ist unser berechtigtes Interesse am Schutz vor Spam und Missbrauch
         (Art. 6 Abs. 1 lit. f DSGVO).
       </p>
@@ -624,8 +643,8 @@ const germanHref = computed(
         A brief summary up front: this website sets a single, purely technical cookie to protect the
         contact form (see the "Cookies" section), but no tracking or advertising services, and does
         not embed third-party content. Your browser loads everything exclusively from our own
-        server. We compile visitor statistics ourselves, on our own servers, without any script
-        running in your browser and without storing anything else on your device.
+        server. We compile visitor statistics ourselves, on our own hardware in Germany, without any
+        script running in your browser and without storing anything else on your device.
       </p>
 
       <h2 class="text-xl font-semibold">1. Data protection at a glance</h2>
@@ -684,20 +703,19 @@ const germanHref = computed(
       <h3 class="text-lg font-semibold">Analytics tools and third-party tools</h3>
       <p>
         When you visit this website, the pages accessed are evaluated statistically. This is done
-        using the open-source software Umami, which we operate ourselves on our own servers; no
-        cookies are set for this purpose, no script runs in your browser, and no data is transmitted
-        to third parties. We do not use tracking or advertising services, or tools from third-party
-        providers. Details can be found in the section "Visitor statistics with Umami".
+        using the open-source software Umami, which we operate ourselves on our own hardware in
+        Germany; no cookies are set for this purpose, no script runs in your browser, and no data is
+        transmitted to third parties. We do not use tracking or advertising services, or tools from
+        third-party providers. Details can be found in the section "Visitor statistics with Umami".
       </p>
 
       <h2 class="text-xl font-semibold">2. Hosting</h2>
 
-      <h3 class="text-lg font-semibold">Hosting on our own servers</h3>
+      <h3 class="text-lg font-semibold">Hosting on our own hardware</h3>
       <p>
-        We host the content of our website ourselves. The website runs on our own servers, which we
-        operate on our own premises in Germany. We do not use an external hosting provider for the
-        website; the data generated when the website is visited (see "Server log files") is
-        processed on these servers.
+        We host the content of our website ourselves. The website is operated on our own hardware in
+        Germany. There is no hosting provider and no processor for hosting; the data generated when
+        the website is visited (see "Server log files") is processed on this hardware.
       </p>
       <p>
         This is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate interest in
@@ -927,8 +945,8 @@ const germanHref = computed(
 
       <h3 class="text-lg font-semibold">Server log files</h3>
       <p>
-        For every request to this website, our web server automatically writes one log line. It
-        records:
+        For every request to this website, our application (our web server) automatically writes one
+        log line, the application access log. It records:
       </p>
       <ul class="list-disc pl-6">
         <li>the time of the request</li>
@@ -948,20 +966,40 @@ const germanHref = computed(
         <li>how long the request took to answer</li>
       </ul>
       <p>
-        Your device's browser type (user agent) and any referrer URL are not recorded as part of
-        this.
+        Your device's browser type (user agent) and any referrer URL are not recorded in the
+        application access log.
       </p>
+      <p>
+        In addition, the ingress in front of the application (the reverse proxy through which your
+        request reaches our application) automatically collects and stores information that your
+        browser transmits to us in a separate access log. This is:
+      </p>
+      <ul class="list-disc pl-6">
+        <li>the IP address</li>
+        <li>the date and time of the server request</li>
+        <li>
+          the request line (page or file requested, with any parameters, request method and protocol
+          version)
+        </li>
+        <li>the HTTP status code and the amount of data transferred</li>
+        <li>browser type and version, and operating system used (user agent)</li>
+        <li>the referrer URL, where your browser transmits it</li>
+      </ul>
       <p>This data is not merged with other data sources.</p>
       <p>
         This data is collected on the basis of Art. 6(1)(f) GDPR. The website operator has a
         legitimate interest in the technically error-free presentation, security and optimisation of
         its website, and in defending against misuse; the server log files must be collected for
-        this purpose.
+        this purpose. We process the log data to keep the website running, to analyse errors and to
+        defend against misuse. We have weighed this interest against your rights and interests; the
+        data is limited to what this requires.
       </p>
       <p>
-        The log files are retained for a limited period only and are automatically deleted after 30
-        days at the latest. Log files whose further retention is required for evidentiary purposes
-        are excluded from deletion until the incident in question has been finally clarified.
+        Both log files, the application access log and the ingress access log, are retained for a
+        limited period only and are automatically deleted after 30 days at the latest. The only
+        exception to these 30 days: log files whose further retention is required for evidentiary
+        purposes are excluded from deletion until the incident in question has been finally
+        clarified.
       </p>
 
       <h3 class="text-lg font-semibold">Rate limiting</h3>
@@ -991,15 +1029,13 @@ const germanHref = computed(
       <p>
         To understand which content on our website is read and how visitors find us, we compile
         visitor statistics using the open-source software Umami. We operate Umami ourselves on our
-        own servers in Germany (see "Hosting on our own servers"). We store backup copies of the
-        statistics database with Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, in a
-        data centre in Germany; beyond this, the data is not transmitted to third parties.
+        own hardware in Germany (see "Hosting on our own hardware"). Our website counts page views
+        on the server with Umami; the data is not transmitted to third parties.
       </p>
       <p>
         Umami does not run in your browser: no script is loaded, no cookie is set, and nothing is
-        stored on or read from your device. Instead, our web server reports every page request to
-        Umami, using the information your browser transmits to us in any case when making the
-        request:
+        stored on or read from your device. Instead, our web server reports page requests to Umami,
+        using the information your browser transmits to us in any case when making the request:
       </p>
       <ul class="list-disc pl-6">
         <li>
@@ -1020,15 +1056,15 @@ const germanHref = computed(
       <p>
         Umami derives the country, region and city from the shortened IP address. From the shortened
         IP address, the user agent, a secret key and the current month, Umami forms a pseudonymous
-        identifier to group together the page views of one visit; the identifier therefore changes
-        every month. Umami does not store the IP address or the full user agent, only the
-        information derived from them (country, region, city, browser, operating system) together
-        with the pseudonymous identifier. No merging with other data, and no identification of
-        individual visitors, takes place.
+        identifier to group together the page views of one visit; the identifier changes every
+        month. Umami does not store the IP address or the full user agent, only the information
+        derived from them (country, region, city, browser, operating system) together with the
+        pseudonymous identifier. No merging with other data, and no identification of individual
+        visitors, takes place.
       </p>
       <p>
         The statistics data is automatically deleted after 14 months. In the backup copies of the
-        database, it typically remains for up to a further 15 days afterwards.
+        database, it remains for up to a further 15 days afterwards.
       </p>
       <p>
         Requests where your browser sends the "Do Not Track" (DNT) or "Global Privacy Control" (GPC)
@@ -1037,9 +1073,11 @@ const germanHref = computed(
       <p>
         This processing is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate
         interest in statistically evaluating the use of our website in order to improve our
-        offering, without passing on our visitors' data to third parties in doing so. You can object
-        to this processing at any time by activating "Do Not Track" or "Global Privacy Control" in
-        your browser, or by contacting us.
+        offering, without passing on our visitors' data to third parties in doing so. We count in
+        order to understand how the website is used. We have weighed this interest against your
+        rights and interests; the data is limited to what this requires. You can object to this
+        processing at any time by activating "Do Not Track" or "Global Privacy Control" in your
+        browser, or by contacting us.
       </p>
 
       <h3 class="text-lg font-semibold">Contact form</h3>
@@ -1051,21 +1089,20 @@ const germanHref = computed(
       </p>
       <p>
         Your details are not stored by our web server in a database, but sent as an email via our
-        own mail server to our mailbox. We operate the mail server ourselves on a server we rent
-        from Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, in a data centre in Germany.
-        Transmission from the web server to the mail server is encrypted.
+        own mail server to our mailbox. We operate the mail server ourselves. Transmission from the
+        web server to the mail server is encrypted.
       </p>
       <p>
         To protect against spam, your browser solves a small computational task (a so-called proof
         of work) when you fill in the form. To do this, it requests a random task from our server
         and sends the solution back together with the form. This itself sets no further cookies,
         stores no further information on your device, and uses no third-party services for this
-        purpose; the technical session cookie set when you load any page of this website (see the
-        "Cookies" section) also protects this form against cross-site request forgery. To prevent
-        misuse, our server also processes your IP address briefly in memory in order to limit the
-        number of requests per address; it is not stored permanently for this purpose. The legal
-        basis for this is our legitimate interest in protection against spam and misuse (Art.
-        6(1)(f) GDPR).
+        purpose; the technical session cookie, which is only set once the form requests the task
+        from our server (see the "Cookies" section), protects this form against cross-site request
+        forgery. To prevent misuse, our server also processes your IP address briefly in memory in
+        order to limit the number of requests per address; it is not stored permanently for this
+        purpose. The legal basis for this is our legitimate interest in protection against spam and
+        misuse (Art. 6(1)(f) GDPR).
       </p>
       <p>
         Processing of this data is carried out on the basis of Art. 6(1)(b) GDPR, where your enquiry

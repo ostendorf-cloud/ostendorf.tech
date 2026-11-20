@@ -57,6 +57,138 @@ describe('legal pages', () => {
       }
     })
 
+    it('names own hardware, no hosting provider and states the counting plainly', async () => {
+      const { container } = await renderPage(locale, 'privacy')
+      const text = (container.textContent ?? '').replace(/\s+/g, ' ')
+
+      expect(text).toContain(locale === 'de' ? 'eigener Hardware' : 'own hardware')
+      expect(text).toContain(locale === 'de' ? 'nach 30 Tagen' : 'after 30 days')
+      expect(text).toContain(locale === 'de' ? 'nach 14 Monaten' : 'after 14 months')
+      expect(text).toContain(
+        locale === 'de' ? 'noch bis zu 15 Tage' : 'for up to a further 15 days',
+      )
+      expect(text).not.toMatch(/in der regel noch bis|typically remains/i)
+      expect(text).toContain(locale === 'de' ? 'Art. 6 Abs. 1 lit. f DSGVO' : 'Art. 6(1)(f) GDPR')
+      expect(text).toContain(
+        locale === 'de' ? 'vorgeschaltete Ingress' : 'the ingress in front of the application',
+      )
+      expect(text).not.toMatch(/beim aufruf\s+jeder seite|when you load any page/i)
+      expect(text).toContain(
+        locale === 'de'
+          ? 'Betrieb der Website sicherzustellen, Fehler zu analysieren und Missbrauch abzuwehren'
+          : 'to keep the website running, to analyse errors and to defend against misuse',
+      )
+      expect(text).toContain(
+        locale === 'de'
+          ? 'um zu verstehen, wie die Website genutzt wird'
+          : 'to understand how the website is used',
+      )
+      expect(text).toContain(
+        locale === 'de'
+          ? 'gegen Ihre Rechte und Interessen abgewogen; die Daten werden auf das dafür Erforderliche beschränkt'
+          : 'weighed this interest against your rights and interests; the data is limited to what this requires',
+      )
+      expect(text).toContain(
+        locale === 'de'
+          ? 'Die einzige Ausnahme von diesen 30 Tagen'
+          : 'The only exception to these 30 days',
+      )
+      expect(text).toContain(
+        locale === 'de'
+          ? 'das technische Sitzungs-Cookie, das erst gesetzt wird, wenn das Formular die Aufgabe bei unserem Server abruft'
+          : 'the technical session cookie, which is only set once the form requests the task from our server',
+      )
+      expect(text).not.toMatch(/hetzner|gunzenhausen|rechenzentrum|data centre/i)
+      expect(text).not.toMatch(
+        /wenn die statistik|sofern die statistik|eingeschaltet|if set up|switched on|when the statistics are/i,
+      )
+    })
+
+    it('lists the application log and the ingress log fields exactly', async () => {
+      const { container } = await renderPage(locale, 'privacy')
+      const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim()
+      const heading = locale === 'de' ? 'Server-Log-Dateien' : 'Server log files'
+      const start = Array.from(container.querySelectorAll('h3')).find(
+        (h) => norm(h.textContent) === heading,
+      )
+      if (!start) throw new Error(`heading ${heading} not found`)
+
+      const lists: string[][] = []
+      let sectionText = ''
+      for (let el = start.nextElementSibling; el && el.tagName !== 'H3';) {
+        sectionText += ' ' + norm(el.textContent)
+        if (el.tagName === 'UL') {
+          lists.push(Array.from(el.querySelectorAll('li')).map((li) => norm(li.textContent)))
+        }
+        el = el.nextElementSibling
+      }
+
+      const appLog =
+        locale === 'de'
+          ? [
+              'Zeitpunkt der Anfrage',
+              'IP-Adresse',
+              'eine zufällige, von unserem Server vergebene Anfrage-Kennung, mit der sich zusammengehörige Protokollzeilen einer einzelnen Anfrage zuordnen lassen',
+              'Anfragemethode (z. B. GET oder POST)',
+              'was angefragt wurde, als internes Muster: bei einem Seitenaufruf, welche Seite in welcher Sprache (z. B. „das Impressum auf Deutsch“), bei allen übrigen Anfragen die jeweilige Art der Anfrage (z. B. eine Design- oder Bilddatei, die Sitemap, eine Anfrage des Kontaktformulars). In keinem Fall die vollständige aufgerufene Adresse mit allen enthaltenen Parametern',
+              'HTTP-Statuscode und übertragene Datenmenge',
+              'Bearbeitungsdauer der Anfrage',
+            ]
+          : [
+              'the time of the request',
+              'the IP address',
+              'a random request id our server assigns, so that log lines belonging to one request can be matched to each other',
+              'the request method (for example, GET or POST)',
+              'what was requested, as an internal pattern: for a page view, which page in which language (for example "the imprint in German"); for every other request, the kind of request it was (for example a design or image file, the sitemap, a contact form request). Never the full address requested with all its parameters',
+              'the HTTP status code and the amount of data transferred',
+              'how long the request took to answer',
+            ]
+      const ingressLog =
+        locale === 'de'
+          ? [
+              'IP-Adresse',
+              'Datum und Uhrzeit der Serveranfrage',
+              'Anfragezeile (aufgerufene Seite bzw. Datei mit etwaigen Parametern, Anfragemethode und Protokollversion)',
+              'HTTP-Statuscode und übertragene Datenmenge',
+              'Browsertyp und Browserversion sowie verwendetes Betriebssystem (User-Agent)',
+              'Referrer URL, sofern Ihr Browser sie übermittelt',
+            ]
+          : [
+              'the IP address',
+              'the date and time of the server request',
+              'the request line (page or file requested, with any parameters, request method and protocol version)',
+              'the HTTP status code and the amount of data transferred',
+              'browser type and version, and operating system used (user agent)',
+              'the referrer URL, where your browser transmits it',
+            ]
+
+      expect(lists).toEqual([appLog, ingressLog])
+      expect(lists[0].join(' ')).not.toMatch(/user.?agent|referrer/i)
+      expect(sectionText).toContain(
+        locale === 'de'
+          ? 'Nicht erfasst werden im Zugriffsprotokoll der Anwendung der Browsertyp Ihres Geräts (User-Agent) und eine etwaige Referrer-URL.'
+          : "Your device's browser type (user agent) and any referrer URL are not recorded in the application access log.",
+      )
+      expect(sectionText).not.toMatch(/anonym/i)
+    })
+
+    it('names own hardware in the headline wording and does not call data anonymous', async () => {
+      const { container } = await renderPage(locale, 'privacy')
+      const text = (container.textContent ?? '').replace(/\s+/g, ' ')
+
+      expect(text).toContain(
+        locale === 'de' ? 'Hosting auf eigener Hardware' : 'Hosting on our own hardware',
+      )
+      expect(text).not.toMatch(/eigenen Servern|our own servers/i)
+      expect(text).not.toMatch(/jeden Seitenaufruf|every page view|jeden Aufruf einer Seite/i)
+      expect(text).toContain(locale === 'de' ? 'zählt Seitenaufrufe' : 'counts page views')
+      expect(text).toContain(
+        locale === 'de' ? 'die Kennung wechselt jeden Monat' : 'the identifier changes every month',
+      )
+      expect(text).not.toMatch(/deshalb jeden Monat|identifier therefore changes/i)
+      expect(text).not.toMatch(/anonym/i)
+    })
+
     it('has no consumer dispute resolution section in the imprint', async () => {
       const { container } = await renderPage(locale, 'imprint')
       const text = container.textContent ?? ''

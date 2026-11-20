@@ -46,11 +46,27 @@ Confirmed and left unchanged, because nothing was wrong:
 
 ## Resolved by the owner
 
-- **Hosting and the Hetzner backup address.** The owner confirmed that the hosting section's "in
-  unseren eigenen Räumlichkeiten" (our own premises) statement and the Hetzner Online GmbH backup
-  address for Umami and the mail server are correct as they stand. No change needed in either
-  page. This closes the two earlier findings about hosting location and the backup address; the
-  owner owes nothing further here.
+- **Hosting.** The owner stated (2026-11-19) that the site runs on the owner's own hardware in
+  Germany. The privacy policy says so in both languages ("eigener Hardware" /
+  "own hardware"), and names no hosting provider and no processor for hosting. This replaces the
+  earlier confirmation of the "own premises" wording and the Hetzner Online GmbH address, which
+  are gone from the page. The contact form text keeps only "we operate the mail server
+  ourselves"; where that server runs is not stated.
+- **Retention and legal basis.** The owner stated: access logs 30 days, Umami statistics 14
+  months, backups up to 15 days, Art. 6(1)(f) GDPR for logs and counting. The page says exactly
+  that. It lists the application access log (method, route pattern, status, bytes, duration,
+  client IP; no user agent, no referrer) and the ingress access log separately, each with the 30
+  day retention. The ingress fields (IP address, time, request line, status and bytes, user
+  agent, referrer) come from the old simon-ostendorf.de privacy template. The exception for log
+  files kept as evidence "bis zur endgültigen Klärung des jeweiligen Vorfalls" is unchanged and
+  is a legal judgement for the owner, as it sits next to the 30 day maximum. The page now says
+  it is the only exception to the 30 days. It also states one purpose sentence each for logs
+  (operation, error analysis, abuse defence) and counting (understand how the site is used), plus
+  one sentence that the interest was weighed against visitor rights and the data is minimal. By
+  owner decision it adds no recipients, third country or data protection officer sentence. Umami
+  counting is
+  stated as fact, without a "when switched on" hedge, because the site counts page views in
+  production.
 - **English privacy policy and AGB.** Both now carry a full English translation, replacing the
   earlier stub that only pointed back to the German version. See "Translated pages" below.
 - **General, site-wide rate limiting.** The owner asked for it to be mentioned. It is now
@@ -182,7 +198,7 @@ the section in both languages of `PrivacyView.vue` to list exactly, and only, wh
 
 - Read `middleware/accesslog.go` in `govue` and `internal/webapp/webapp.go` on `feat/go-live`
   directly. `AccessLog.log` writes: the request method, `Route(r)` (the matched net/http mux
-  *pattern*, never the raw path), the HTTP status, the byte count, the duration, and, because
+  _pattern_, never the raw path), the HTTP status, the byte count, the duration, and, because
   `internal/webapp/webapp.go` constructs `middleware.AccessLog{ClientIP: clientIPs}` without
   setting `UserAgent`, the resolved client address but never the user agent. `RequestID`
   middleware additionally attaches a per-request id to the same log line.
@@ -193,9 +209,9 @@ the section in both languages of `PrivacyView.vue` to list exactly, and only, wh
   happens inside that one handler, never as further mux patterns) — the home page, the imprint,
   the privacy policy, the AGB and the 404 page all produce the identical logged value. The
   browser's user agent is not logged at all.
-- The legal basis and retention sentences were left exactly as they were, since the 30 day
-  retention is already recorded above as a standing operational requirement rather than something
-  this section needed to restate.
+- When this finding was closed, the legal basis and retention sentences were left as they were.
+  They were later revised: see "Retention and legal basis" under "Resolved by the owner" for the
+  current state (30 days for both logs, up to 15 days for backups, Art. 6(1)(f) GDPR).
 
 This closes the finding.
 
@@ -315,5 +331,6 @@ four points changed as a result, the cookie point; the other three held up uncha
 - The Instagram feed likewise does not exist on `feat/go-live` yet (also a later milestone); the
   privacy text's Instagram section remains forward-looking, based on `old_simon-ostendorf.de`'s
   `internal/instagram/client.go` and `feed.go`, and needs re-checking once that code lands.
-- The site is not cookie-free. `feat/go-live` sets one real cookie, on every page view, for the
-  reason and with the attributes described above; the privacy policy no longer claims otherwise.
+- The site is not cookie-free. `feat/go-live` sets one real cookie, only once the contact form
+  requests its task from the server, for the reason and with the attributes described above;
+  the privacy policy no longer claims otherwise.
