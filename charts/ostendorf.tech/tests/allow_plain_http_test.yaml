@@ -1,0 +1,38 @@
+suite: config.allowPlainHttp refused with an https siteUrl
+templates:
+  - templates/deployment.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+tests:
+  - it: fails the render when allowPlainHttp is true and siteUrl is https
+    set:
+      config:
+        allowPlainHttp: true
+        siteUrl: "https://ostendorf.tech"
+    asserts:
+      - failedTemplate:
+          errorMessage: >-
+            config.allowPlainHttp must not be true when config.siteUrl is https: it drops
+            the session cookie's Secure attribute and turns HSTS off, which a site served
+            over https must keep. Set it only for a plain http development run, or serve
+            the site over plain http.
+
+  - it: renders when allowPlainHttp is true and siteUrl is plain http
+    set:
+      config:
+        allowPlainHttp: true
+        siteUrl: "http://localhost:8080"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ALLOW_PLAIN_HTTP
+            value: "true"
+
+  - it: renders when allowPlainHttp is false and siteUrl is https
+    asserts:
+      - hasDocuments:
+          count: 1

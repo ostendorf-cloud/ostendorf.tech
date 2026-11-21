@@ -131,6 +131,7 @@ if [ "$mode" = "lint" ]; then
     "existingSecret.name left empty"
     "feed.enabled true with feed.config.openBaoAddr left empty"
     "feed.enabled true with feed.config.openBaoRole left empty"
+    "config.allowPlainHttp true with an https config.siteUrl"
   )
 
   fail_sets=(
@@ -142,6 +143,7 @@ if [ "$mode" = "lint" ]; then
     "replicaCount=1"
     "${baseline},feed.enabled=true,feed.config.openBaoRole=ostendorf-tech-feed"
     "${baseline},feed.enabled=true,feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200"
+    "${baseline},config.allowPlainHttp=true,config.siteUrl=https://ostendorf.tech"
   )
 
   fail_messages=(
@@ -153,6 +155,7 @@ if [ "$mode" = "lint" ]; then
     "existingSecret.name is required: set it to the name of an existing Secret carrying CSRF_KEY, which the application needs to start and has no default."
     "feed.config.openBaoAddr is required: set it to the OpenBao address the feed service authenticates against. There is no default, since none could ever point at an OpenBao installation that actually exists."
     "feed.config.openBaoRole is required: set it to the OpenBao Kubernetes auth role the feed service logs in as. There is no default, since none could ever name a role that actually exists in your OpenBao installation."
+    "config.allowPlainHttp must not be true when config.siteUrl is https: it drops the session cookie's Secure attribute and turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
   )
 
   for i in "${!fail_names[@]}"; do
