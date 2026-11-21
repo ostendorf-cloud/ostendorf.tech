@@ -201,6 +201,9 @@ func (p *pageServer) pageHandler() http.Handler {
 			locale := preferredLocale(r.Header.Get("Accept-Language"))
 			// The target depends on this header, so a cache must key on it.
 			w.Header().Add("Vary", "Accept-Language")
+			// A 302 is not cached by default in every client; make sure a
+			// changed preference is not answered from a stored redirect.
+			w.Header().Set("Cache-Control", "no-cache")
 			http.Redirect(w, r, "/"+locale+"/", http.StatusFound)
 			return
 		}
