@@ -17,6 +17,7 @@ function fakeClient(overrides: Partial<{ maxnumber: number; csrfToken: string }>
       signature: 'deadbeef',
       csrfToken: overrides.csrfToken ?? 'token-1',
     }),
+    head: vi.fn(),
     post: vi.fn(),
     put: vi.fn(),
     patch: vi.fn(),
