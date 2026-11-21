@@ -199,10 +199,12 @@ describe('legal pages', () => {
     })
   })
 
-  it('keeps the German binding notice on the English pages', async () => {
+  it('says on the English pages that they are a convenience translation', async () => {
     for (const page of SITE_LEGAL_PAGES) {
       const { container, unmount } = await renderPage('en', page)
+      expect(container.textContent).toContain('This English text is a convenience translation.')
       expect(container.textContent).toContain('The German version is the legally binding one.')
+      expect(container.textContent).not.toContain('only available in German')
       unmount()
     }
   })

@@ -131,7 +131,7 @@
         },
         "submit": "Absenden",
         "submitting": "Wird gesendet …",
-        "hint": "Pflichtfeld. Ein kurzer Rechentest in Ihrem Browser schützt vor Spam, ohne Cookies und ohne Drittanbieter.",
+        "hint": "Pflichtfeld. Ein kurzer Rechentest in Ihrem Browser schützt vor Spam, ohne Drittanbieter.",
         "noscript": "Der Spamschutz dieses Formulars braucht JavaScript. Ohne JavaScript erreichen Sie mich per E-Mail an simon\\@ostendorf.tech.",
         "fallbackError": "Die Nachricht konnte nicht gesendet werden. Bitte schreiben Sie mir an simon\\@ostendorf.tech.",
         "success": "Vielen Dank für Ihre Nachricht! Ich melde mich so schnell wie möglich bei Ihnen."
