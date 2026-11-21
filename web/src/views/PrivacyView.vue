@@ -24,11 +24,12 @@ const germanHref = computed(
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
       <p class="text-text-muted">
         Kurz vorab: Diese Website setzt ein einziges, rein technisches Cookie zum Schutz des
-        Kontaktformulars (siehe Abschnitt „Cookies“), nutzt aber keine Tracking- oder Werbedienste
-        und bindet keine Inhalte von Drittanbietern ein. Ihr Browser lädt alle Inhalte
-        ausschließlich von unserem eigenen Server. Eine Besucherstatistik erstellen wir selbst auf
-        eigener Hardware in Deutschland, ohne Skript in Ihrem Browser und ohne sonst etwas auf Ihrem
-        Endgerät zu speichern.
+        Kontaktformulars (siehe Abschnitt „Cookies“). Wenn Sie die Farbdarstellung umstellen,
+        speichert Ihr Browser diese Wahl in seinem lokalen Speicher auf Ihrem Gerät. Ihr Browser
+        lädt keine Dienste von Drittanbietern und alle Inhalte ausschließlich von unserem eigenen
+        Server. Wir setzen keine Werbedienste ein. Seitenaufrufe zählt unser Server mit unserem
+        eigenen Umami, das wir auf eigener Hardware in Deutschland betreiben, ohne Skript in Ihrem
+        Browser (siehe „Besucherstatistik mit Umami“).
       </p>
 
       <h2 class="text-xl font-semibold">1. Datenschutz auf einen Blick</h2>
@@ -94,9 +95,8 @@ const germanHref = computed(
         Beim Besuch dieser Website werden die aufgerufenen Seiten statistisch ausgewertet. Das
         geschieht mit der Open-Source-Software Umami, die wir selbst auf eigener Hardware in
         Deutschland betreiben; es werden dafür keine Cookies gesetzt, kein Skript in Ihrem Browser
-        ausgeführt und keine Daten an Dritte übermittelt. Tracking- oder Werbedienste und Tools von
-        Drittanbietern setzen wir nicht ein. Details finden Sie im Abschnitt „Besucherstatistik mit
-        Umami“.
+        ausgeführt und keine Daten an Dritte übermittelt. Werbedienste und Tools von Drittanbietern
+        setzen wir nicht ein. Details finden Sie im Abschnitt „Besucherstatistik mit Umami“.
       </p>
 
       <h2 class="text-xl font-semibold">2. Hosting</h2>
@@ -336,15 +336,25 @@ const germanHref = computed(
         Das Cookie ist ein Sitzungs-Cookie ohne eigenes Speicherdauer-Attribut: Ihr Browser verwirft
         es, sobald Sie ihn schließen. Zusätzlich ist es so gesetzt, dass kein Skript auf der Seite
         es auslesen kann (HttpOnly), dass es nur über eine verschlüsselte Verbindung übertragen wird
-        (Secure) und dass es nicht an eine andere Website mitgesendet wird (SameSite=Lax).
+        (Secure) und dass es nicht an eine andere Website mitgesendet wird (SameSite=Lax). Das
+        Cookie heißt „__Host-session“. Unser Server hält die zugehörige Sitzung höchstens 12 Stunden
+        im Arbeitsspeicher vor.
       </p>
       <p>
         Nach unserer Einschätzung ist dieses Cookie technisch notwendig im Sinne von § 25 Abs. 2 Nr.
         2 TDDDG, weil ohne ein solches Sitzungs-Cookie das Kontaktformular nicht wirksam vor
         Cross-Site-Request-Forgery geschützt werden kann; eine Einwilligung ist deshalb nicht
-        erforderlich, und wir zeigen kein Cookie-Banner an. Darüber hinaus speichern wir keine
-        weiteren Informationen in Ihrem Endgerät, greifen nicht auf dort gespeicherte Informationen
-        zu und setzen auch kein Device-Fingerprinting im Browser ein.
+        erforderlich, und wir zeigen kein Cookie-Banner an.
+      </p>
+      <h3 class="text-lg font-semibold">Lokaler Speicher (Farbdarstellung)</h3>
+      <p>
+        Wenn Sie über den Schalter in der Kopfzeile die Farbdarstellung wählen (hell, dunkel oder
+        wie das System), speichert Ihr Browser diese Wahl im lokalen Speicher (localStorage) auf
+        Ihrem Gerät, unter dem Schlüssel „govue-theme“. Beim nächsten Besuch liest Ihr Browser die
+        Wahl dort wieder aus. Die Wahl wird nicht an unseren Server gesendet. Sie können sie in den
+        Einstellungen Ihres Browsers löschen. Darüber hinaus speichern wir keine weiteren
+        Informationen in Ihrem Endgerät, greifen nicht auf dort gespeicherte Informationen zu und
+        setzen auch kein Device-Fingerprinting im Browser ein.
       </p>
 
       <h3 class="text-lg font-semibold">Server-Log-Dateien</h3>
@@ -564,14 +574,15 @@ const germanHref = computed(
       </p>
       <p>
         Die Beiträge (Bilder, Bildbeschreibungen und Links) ruft unser Server regelmäßig über die
-        Programmierschnittstelle (API) von Instagram ab, hält sie auf unserem Server vor und liefert
-        sie von unserer eigenen Domain aus. Ihr Browser baut dabei keine Verbindung zu Servern von
+        Programmierschnittstelle (API) von Instagram ab. Die Bilder lädt er von den Servern von Meta
+        (CDN) herunter. Er hält sie auf unserem Server vor und liefert sie von unserer eigenen
+        Domain aus. Ihr Browser baut beim Betrachten der Seite keine Verbindung zu Servern von
         Instagram oder Meta auf, und es werden keine Daten über Ihren Besuch an Instagram oder Meta
-        übermittelt. Bei diesem Abruf übermittelt unser Server lediglich seine eigene IP-Adresse und
-        unseren Zugangsschlüssel an Instagram.
+        übermittelt. Bei diesem Abruf übermittelt unser Server lediglich seine eigene IP-Adresse
+        und, an die API, unseren Zugangsschlüssel an Meta.
       </p>
       <p>
-        Erst wenn Sie einen Beitrag anklicken, öffnet sich dieser auf der Website von Instagram. Ab
+        Erst wenn Sie einen Link zu Instagram anklicken, öffnet sich Instagram in Ihrem Browser. Ab
         dann gilt die Datenschutzerklärung von Instagram:
         <a
           class="text-accent-text hover:underline"
@@ -641,10 +652,12 @@ const germanHref = computed(
 
       <p class="text-text-muted">
         A brief summary up front: this website sets a single, purely technical cookie to protect the
-        contact form (see the "Cookies" section), but no tracking or advertising services, and does
-        not embed third-party content. Your browser loads everything exclusively from our own
-        server. We compile visitor statistics ourselves, on our own hardware in Germany, without any
-        script running in your browser and without storing anything else on your device.
+        contact form (see the "Cookies" section). If you change the colour scheme, your browser
+        stores that choice in its local storage on your device. Your browser loads no third-party
+        services and loads everything exclusively from our own server. We use no advertising
+        services. Our server counts page views with our own Umami, which we operate on our own
+        hardware in Germany, without any script running in your browser (see "Visitor statistics
+        with Umami").
       </p>
 
       <h2 class="text-xl font-semibold">1. Data protection at a glance</h2>
@@ -705,8 +718,8 @@ const germanHref = computed(
         When you visit this website, the pages accessed are evaluated statistically. This is done
         using the open-source software Umami, which we operate ourselves on our own hardware in
         Germany; no cookies are set for this purpose, no script runs in your browser, and no data is
-        transmitted to third parties. We do not use tracking or advertising services, or tools from
-        third-party providers. Details can be found in the section "Visitor statistics with Umami".
+        transmitted to third parties. We do not use advertising services or tools from third-party
+        providers. Details can be found in the section "Visitor statistics with Umami".
       </p>
 
       <h2 class="text-xl font-semibold">2. Hosting</h2>
@@ -932,15 +945,23 @@ const germanHref = computed(
         The cookie is a session cookie with no storage-duration attribute of its own: your browser
         discards it once you close it. It is also set so that no script on the page can read it
         (HttpOnly), so that it is only transmitted over an encrypted connection (Secure), and so
-        that it is not sent along to another website (SameSite=Lax).
+        that it is not sent along to another website (SameSite=Lax). The cookie is named
+        "__Host-session". Our server keeps the matching session in memory for 12 hours at most.
       </p>
       <p>
         In our assessment, this cookie is technically necessary within the meaning of Section 25(2)
         no. 2 TDDDG, because the contact form cannot be effectively protected against cross-site
         request forgery without a session cookie of this kind; consent is therefore not required,
-        and we do not display a cookie banner. Beyond this, we do not store any further information
-        on your device, do not access information stored there, and do not use device fingerprinting
-        in the browser either.
+        and we do not display a cookie banner.
+      </p>
+      <h3 class="text-lg font-semibold">Local storage (colour scheme)</h3>
+      <p>
+        If you choose the colour scheme with the switch in the header (light, dark or like the
+        system), your browser stores this choice in its local storage (localStorage) on your device,
+        under the key "govue-theme". On your next visit, your browser reads the choice from there.
+        The choice is not sent to our server. You can delete it in your browser settings. Beyond
+        this, we do not store any further information on your device, do not access information
+        stored there, and do not use device fingerprinting in the browser either.
       </p>
 
       <h3 class="text-lg font-semibold">Server log files</h3>
@@ -1148,15 +1169,16 @@ const germanHref = computed(
       </p>
       <p>
         Our server regularly retrieves the posts (images, image descriptions and links) via
-        Instagram's application programming interface (API), holds them on our server and delivers
-        them from our own domain. Your browser does not establish any connection to Instagram's or
-        Meta's servers in doing so, and no data about your visit is transmitted to Instagram or
-        Meta. In making this retrieval, our server only transmits its own IP address and our access
-        key to Instagram.
+        Instagram's application programming interface (API). It downloads the images from Meta's
+        servers (CDN). It holds them on our server and delivers them from our own domain. Your
+        browser does not establish any connection to Instagram's or Meta's servers when viewing the
+        page, and no data about your visit is transmitted to Instagram or Meta. In making this
+        retrieval, our server only transmits its own IP address and, to the API, our access key to
+        Meta.
       </p>
       <p>
-        Only once you click on a post does it open on Instagram's website. From that point,
-        Instagram's privacy policy applies:
+        Only once you click on a link to Instagram does Instagram open in your browser. From that
+        point, Instagram's privacy policy applies:
         <a
           class="text-accent-text hover:underline"
           href="https://privacycenter.instagram.com/policy/"

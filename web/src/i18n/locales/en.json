@@ -122,7 +122,7 @@
         },
         "submit": "Send",
         "submitting": "Sending …",
-        "hint": "Required field. A short computation in your browser protects against spam, with no cookies and no third parties.",
+        "hint": "Required field. A short computation in your browser protects against spam, with no third parties.",
         "noscript": "This form's spam protection needs JavaScript. Without JavaScript, reach me by email at simon\\@ostendorf.tech.",
         "fallbackError": "The message could not be sent. Please write to me at simon\\@ostendorf.tech.",
         "success": "Thank you for your message! I will get back to you as soon as possible."
