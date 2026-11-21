@@ -135,7 +135,7 @@ func registerRoutes(mux *http.ServeMux, p *pageServer, wrap func(http.Handler) h
 // built SPA and the prerendered HTML, both read only filesystems.
 type pageServer struct {
 	assets      fs.FS
-	public      fs.FS
+	public      map[string]publicFile
 	prerendered fs.FS
 }
 
@@ -149,10 +149,11 @@ func newPageServer(dist, prerendered fs.FS) (*pageServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("webapp: dist has no assets directory: %w", err)
 	}
-	if err := checkPublicFiles(dist); err != nil {
+	public, err := loadPublicFiles(dist)
+	if err != nil {
 		return nil, err
 	}
-	return &pageServer{assets: assets, public: dist, prerendered: prerendered}, nil
+	return &pageServer{assets: assets, public: public, prerendered: prerendered}, nil
 }
 
 // assetHandler serves the SPA's built, content hashed files as immutable:
