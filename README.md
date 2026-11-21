@@ -10,7 +10,7 @@ A Go service serves a Vue 3 single page application built on the organisation's 
 time, so a crawler or a browser's first paint gets real markup before the SPA takes
 over.
 
-The home page's hero, Leistungen, Bands, Über mich and Kontakt sections, and the
+The home page's hero, Leistungen, Impressionen, Bands, Über mich and Kontakt sections, and the
 imprint, privacy and AGB pages, are implemented in German (the source of truth) and
 English. The Kontakt section's contact form sends mail over SMTP, protected by a
 proof of work challenge, a per-session CSRF token and a per-address rate limit. See
@@ -150,10 +150,21 @@ cp .env.example .env   # fill in CSRF_KEY at least; see .env.example
 docker compose up --build
 ```
 
+`CSRF_KEY` alone starts the site. The contact form needs `CHALLENGE_KEY`, `SMTP_USERNAME` and
+`SMTP_PASSWORD` too, and answers "unavailable" without them. Compose runs the website only, no
+feed service, so the Impressionen section stays off unless `FEED_SERVICE_URL` points at a feed
+service started some other way.
+
 Builds the multi-stage `Dockerfile` (frontend, prerender, static Go binary, then a
 minimal non-root runtime stage with no shell) and serves the site at
 `http://localhost:8080`. `docker-compose.yaml` is for local development only; see
 `charts/ostendorf.tech/README.md` for a cluster installation.
+
+To use another port, set `LISTEN_PORT=8123` in `.env`. Compose passes `LISTEN_ADDR=:8123`
+to the container and publishes `127.0.0.1:8123:8123` from that one value. Compose cannot
+cut a port out of an address, so `LISTEN_ADDR` itself is not read from `.env` here.
+`internal/envsync` checks that the two stay in step. The admin listener (`:8081`) is not
+published.
 
 `scripts/smoke-test-image.sh <image-ref>` starts an already built image the same way,
 with a throwaway `CSRF_KEY`, and asserts its admin listener (`ADMIN_ADDR`, `:8081`)

@@ -28,10 +28,12 @@ import {
   canonical,
   fullTitle,
   hreflangAlternates,
+  isIndexable,
   NOT_FOUND,
   SITE_URL,
   ogLocale,
   pageMeta,
+  robotsContent,
   type PageRoute,
 } from '../src/lib/seo'
 import { DEFAULT_MODE, STORAGE_KEY, THEME_NAME } from '../src/lib/theme'
@@ -245,7 +247,11 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
   const title = fullTitle(route, meta, siteName)
   const url = canonical(locale, route)
 
-  const alternates = hreflangAlternates(route)
+  const indexable = isIndexable(route)
+  // The 404 page gets no canonical, no hreflang pair and no og:url: see isIndexable.
+  const canonicalLink = indexable ? `<link rel="canonical" href="${url}">\n    ` : ''
+  const ogUrl = indexable ? `<meta property="og:url" content="${url}">\n    ` : ''
+  const alternates = (indexable ? hreflangAlternates(route) : [])
     .map((a) => `<link rel="alternate" hreflang="${a.hreflang}" href="${a.href}">`)
     .join('\n    ')
   const styleLinks = assets.styles
@@ -265,16 +271,14 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(meta.description)}">
-    <meta name="robots" content="index, follow">
-    <link rel="canonical" href="${url}">
-    ${alternates}
+    <meta name="robots" content="${robotsContent(route)}">
+    ${canonicalLink}${alternates}
     <meta property="og:type" content="website">
     <meta property="og:locale" content="${ogLocale(locale)}">
     <meta property="og:site_name" content="${escapeHtml(siteName)}">
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(meta.description)}">
-    <meta property="og:url" content="${url}">
-    ${socialImageMeta(SITE_URL, escapeHtml(t('common.socialImageAlt'))).join('\n    ')}
+    ${ogUrl}${socialImageMeta(SITE_URL, escapeHtml(t('common.socialImageAlt'))).join('\n    ')}
     ${iconLinks().join('\n    ')}
     ${themeColorMeta}
     ${themeBootScript}

@@ -42,6 +42,18 @@ export function canonical(locale: Locale, route: PageRoute): string {
   return SITE_URL + path(locale, route)
 }
 
+/** isIndexable is false for the 404 page only. It answers no path of its
+ *  own, so a canonical link to the home page or an hreflang pair would
+ *  tell a crawler the missing URL is a copy of the home page. */
+export function isIndexable(route: PageRoute): boolean {
+  return route !== NOT_FOUND
+}
+
+/** robotsContent is the content of the robots meta tag of route. */
+export function robotsContent(route: PageRoute): string {
+  return isIndexable(route) ? 'index, follow' : 'noindex'
+}
+
 /** ogLocale is the Open Graph og:locale value for locale. */
 export function ogLocale(locale: Locale): string {
   return locale === 'de' ? 'de_DE' : 'en_US'

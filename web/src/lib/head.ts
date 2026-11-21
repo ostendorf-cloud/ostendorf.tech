@@ -2,7 +2,16 @@ import { watchEffect, type ComputedRef } from 'vue'
 import type { Composer } from 'vue-i18n'
 
 import type { Locale } from '../i18n'
-import { canonical, fullTitle, hreflangAlternates, ogLocale, pageMeta, type PageRoute } from './seo'
+import {
+  canonical,
+  fullTitle,
+  hreflangAlternates,
+  isIndexable,
+  ogLocale,
+  pageMeta,
+  robotsContent,
+  type PageRoute,
+} from './seo'
 
 /**
  * usePageHead keeps the document's title, description, canonical link and
@@ -26,12 +35,20 @@ export function usePageHead(
     const siteName = i18n.t('common.siteName')
     document.title = fullTitle(route.value, meta, siteName)
     setMeta('description', meta.description)
-    setLink('canonical', canonical(locale.value, route.value))
+    setMeta('robots', robotsContent(route.value))
     setProperty('og:title', document.title)
     setProperty('og:description', meta.description)
-    setProperty('og:url', canonical(locale.value, route.value))
     setProperty('og:locale', ogLocale(locale.value))
-    replaceAlternates(hreflangAlternates(route.value))
+    if (isIndexable(route.value)) {
+      setLink('canonical', canonical(locale.value, route.value))
+      setProperty('og:url', canonical(locale.value, route.value))
+      replaceAlternates(hreflangAlternates(route.value))
+    } else {
+      // The 404 page is no copy of any page: no canonical, no og:url, no hreflang pair.
+      document.querySelector('link[rel="canonical"]')?.remove()
+      document.querySelector('meta[property="og:url"]')?.remove()
+      replaceAlternates([])
+    }
   })
 }
 
