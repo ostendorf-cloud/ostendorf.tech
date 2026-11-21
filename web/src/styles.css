@@ -34,3 +34,22 @@
 #app {
   overflow-x: clip;
 }
+
+/*
+ * The sticky header is as tall as its rows make it: one row from 480px up,
+ * more below that. AppHeader measures it and writes the real height to
+ * --header-height on the root element (src/lib/headerHeight.ts), and every
+ * anchored heading lands below it through this one rule instead of a
+ * per-section guess. The values here are only what applies before the
+ * script has run, a prerendered page for instance.
+ */
+:root {
+  --header-height: var(--spacing-header);
+  scroll-padding-top: calc(var(--header-height) + 1rem);
+}
+
+@media (width < 30rem) {
+  :root {
+    --header-height: 6.75rem;
+  }
+}

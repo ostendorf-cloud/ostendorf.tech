@@ -68,7 +68,7 @@ onMounted(async () => {
     v-if="posts.length > 0"
     id="impressions"
     aria-labelledby="impressions-title"
-    class="scroll-mt-20 py-8 sm:py-14"
+    class="py-8 sm:py-14"
   >
     <header class="mb-6 flex flex-col gap-2">
       <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">

@@ -1,13 +1,28 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { GovueHeader, GovueNav, type NavItem } from '@ostendorf-cloud/govue'
 
+import { trackHeaderHeight } from '../lib/headerHeight'
 import LocaleSwitch from './LocaleSwitch.vue'
 import LogoMark from './LogoMark.vue'
 import ThemeToggle from './ThemeToggle.vue'
 import WordMark from './WordMark.vue'
+
+// The header's height is not a constant: below 480px govue's header puts
+// the navigation on a second row. Measuring it once here keeps
+// scroll-padding-top (styles.css) equal to what is really on screen.
+const header = ref<{ $el: HTMLElement } | null>(null)
+let stopTracking = (): void => {}
+onMounted(() => {
+  if (header.value) {
+    stopTracking = trackHeaderHeight(header.value.$el)
+  }
+})
+onBeforeUnmount(() => {
+  stopTracking()
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -30,7 +45,7 @@ const items = computed<NavItem[]>(() => {
 </script>
 
 <template>
-  <GovueHeader>
+  <GovueHeader ref="header">
     <template #brand>
       <router-link
         :to="{ name: 'home', params: { locale: route.params.locale } }"

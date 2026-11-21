@@ -6,26 +6,39 @@ import { useTheme, GovueButton } from '@ostendorf-cloud/govue'
 import { prefersReducedMotion } from '../lib/motion'
 
 /**
- * The header's dark/light toggle. useTheme's mode already has three
- * states, light, dark and system, in that cycling order; this button only
- * ever cycles through them. A visitor who has not chosen yet is on dark,
- * the default main.ts and the prerender script both start useTheme with
- * (src/lib/theme.ts), so the first click from there offers the system
- * setting and the one after that offers light.
+ * The header's colour mode switch. useTheme's mode has three states,
+ * light, dark and system, in that cycling order; this button only ever
+ * cycles through them. A visitor who has not chosen yet is on dark, the
+ * default main.ts and the prerender script both start useTheme with
+ * (src/lib/theme.ts).
  *
- * The label names the mode a click switches to, the next one in that
- * order, not the one currently active: an accessible name on a button
- * describes what activating it does.
+ * The icon shows the CHOSEN mode, not the resolved one: a sun for light,
+ * a moon for dark and a monitor for "follow the system", so the system
+ * choice no longer looks like light or dark. The accessible name states
+ * the current mode and what activating the button does.
+ *
+ * Why not GovueThemeSwitch: it is a radio group of three text buttons,
+ * at least about 200 px wide. Next to the wordmark and the language link
+ * it does not fit the 328 px of a 360 px phone header in one row, and it
+ * has no compact icon variant. That is a govue gap: no compact icon
+ * variant of GovueThemeSwitch, see the govue issue to be filed. The button
+ * does not use aria-pressed because that is binary and this is a three
+ * state cycle; its name carries the state instead.
  */
 const cycleOrder = ['light', 'dark', 'system'] as const
 
-const { mode, resolvedMode, cycleMode } = useTheme()
+const { mode, cycleMode } = useTheme()
 const { t } = useI18n()
 
 const nextMode = computed(
   () => cycleOrder[(cycleOrder.indexOf(mode.value) + 1) % cycleOrder.length],
 )
-const label = computed(() => t(`common.theme.${nextMode.value}`))
+const label = computed(() =>
+  t('common.theme.switch', {
+    current: t(`common.theme.modes.${mode.value}`),
+    next: t(`common.theme.modes.${nextMode.value}`),
+  }),
+)
 
 // The circle's curve mirrors base.css's own --ease-out token: the Web
 // Animations API takes a literal easing function, not a CSS var()
@@ -95,10 +108,42 @@ function onToggle(event: MouseEvent): void {
 </script>
 
 <template>
-  <GovueButton variant="quiet" :title="label" :aria-label="label" @click="onToggle">
+  <GovueButton
+    variant="quiet"
+    class="min-w-11 px-2!"
+    :data-mode="mode"
+    :title="label"
+    :aria-label="label"
+    @click="onToggle"
+  >
     <svg
-      v-if="resolvedMode === 'dark'"
-      class="size-4 shrink-0"
+      v-if="mode === 'system'"
+      class="size-5 shrink-0"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect
+        x="3"
+        y="4"
+        width="18"
+        height="12"
+        rx="2"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+      />
+      <path
+        d="M8 20h8M12 16v4"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+      />
+    </svg>
+    <svg
+      v-else-if="mode === 'dark'"
+      class="size-5 shrink-0"
       viewBox="0 0 24 24"
       aria-hidden="true"
       focusable="false"
@@ -112,7 +157,7 @@ function onToggle(event: MouseEvent): void {
         stroke-linejoin="round"
       />
     </svg>
-    <svg v-else class="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg v-else class="size-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="1.7" />
       <path
         d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8 6 18M18 6l1.8-1.8"

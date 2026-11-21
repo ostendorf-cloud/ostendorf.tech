@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { GovueCard, GovuePage } from '@ostendorf-cloud/govue'
 
+import CardCarousel from '../components/CardCarousel.vue'
 import ContactChannels from '../components/ContactChannels.vue'
 import ContactForm from '../components/ContactForm.vue'
 import CountingFacts from '../components/CountingFacts.vue'
@@ -89,7 +90,7 @@ const aboutFacts = computed<Fact[]>(() => [
       </a>
     </section>
 
-    <section id="services" aria-labelledby="services-title" class="panel-section scroll-mt-20">
+    <section id="services" aria-labelledby="services-title" class="panel-section">
       <header class="panel-group-header flex flex-col gap-2">
         <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">
           {{ t('home.services.eyebrow') }}
@@ -142,7 +143,7 @@ const aboutFacts = computed<Fact[]>(() => [
          show; see InstagramFeed.vue. -->
     <InstagramFeed />
 
-    <section id="bands" aria-labelledby="bands-title" class="panel-section scroll-mt-20">
+    <section id="bands" aria-labelledby="bands-title" class="panel-section">
       <header class="panel-group-header flex flex-col gap-2">
         <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">
           {{ t('home.bands.eyebrow') }}
@@ -153,27 +154,36 @@ const aboutFacts = computed<Fact[]>(() => [
         <p class="text-lg text-text-muted">{{ t('home.bands.lead') }}</p>
       </header>
 
-      <div class="panel-grid grid sm:grid-cols-2 lg:grid-cols-3">
-        <GovueCard v-for="band in bands" :key="band.slug" class="panel-lit">
-          <h3 class="mb-3 text-lg font-semibold text-text">{{ t(`bands.${band.slug}.name`) }}</h3>
-          <div v-if="band.hasDescription" class="flex flex-col gap-2 text-sm text-text-muted">
-            <p v-for="(paragraph, index) in tm(`bands.${band.slug}.paragraphs`)" :key="index">
-              {{ rt(paragraph) }}
-            </p>
-          </div>
-          <a
-            :href="band.instagramUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="mt-auto inline-flex min-h-11 items-center gap-1 self-start pt-3 text-sm text-accent-text hover:underline"
-          >
-            {{ t('home.bands.instagramLabel') }}: {{ band.instagramHandle }}
-          </a>
-        </GovueCard>
-      </div>
+      <CardCarousel
+        :items="bands"
+        :label="t('home.bands.title')"
+        :previous-label="t('home.bands.previous')"
+        :next-label="t('home.bands.next')"
+      >
+        <template #slide="{ item: band }">
+          <GovueCard class="panel-lit">
+            <h3 class="mb-3 text-lg font-semibold text-text">
+              {{ t(`bands.${band.slug}.name`) }}
+            </h3>
+            <div v-if="band.hasDescription" class="flex flex-col gap-2 text-sm text-text-muted">
+              <p v-for="(paragraph, index) in tm(`bands.${band.slug}.paragraphs`)" :key="index">
+                {{ rt(paragraph) }}
+              </p>
+            </div>
+            <a
+              :href="band.instagramUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-auto inline-flex min-h-11 items-center gap-1 self-start pt-3 text-sm text-accent-text hover:underline"
+            >
+              {{ t('home.bands.instagramLabel') }}: {{ band.instagramHandle }}
+            </a>
+          </GovueCard>
+        </template>
+      </CardCarousel>
     </section>
 
-    <section id="about" aria-labelledby="about-title" class="scroll-mt-20 py-8 sm:py-14">
+    <section id="about" aria-labelledby="about-title" class="py-8 sm:py-14">
       <div class="grid items-center gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <!-- The gradient is the frame itself: two pixels of padding under
              the picture, so the brand holds the portrait rather than
@@ -220,7 +230,7 @@ const aboutFacts = computed<Fact[]>(() => [
       </div>
     </section>
 
-    <section id="contact" aria-labelledby="contact-title" class="scroll-mt-20 py-8 sm:py-14">
+    <section id="contact" aria-labelledby="contact-title" class="py-8 sm:py-14">
       <header class="mb-6 flex flex-col gap-2">
         <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">
           {{ t('home.contact.eyebrow') }}
@@ -305,6 +315,17 @@ const aboutFacts = computed<Fact[]>(() => [
   max-width: 48rem;
   flex-direction: column;
   align-items: center;
+}
+
+/*
+ * The headline is the Largest Contentful Paint candidate for the text, so
+ * it paints at once, fully opaque. Only the decoration around it rises in:
+ * fading the whole block from opacity 0 held the headline back for the
+ * length of the animation.
+ */
+.hero-logo,
+.hero-tagline,
+.hero-actions {
   animation: hero-rise 800ms var(--ease-out) both;
 }
 
@@ -382,15 +403,35 @@ const aboutFacts = computed<Fact[]>(() => [
   margin-top: 2.375rem;
 }
 
-/* A mouse outline with a dot rolling down it. */
+/*
+ * A mouse outline with a dot rolling down it. The link itself is a 44 by
+ * 52 px target (WCAG 2.5.8 asks for 24, this site holds 44 everywhere);
+ * the outline is drawn by ::after, centred inside it, at its old 26 by
+ * 42 px, and the dot by ::before.
+ *
+ * The dot rolls twice, 3.6 seconds in all, and then rests: moving content
+ * that starts by itself and runs longer than five seconds needs a way to
+ * stop it (WCAG 2.2.2), and this one simply ends before that.
+ */
 .hero-cue {
   position: absolute;
   z-index: var(--hero-layer-content);
-  bottom: 1.75rem;
+  bottom: 1.25rem;
+  left: 50%;
+  width: 2.75rem;
+  height: 3.25rem;
+  margin-left: -1.375rem;
+}
+
+.hero-cue::after {
+  content: '';
+  position: absolute;
+  top: 50%;
   left: 50%;
   width: 1.625rem;
   height: 2.625rem;
-  margin-left: -0.8125rem;
+  margin: -1.3125rem 0 0 -0.8125rem;
+  box-sizing: border-box;
   border: 2px solid var(--color-accent);
   border-radius: 0.875rem;
 }
@@ -398,14 +439,14 @@ const aboutFacts = computed<Fact[]>(() => [
 .hero-cue::before {
   content: '';
   position: absolute;
-  top: 0.4375rem;
+  top: 50%;
   left: 50%;
   width: 0.25rem;
   height: 0.5rem;
-  margin-left: -0.125rem;
+  margin: -0.875rem 0 0 -0.125rem;
   border-radius: 0.125rem;
   background: var(--color-accent);
-  animation: hero-roll 1.8s ease-in-out infinite;
+  animation: hero-roll 1.8s ease-in-out 2;
 }
 
 @media (max-height: 40rem) {
@@ -546,7 +587,9 @@ const aboutFacts = computed<Fact[]>(() => [
 
 /* The stage stands still; hover keeps only its colour change. */
 @media (prefers-reduced-motion: reduce) {
-  .hero-inner,
+  .hero-logo,
+  .hero-tagline,
+  .hero-actions,
   .hero-cue::before {
     animation: none;
   }

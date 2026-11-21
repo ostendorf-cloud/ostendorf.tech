@@ -50,22 +50,47 @@ describe('ThemeToggle', () => {
     useTheme().setMode('system')
   })
 
-  it('names light, the first step of the cycle, as the action at the start', () => {
+  it('shows a monitor and names the system setting as current for "system"', () => {
     renderToggle()
 
-    expect(screen.getByRole('button', { name: 'Zu hellem Modus wechseln' })).toBeVisible()
+    const button = screen.getByRole('button', {
+      name: 'Farbmodus: Systemeinstellung. Wechseln zu: Hell.',
+    })
+    expect(button).toBeVisible()
+    expect(button).toHaveAttribute('data-mode', 'system')
+    expect(button.querySelector('rect')).not.toBeNull()
   })
 
-  // The site does not start on "system": src/lib/theme.ts starts it dark,
-  // and main.ts and the prerender script both hand that to useTheme. So
-  // the state a visitor who has never touched the toggle actually finds
-  // it in is dark, with the system setting as the next step, and the moon
-  // rather than the sun on the button.
-  it('shows the mode this site starts in, with the system setting as the next step', () => {
+  // The site does not start on "system": src/lib/theme.ts starts it dark.
+  it('shows a moon for dark, the mode this site starts in', () => {
     useTheme().setMode(DEFAULT_MODE)
     renderToggle()
 
-    expect(screen.getByRole('button', { name: 'Systemeinstellung übernehmen' })).toBeVisible()
+    const button = screen.getByRole('button', {
+      name: 'Farbmodus: Dunkel. Wechseln zu: Systemeinstellung.',
+    })
+    expect(button).toHaveAttribute('data-mode', 'dark')
+    expect(button.querySelector('rect')).toBeNull()
+    expect(button.querySelector('circle')).toBeNull()
+  })
+
+  it('shows a sun for light', () => {
+    useTheme().setMode('light')
+    renderToggle()
+
+    const button = screen.getByRole('button', {
+      name: 'Farbmodus: Hell. Wechseln zu: Dunkel.',
+    })
+    expect(button).toHaveAttribute('data-mode', 'light')
+    expect(button.querySelector('circle')).not.toBeNull()
+  })
+
+  it('does not show light or dark for the system choice, whatever the system resolves to', () => {
+    useTheme().setMode('system')
+    renderToggle()
+
+    expect(screen.getByRole('button').querySelector('circle')).toBeNull()
+    expect(screen.getByRole('button').querySelector('rect')).not.toBeNull()
   })
 
   it('cycles through light, dark and back to system on repeated clicks', async () => {
@@ -73,16 +98,47 @@ describe('ThemeToggle', () => {
     renderToggle()
 
     const button = screen.getByRole('button')
-    // Starting from system, a click switches to light; the label then
-    // names the next step, dark.
     await user.click(button)
-    expect(screen.getByRole('button', { name: 'Zu dunklem Modus wechseln' })).toBeVisible()
+    expect(button).toHaveAccessibleName('Farbmodus: Hell. Wechseln zu: Dunkel.')
 
     await user.click(button)
-    expect(screen.getByRole('button', { name: 'Systemeinstellung übernehmen' })).toBeVisible()
+    expect(button).toHaveAccessibleName('Farbmodus: Dunkel. Wechseln zu: Systemeinstellung.')
 
     await user.click(button)
-    expect(screen.getByRole('button', { name: 'Zu hellem Modus wechseln' })).toBeVisible()
+    expect(button).toHaveAccessibleName('Farbmodus: Systemeinstellung. Wechseln zu: Hell.')
+  })
+
+  it('is operable from the keyboard with Enter and Space', async () => {
+    const user = userEvent.setup()
+    renderToggle()
+
+    await user.tab()
+    const button = screen.getByRole('button')
+    expect(button).toHaveFocus()
+
+    await user.keyboard('{Enter}')
+    expect(button).toHaveAttribute('data-mode', 'light')
+    await user.keyboard(' ')
+    expect(button).toHaveAttribute('data-mode', 'dark')
+  })
+
+  it('persists the choice the way useTheme does and applies it to the page', async () => {
+    const user = userEvent.setup()
+    localStorage.removeItem('govue-theme')
+    renderToggle()
+
+    await user.click(screen.getByRole('button'))
+
+    const stored = JSON.parse(localStorage.getItem('govue-theme') ?? '{}') as { mode?: string }
+    expect(stored.mode).toBe('light')
+    expect(document.documentElement.dataset.mode).toBe('light')
+  })
+
+  it('keeps a touch target of at least 44 px', () => {
+    renderToggle()
+
+    expect(screen.getByRole('button').className).toContain('min-h-11')
+    expect(screen.getByRole('button').className).toContain('min-w-11')
   })
 })
 
@@ -103,7 +159,9 @@ describe('ThemeToggle with View Transitions support', () => {
 
     await user.click(screen.getByRole('button'))
 
-    expect(screen.getByRole('button', { name: 'Zu dunklem Modus wechseln' })).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Farbmodus: Hell. Wechseln zu: Dunkel.' }),
+    ).toBeVisible()
   })
 
   it('clips the new view to a circle growing from the click point', async () => {
@@ -165,7 +223,9 @@ describe('ThemeToggle with View Transitions support', () => {
 
     await user.click(screen.getByRole('button'))
 
-    expect(screen.getByRole('button', { name: 'Zu dunklem Modus wechseln' })).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Farbmodus: Hell. Wechseln zu: Dunkel.' }),
+    ).toBeVisible()
     expect(startViewTransition).not.toHaveBeenCalled()
     expect(animate).not.toHaveBeenCalled()
   })
