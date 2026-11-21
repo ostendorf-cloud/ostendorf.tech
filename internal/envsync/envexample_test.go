@@ -4,6 +4,8 @@ import (
 	"os"
 	"regexp"
 	"testing"
+
+	"github.com/ostendorf-cloud/govue/analytics"
 )
 
 const envExamplePath = "../../.env.example"
@@ -14,8 +16,14 @@ const envExamplePath = "../../.env.example"
 var envRead = regexp.MustCompile(`(?:loader\.(\w+)|resolved)\("([A-Z][A-Z0-9_]*)"`)
 
 // govueEnv lists the variables govue's analytics.LoadConfig reads on the website's
-// behalf. They never appear as a literal in this repository's own Go code.
-var govueEnv = []string{"UMAMI_URL", "UMAMI_WEBSITE_ID", "UMAMI_TIMEOUT", "UMAMI_QUEUE_SIZE"}
+// behalf. They never appear as a literal in this repository's own Go code, so a govue
+// upgrade that adds or renames one shows up here as a compile error or a failed test.
+var govueEnv = []string{
+	analytics.EnvURL,
+	analytics.EnvWebsiteID,
+	analytics.EnvTimeout,
+	analytics.EnvQueueSize,
+}
 
 // commentLine matches a whole YAML comment line, which may name ${VAR} forms as prose.
 var commentLine = regexp.MustCompile(`(?m)^\s*#.*$`)

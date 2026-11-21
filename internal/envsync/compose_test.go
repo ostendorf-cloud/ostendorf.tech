@@ -9,35 +9,64 @@ import (
 	"strings"
 	"testing"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
 )
 
 const composePath = "../../docker-compose.yaml"
 
-// interpolation matches the one compose form docker-compose.yaml may use: ${VAR} or
-// ${VAR:-default}. Anything else fails the test, so a new form is looked at, not
-// silently skipped.
-var interpolation = regexp.MustCompile(`\$\{([A-Z][A-Z0-9_]*)(?::-([^}]*))?\}`)
+// interpolation matches every compose substitution form that takes a variable name:
+// ${VAR}, ${VAR:-x}, ${VAR-x}, ${VAR:?msg}, ${VAR?msg}, ${VAR:+x} and ${VAR+x}. Group 1 is
+// the name, group 2 the operator and group 3 its operand.
+var interpolation = regexp.MustCompile(`\$\{([A-Z][A-Z0-9_]*)(?:(:?[-?+])([^}]*))?\}`)
 
-// expand applies compose's ${VAR:-default} rule: unset or empty takes the default.
+// expand applies compose's ${VAR:-default} rule: unset or empty takes the default. It is
+// the only form the port and address values may use, so any other form is an error here,
+// looked at rather than silently skipped.
 func expand(value string, env map[string]string) (string, error) {
+	var bad error
 	out := interpolation.ReplaceAllStringFunc(value, func(m string) string {
 		sub := interpolation.FindStringSubmatch(m)
+		if sub[2] != ":-" {
+			bad = fmt.Errorf("unsupported interpolation %q in %q", m, value)
+			return m
+		}
 		if got := env[sub[1]]; got != "" {
 			return got
 		}
-		return sub[2]
+		return sub[3]
 	})
+	if bad != nil {
+		return "", bad
+	}
 	if strings.Contains(out, "${") {
 		return "", fmt.Errorf("unsupported interpolation in %q", value)
 	}
 	return out, nil
 }
 
-var (
-	listenAddrLine = regexp.MustCompile(`(?m)^\s+LISTEN_ADDR:\s*"([^"]*)"\s*$`)
-	portLine       = regexp.MustCompile(`(?m)^\s+-\s*"([^"]+)"\s*$`)
-)
+// composeFile is the part of docker-compose.yaml this package reads.
+type composeFile struct {
+	Services map[string]struct {
+		Environment map[string]string `yaml:"environment"`
+		Ports       []string          `yaml:"ports"`
+	} `yaml:"services"`
+}
+
+// loadCompose reads and unmarshals docker-compose.yaml.
+func loadCompose(t *testing.T) composeFile {
+	t.Helper()
+	raw, err := os.ReadFile(composePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c composeFile
+	if err := yaml.Unmarshal(raw, &c); err != nil {
+		t.Fatalf("parse %s: %v", composePath, err)
+	}
+	return c
+}
 
 // TestComposePublishedPortFollowsListenAddr proves the container's LISTEN_ADDR and the
 // published host and container port come from the same value, for the default and for
@@ -45,19 +74,16 @@ var (
 func TestComposePublishedPortFollowsListenAddr(t *testing.T) {
 	t.Parallel()
 
-	raw, err := os.ReadFile(composePath)
-	if err != nil {
-		t.Fatal(err)
+	website, ok := loadCompose(t).Services["website"]
+	if !ok {
+		t.Fatal("docker-compose.yaml has no website service")
 	}
-	text := string(raw)
-
-	listen := listenAddrLine.FindStringSubmatch(text)
-	if listen == nil {
+	listen, ok := website.Environment["LISTEN_ADDR"]
+	if !ok {
 		t.Fatal("docker-compose.yaml does not pass LISTEN_ADDR to the container")
 	}
-	ports := portLine.FindAllStringSubmatch(text, -1)
-	if len(ports) != 1 {
-		t.Fatalf("docker-compose.yaml publishes %d ports, want exactly the one public port", len(ports))
+	if len(website.Ports) != 1 {
+		t.Fatalf("docker-compose.yaml publishes %d ports, want exactly the one public port", len(website.Ports))
 	}
 
 	cases := []struct {
@@ -72,11 +98,11 @@ func TestComposePublishedPortFollowsListenAddr(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			addr, err := expand(listen[1], tc.env)
+			addr, err := expand(listen, tc.env)
 			if err != nil {
 				t.Fatal(err)
 			}
-			published, err := expand(ports[0][1], tc.env)
+			published, err := expand(website.Ports[0], tc.env)
 			if err != nil {
 				t.Fatal(err)
 			}
