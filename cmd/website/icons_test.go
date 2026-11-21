@@ -95,34 +95,47 @@ func TestAppServesTheLinkedIconsFromTheEmbeddedDist(t *testing.T) {
 func TestPrerenderedPagesCarryTheSocialImage(t *testing.T) {
 	dist, prerendered := realFS(t)
 	want := config.DefaultSiteURL + "/og-image.png"
-	for _, tag := range []string{
-		`<meta property="og:image" content="` + want + `">`,
-		`<meta name="twitter:image" content="` + want + `">`,
-	} {
-		pages := 0
-		err := fs.WalkDir(prerendered, ".", func(p string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() || !strings.HasSuffix(p, ".html") {
-				return nil
-			}
-			data, err := fs.ReadFile(prerendered, p)
-			if err != nil {
-				return err
-			}
-			pages++
+	alts := map[string]string{
+		"de": "Simon Ostendorf Veranstaltungstechnik: das Fader-Zeichen und der Schriftzug auf dunklem Hintergrund",
+		"en": "Simon Ostendorf Event Technology: the fader mark and the wordmark on a dark background",
+	}
+	pages := 0
+	err := fs.WalkDir(prerendered, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".html") {
+			return nil
+		}
+		data, err := fs.ReadFile(prerendered, p)
+		if err != nil {
+			return err
+		}
+		pages++
+		locale, _, _ := strings.Cut(p, "/")
+		alt, ok := alts[locale]
+		if !ok {
+			t.Fatalf("%s is in no known locale directory", p)
+		}
+		for _, tag := range []string{
+			`<meta property="og:image" content="` + want + `">`,
+			`<meta property="og:image:width" content="1200">`,
+			`<meta property="og:image:height" content="630">`,
+			`<meta property="og:image:alt" content="` + alt + `">`,
+			`<meta name="twitter:image" content="` + want + `">`,
+			`<meta name="twitter:image:alt" content="` + alt + `">`,
+		} {
 			if !strings.Contains(string(data), tag) {
 				t.Errorf("%s does not carry %s", p, tag)
 			}
-			return nil
-		})
-		if err != nil {
-			t.Fatalf("fs.WalkDir(prerendered) error = %v", err)
 		}
-		if pages == 0 {
-			t.Fatal("prerendered has no pages; run task prerender first")
-		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("fs.WalkDir(prerendered) error = %v", err)
+	}
+	if pages == 0 {
+		t.Fatal("prerendered has no pages; run task prerender first")
 	}
 
 	data, err := fs.ReadFile(dist, "og-image.png")

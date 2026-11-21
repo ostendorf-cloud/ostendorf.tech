@@ -274,7 +274,7 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(meta.description)}">
     <meta property="og:url" content="${url}">
-    ${socialImageMeta(SITE_URL).join('\n    ')}
+    ${socialImageMeta(SITE_URL, escapeHtml(t('common.socialImageAlt'))).join('\n    ')}
     ${iconLinks().join('\n    ')}
     ${themeColorMeta}
     ${themeBootScript}

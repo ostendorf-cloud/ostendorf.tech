@@ -24,14 +24,18 @@ export function iconLinks(): string[] {
 }
 
 /** socialImageMeta is the og:image and twitter:image half of the head, with
- *  an absolute URL built from siteUrl, the configured site origin. */
-export function socialImageMeta(siteUrl: string): string[] {
+ *  an absolute URL built from siteUrl, the configured site origin. alt is
+ *  the page language's description of the image (common.socialImageAlt),
+ *  already escaped for an attribute by the caller. */
+export function socialImageMeta(siteUrl: string, alt: string): string[] {
   const url = siteUrl + SOCIAL_IMAGE_PATH
   return [
     `<meta property="og:image" content="${url}">`,
     '<meta property="og:image:width" content="1200">',
     '<meta property="og:image:height" content="630">',
+    `<meta property="og:image:alt" content="${alt}">`,
     '<meta name="twitter:card" content="summary_large_image">',
     `<meta name="twitter:image" content="${url}">`,
+    `<meta name="twitter:image:alt" content="${alt}">`,
   ]
 }
