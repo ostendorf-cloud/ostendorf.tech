@@ -21,6 +21,7 @@ import { createGovueI18n, sitemapXml, useTheme } from '@ostendorf-cloud/govue'
 import App from '../src/App.vue'
 import { createAppI18n, SUPPORTED_LOCALES, type Locale } from '../src/i18n'
 import { HERO_SIZES } from '../src/lib/heroImage'
+import { iconLinks, socialImageMeta } from '../src/lib/icons'
 import { siteRouteDefs } from '../src/lib/legal'
 import { routeTable } from '../src/lib/routeTable'
 import {
@@ -273,6 +274,8 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(meta.description)}">
     <meta property="og:url" content="${url}">
+    ${socialImageMeta(SITE_URL, escapeHtml(t('common.socialImageAlt'))).join('\n    ')}
+    ${iconLinks().join('\n    ')}
     ${themeColorMeta}
     ${themeBootScript}
     ${heroPreload}${styleLinks}

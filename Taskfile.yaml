@@ -195,6 +195,31 @@ tasks:
     cmds:
       - pnpm run prerender
 
+  # The PNG files are generated output and committed, never edited by hand. Run it again
+  # whenever web/public/favicon.svg or the wordmark changes. Follows govue's favicon:generate
+  # (same file names, same flags), plus the social preview image: the fader mark and the
+  # white wordmark on the favicon's own background colour.
+  favicon:generate:
+    desc: Generate the favicon PNG files and the social preview image from the SVG sources
+    dir: web
+    cmds:
+      - >-
+        magick -background none -density 1200 public/favicon.svg -resize 32x32
+        -depth 8 -strip -define png:exclude-chunks=date,time public/favicon-32x32.png
+      # The touch icon is opaque: iOS fills transparent pixels with black.
+      - >-
+        magick -background '#07060f' -density 1200 public/favicon.svg -resize 180x180
+        -alpha remove -alpha off -depth 8 -strip -define png:exclude-chunks=date,time
+        public/apple-touch-icon.png
+      - >-
+        magick -size 1200x630 xc:'#07060f'
+        \( -background none -density 1200 public/favicon.svg -resize 300x300 \)
+        -gravity west -geometry +130+0 -composite
+        \( -background none -density 600 src/assets/logo-wordmark-dark.svg -resize 620x \)
+        -gravity west -geometry +500+0 -composite
+        -alpha remove -alpha off -depth 8 -strip -define png:exclude-chunks=date,time
+        public/og-image.png
+
   check:
     desc: Every check, one after another
     cmds:

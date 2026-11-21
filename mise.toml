@@ -49,7 +49,8 @@ poppler = "26.11.0"
 "npm:svgo" = "4.1.0"
 # imagemagick encodes the two photographs into the AVIF and WebP variants
 # web/src/assets holds, again once rather than on every build; see AGENTS.md for the
-# commands. Pinned to the patch like every other encoder here, because the output bytes
+# commands. It also renders the favicon PNG files and the social preview image from the
+# SVG sources (task favicon:generate). Pinned to the patch like every other encoder here, because the output bytes
 # are committed and a different version would rewrite every one of them on the next run.
 imagemagick = "7.1.2_31"
 

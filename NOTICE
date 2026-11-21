@@ -34,6 +34,12 @@ where the surrounding code was reused lawfully.
 `web/src/assets/logo-wordmark-light.svg` and `logo-wordmark-dark.svg` are
 generated from vector sources held outside this repository; see AGENTS.md.
 
+`web/public/favicon.svg` is the icon source kept in this repository. The PNG
+files next to it, `favicon-32x32.png`, `apple-touch-icon.png` and
+`og-image.png`, are generated from it and from the dark wordmark; see
+AGENTS.md. The icon, the wordmark and the preview image are part of the brand
+and are not licensed to anyone.
+
 ## Page texts
 
 The German texts on the site are the copyright of Simon Ostendorf, with two

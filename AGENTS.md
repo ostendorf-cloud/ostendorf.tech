@@ -253,6 +253,26 @@ repeated for 640, 960, 1280, 1600, 1920 and 2400, and for the portrait at 460 an
 The JPEG fallback each one carries is the 1280 (hero) and 460 (portrait) width at
 `-quality 78 -sampling-factor 4:2:0 -interlace JPEG`.
 
+`web/public/favicon.svg` is the one hand kept source of the icon: the earlier site's 32 by
+32 fader mark on a dark rounded square. `web/public/favicon-32x32.png`,
+`apple-touch-icon.png` (180x180, opaque, the square's own dark colour fills the corners)
+and `og-image.png` (1200x630, the mark and the white wordmark on that same colour) are
+generated from it and from `web/src/assets/logo-wordmark-dark.svg`, never hand edited. The
+file names are govue's favicon contract (its Go package `favicon`), plus `og-image.png`.
+Vite copies `web/public` to the root of `dist/`, `internal/webapp/public.go` serves the
+four files there and refuses to start without one, `web/src/lib/icons.ts` writes the links
+into every prerendered head, and `cmd/website/icons_test.go` runs govue's
+`favicon.CheckPages` over the real output. The command, needing ImageMagick from
+`mise.toml`, run again whenever the SVG or the wordmark changes:
+
+```sh
+task favicon:generate
+```
+
+The icon is a dark square with a bright gradient mark, so it reads on a light and on a dark
+tab bar without a colour scheme switch. The SVG carries literal colours because a favicon
+cannot read the page's design tokens.
+
 The fader mark alone (the icon, `LogoMark.vue`) is not
 generated: it is inline Vue markup ported from old_simon-ostendorf.de's `{{define
 "logo"}}` template block, recoloured through a gradient whose stops read this theme's
