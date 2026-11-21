@@ -147,6 +147,10 @@ func TestPageHandlerRedirectsRoot(t *testing.T) {
 			if got := rec.Header().Get("Location"); got != tc.wantLocation {
 				t.Errorf("Location = %q, want %q", got, tc.wantLocation)
 			}
+			// The target depends on Accept-Language, so a cache must key on it.
+			if got := rec.Header().Get("Vary"); got != "Accept-Language" {
+				t.Errorf("Vary = %q, want %q", got, "Accept-Language")
+			}
 		})
 	}
 }

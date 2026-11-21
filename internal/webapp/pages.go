@@ -199,6 +199,8 @@ func (p *pageServer) pageHandler() http.Handler {
 		path := r.URL.Path
 		if path == "/" {
 			locale := preferredLocale(r.Header.Get("Accept-Language"))
+			// The target depends on this header, so a cache must key on it.
+			w.Header().Add("Vary", "Accept-Language")
 			http.Redirect(w, r, "/"+locale+"/", http.StatusFound)
 			return
 		}
