@@ -92,10 +92,35 @@ describe('CardCarousel semantics', () => {
     expect(screen.getByRole('button', { name: 'Nächste Bands' })).toBeVisible()
   })
 
-  it('makes the track itself focusable so it scrolls from the keyboard', async () => {
+  it('makes the track focusable, as a named region, so it scrolls from the keyboard', async () => {
     const { container } = await renderCarousel()
 
-    expect(trackOf(container)).toHaveAttribute('tabindex', '0')
+    const track = trackOf(container)
+    expect(track).toHaveAttribute('tabindex', '0')
+    expect(track).toHaveAttribute('role', 'region')
+    expect(screen.getByRole('region', { name: 'Bands, seitlich scrollbar' })).toBe(track)
+  })
+
+  it('names the track region in English too', async () => {
+    await renderCarousel('en')
+
+    expect(screen.getByRole('region', { name: 'Bands, scrolls sideways' })).toBeVisible()
+  })
+
+  it('stops observing its size when it is removed', async () => {
+    const disconnect = vi.fn()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn()
+        disconnect = disconnect
+      },
+    )
+    const view = await renderCarousel()
+
+    view.unmount()
+
+    expect(disconnect).toHaveBeenCalledOnce()
   })
 
   it('keeps a touch target of at least 44 px on the arrows', async () => {

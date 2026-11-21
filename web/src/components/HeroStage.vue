@@ -126,7 +126,11 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
   mix-blend-mode: var(--hero-beam-blend);
   opacity: 0.75;
   will-change: transform;
-  animation: hero-sway 12s ease-in-out infinite alternate;
+  /* Each beam sways once, from --from to --to in under five seconds, and
+     stays where it ends: moving content that starts by itself and goes on
+     longer than that needs a pause control (WCAG 2.2.2), and decoration is
+     not exempt. */
+  animation: hero-sway 4s ease-in-out 1 both;
 }
 
 .hero-beam::before {
@@ -149,8 +153,7 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
   --beam: color-mix(in srgb, var(--color-accent-text) 70%, transparent);
   --from: 14deg;
   --to: -10deg;
-  animation-duration: 15s;
-  animation-delay: -4s;
+  animation-duration: 5s;
 }
 
 .hero-beam:nth-child(3) {
@@ -158,8 +161,7 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
   --beam: color-mix(in srgb, var(--color-accent) 50%, transparent);
   --from: -12deg;
   --to: 14deg;
-  animation-duration: 13s;
-  animation-delay: -7s;
+  animation-duration: 4.5s;
 }
 
 .hero-beam:nth-child(4) {
@@ -167,8 +169,7 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
   --beam: color-mix(in srgb, var(--color-accent-text) 70%, transparent);
   --from: 28deg;
   --to: 8deg;
-  animation-duration: 17s;
-  animation-delay: -2s;
+  animation-duration: 3.5s;
 }
 
 @keyframes hero-sway {

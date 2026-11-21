@@ -5,7 +5,8 @@
     "skipToContent": "Zum Inhalt springen",
     "switchLocale": "English",
     "carousel": {
-      "slide": "{n} von {total}"
+      "slide": "{n} von {total}",
+      "region": "{label}, seitlich scrollbar"
     },
     "theme": {
       "switch": "Farbmodus: {current}. Wechseln zu: {next}.",

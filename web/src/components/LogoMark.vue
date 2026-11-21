@@ -105,28 +105,27 @@ const maskId = `logo-mark-cut-${useId()}`
   animation: logo-fader 4s ease-in-out 1;
 }
 
+/*
+ * Only the travel differs per knob. The old rules also carried a duration
+ * and a delay each, but the shared rule above sets the animation shorthand
+ * with higher specificity, so those never applied and all four knobs have
+ * always slid together over 4 seconds. They are gone rather than made
+ * live, so the animation looks as it always did.
+ */
 .knob-1 {
   --travel: 5px;
-  animation-duration: 4.2s;
-  animation-delay: -0.6s;
 }
 
 .knob-2 {
   --travel: -6px;
-  animation-duration: 5.1s;
-  animation-delay: -2.4s;
 }
 
 .knob-3 {
   --travel: 6px;
-  animation-duration: 3.7s;
-  animation-delay: -1.3s;
 }
 
 .knob-4 {
   --travel: -5px;
-  animation-duration: 4.6s;
-  animation-delay: -3.1s;
 }
 
 @keyframes logo-fader {

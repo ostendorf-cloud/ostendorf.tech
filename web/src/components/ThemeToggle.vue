@@ -20,7 +20,10 @@ import { prefersReducedMotion } from '../lib/motion'
  * Why not GovueThemeSwitch: it is a radio group of three text buttons,
  * at least about 200 px wide. Next to the wordmark and the language link
  * it does not fit the 328 px of a 360 px phone header in one row, and it
- * has no compact icon variant. That is a govue gap (issue #104).
+ * has no compact icon variant. That is a govue gap: no compact icon
+ * variant of GovueThemeSwitch, see the govue issue to be filed. The button
+ * does not use aria-pressed because that is binary and this is a three
+ * state cycle; its name carries the state instead.
  */
 const cycleOrder = ['light', 'dark', 'system'] as const
 

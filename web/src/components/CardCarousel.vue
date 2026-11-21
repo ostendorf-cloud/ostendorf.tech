@@ -138,8 +138,16 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- tabindex 0: a scroll container with no focusable content in view
-         could otherwise not be scrolled from the keyboard. -->
-    <div ref="track" class="carousel-track" tabindex="0" @scroll.passive="update">
+         could otherwise not be scrolled from the keyboard. A focusable
+         element needs a role and a name, hence the region. -->
+    <div
+      ref="track"
+      class="carousel-track"
+      role="region"
+      :aria-label="t('common.carousel.region', { label })"
+      tabindex="0"
+      @scroll.passive="update"
+    >
       <div
         v-for="(item, index) in props.items"
         :key="index"

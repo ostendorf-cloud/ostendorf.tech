@@ -5,7 +5,8 @@
     "skipToContent": "Skip to content",
     "switchLocale": "Deutsch",
     "carousel": {
-      "slide": "{n} of {total}"
+      "slide": "{n} of {total}",
+      "region": "{label}, scrolls sideways"
     },
     "theme": {
       "switch": "Colour mode: {current}. Switch to: {next}.",

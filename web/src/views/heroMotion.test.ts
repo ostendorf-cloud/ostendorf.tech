@@ -88,18 +88,16 @@ describe('logo animation', () => {
     const base = /logo-fader\s+([\d.]+)s\s+\S+\s+(\d+)$/.exec(animated)
     expect(base, animated).not.toBeNull()
     expect(Number(base?.[2])).toBe(1)
+    expect(Number(base?.[1]) * Number(base?.[2])).toBeLessThanOrEqual(5)
+  })
 
-    // A knob's own duration and negative delay: the first pass only runs
-    // for what is left of the cycle.
-    const ends = [Number(base?.[1])]
+  // The shared rule sets the animation shorthand with higher specificity
+  // than a .knob-N rule, so a duration or delay on a knob rule would never
+  // apply and would only mislead. The animation that runs is the shared one.
+  it('keeps no dead per knob timing that the shared rule would override', () => {
     for (const knob of ['.knob-1', '.knob-2', '.knob-3', '.knob-4']) {
-      const block = rule(logo, knob)
-      ends.push(
-        pixelsOfSeconds(declaration(block, 'animation-duration')) +
-          pixelsOfSeconds(declaration(block, 'animation-delay')),
-      )
+      expect(rule(logo, knob)).not.toMatch(/animation/)
     }
-    expect(Math.max(...ends)).toBeLessThanOrEqual(5)
   })
 
   it('stays still for reduced motion', () => {
@@ -116,6 +114,38 @@ function pixelsOfSeconds(value: string): number {
   }
   return Number(match[1])
 }
+
+describe('hero light beams', () => {
+  const stage = styleBlock(source('src/components/HeroStage.vue'))
+
+  it('never loop', () => {
+    expect(stage).not.toMatch(/infinite/)
+  })
+
+  it('each sway runs once and ends within five seconds', () => {
+    const shared = declaration(rule(stage, '.hero-beam'), 'animation')
+    const base = /hero-sway\s+([\d.]+)s\s+\S+\s+(\d+)\s/.exec(`${shared} `)
+    expect(base, shared).not.toBeNull()
+    expect(Number(base?.[2])).toBe(1)
+
+    // A beam may override only the duration; none may add a delay or a
+    // repeat that lengthens the run.
+    const ends = [Number(base?.[1])]
+    for (const n of [1, 2, 3, 4]) {
+      const block = rule(stage, `.hero-beam:nth-child(${n})`)
+      expect(block).not.toMatch(/animation-(delay|iteration-count)/)
+      const own = /animation-duration:\s*([^;]+);/.exec(block)
+      ends.push(own ? pixelsOfSeconds(own[1].trim()) : Number(base?.[1]))
+    }
+    expect(Math.max(...ends)).toBeLessThanOrEqual(5)
+  })
+
+  it('stays still for reduced motion', () => {
+    expect(stage).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.hero-beam\s*\{\s*animation: none;/,
+    )
+  })
+})
 
 describe('hero entrance', () => {
   it('does not fade the headline in from opacity 0', () => {

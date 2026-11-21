@@ -40,6 +40,28 @@ describe('AppHeader', () => {
     expect(document.documentElement.style.getPropertyValue(HEADER_HEIGHT_PROPERTY)).toBe('108px')
     spy.mockRestore()
   })
+
+  it('stops publishing the height when it is removed', async () => {
+    const disconnect = vi.fn()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn()
+        disconnect = disconnect
+      },
+    )
+    const spy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ height: 56 } as DOMRect)
+    const view = await renderHeader()
+    expect(document.documentElement.style.getPropertyValue(HEADER_HEIGHT_PROPERTY)).toBe('56px')
+
+    view.unmount()
+
+    expect(disconnect).toHaveBeenCalledOnce()
+    expect(document.documentElement.style.getPropertyValue(HEADER_HEIGHT_PROPERTY)).toBe('')
+    spy.mockRestore()
+  })
 })
 
 describe('WordMark', () => {
@@ -65,7 +87,7 @@ describe('anchor offset', () => {
   })
 
   it('has a phone fallback for the moment before the script has measured', () => {
-    expect(stylesheet).toMatch(/max-width:\s*29\.99rem[\s\S]*--header-height:\s*6\.75rem/)
+    expect(stylesheet).toMatch(/width < 30rem[\s\S]*--header-height:\s*6\.75rem/)
   })
 
   it('leaves no per section scroll margin guess behind', () => {
