@@ -5,9 +5,12 @@
     "skipToContent": "Skip to content",
     "switchLocale": "Deutsch",
     "theme": {
-      "light": "Switch to light mode",
-      "dark": "Switch to dark mode",
-      "system": "Follow system setting"
+      "switch": "Colour mode: {current}. Switch to: {next}.",
+      "modes": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System setting"
+      }
     }
   },
   "nav": {

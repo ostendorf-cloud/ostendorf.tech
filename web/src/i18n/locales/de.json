@@ -5,9 +5,12 @@
     "skipToContent": "Zum Inhalt springen",
     "switchLocale": "English",
     "theme": {
-      "light": "Zu hellem Modus wechseln",
-      "dark": "Zu dunklem Modus wechseln",
-      "system": "Systemeinstellung übernehmen"
+      "switch": "Farbmodus: {current}. Wechseln zu: {next}.",
+      "modes": {
+        "light": "Hell",
+        "dark": "Dunkel",
+        "system": "Systemeinstellung"
+      }
     }
   },
   "nav": {
