@@ -4,6 +4,9 @@
     "socialImageAlt": "Simon Ostendorf Event Technology: the fader mark and the wordmark on a dark background",
     "skipToContent": "Skip to content",
     "switchLocale": "Deutsch",
+    "carousel": {
+      "slide": "{n} of {total}"
+    },
     "theme": {
       "switch": "Colour mode: {current}. Switch to: {next}.",
       "modes": {
@@ -82,7 +85,9 @@
       "eyebrow": "On stage",
       "title": "Bands",
       "lead": "Bands and ensembles I provide technical support for.",
-      "instagramLabel": "View on Instagram"
+      "instagramLabel": "View on Instagram",
+      "previous": "Previous bands",
+      "next": "Next bands"
     },
     "about": {
       "eyebrow": "Who's behind it",

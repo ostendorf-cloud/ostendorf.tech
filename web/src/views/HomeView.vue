@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { GovueCard, GovuePage } from '@ostendorf-cloud/govue'
 
+import CardCarousel from '../components/CardCarousel.vue'
 import ContactChannels from '../components/ContactChannels.vue'
 import ContactForm from '../components/ContactForm.vue'
 import CountingFacts from '../components/CountingFacts.vue'
@@ -153,24 +154,33 @@ const aboutFacts = computed<Fact[]>(() => [
         <p class="text-lg text-text-muted">{{ t('home.bands.lead') }}</p>
       </header>
 
-      <div class="panel-grid grid sm:grid-cols-2 lg:grid-cols-3">
-        <GovueCard v-for="band in bands" :key="band.slug" class="panel-lit">
-          <h3 class="mb-3 text-lg font-semibold text-text">{{ t(`bands.${band.slug}.name`) }}</h3>
-          <div v-if="band.hasDescription" class="flex flex-col gap-2 text-sm text-text-muted">
-            <p v-for="(paragraph, index) in tm(`bands.${band.slug}.paragraphs`)" :key="index">
-              {{ rt(paragraph) }}
-            </p>
-          </div>
-          <a
-            :href="band.instagramUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="mt-auto inline-flex min-h-11 items-center gap-1 self-start pt-3 text-sm text-accent-text hover:underline"
-          >
-            {{ t('home.bands.instagramLabel') }}: {{ band.instagramHandle }}
-          </a>
-        </GovueCard>
-      </div>
+      <CardCarousel
+        :items="bands"
+        :label="t('home.bands.title')"
+        :previous-label="t('home.bands.previous')"
+        :next-label="t('home.bands.next')"
+      >
+        <template #slide="{ item: band }">
+          <GovueCard class="panel-lit">
+            <h3 class="mb-3 text-lg font-semibold text-text">
+              {{ t(`bands.${band.slug}.name`) }}
+            </h3>
+            <div v-if="band.hasDescription" class="flex flex-col gap-2 text-sm text-text-muted">
+              <p v-for="(paragraph, index) in tm(`bands.${band.slug}.paragraphs`)" :key="index">
+                {{ rt(paragraph) }}
+              </p>
+            </div>
+            <a
+              :href="band.instagramUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-auto inline-flex min-h-11 items-center gap-1 self-start pt-3 text-sm text-accent-text hover:underline"
+            >
+              {{ t('home.bands.instagramLabel') }}: {{ band.instagramHandle }}
+            </a>
+          </GovueCard>
+        </template>
+      </CardCarousel>
     </section>
 
     <section id="about" aria-labelledby="about-title" class="py-8 sm:py-14">
