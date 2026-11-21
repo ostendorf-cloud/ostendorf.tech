@@ -18,6 +18,19 @@ tests:
             over https must keep. Set it only for a plain http development run, or serve
             the site over plain http.
 
+  - it: fails the render for an upper case https scheme too
+    set:
+      config:
+        allowPlainHttp: true
+        siteUrl: "HTTPS://ostendorf.tech"
+    asserts:
+      - failedTemplate:
+          errorMessage: >-
+            config.allowPlainHttp must not be true when config.siteUrl is https: it drops
+            the session cookie's Secure attribute and turns HSTS off, which a site served
+            over https must keep. Set it only for a plain http development run, or serve
+            the site over plain http.
+
   - it: renders when allowPlainHttp is true and siteUrl is plain http
     set:
       config:
