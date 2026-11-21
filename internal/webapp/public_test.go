@@ -1,6 +1,7 @@
 package webapp
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,6 +56,64 @@ func TestPublicFilesAreServedAtTheRoot(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAppServesThePublicFiles goes through the real handler chain and mux
+// New builds, so a registration dropped from buildHandler is caught, which
+// the test above with its own mux cannot do.
+func TestAppServesThePublicFiles(t *testing.T) {
+	handler := testApp(t).Handler()
+	dist := testDist()
+
+	tests := map[string]string{
+		"/favicon.svg":          "image/svg+xml",
+		"/favicon-32x32.png":    "image/png",
+		"/apple-touch-icon.png": "image/png",
+		"/og-image.png":         "image/png",
+	}
+	for path, wantType := range tests {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("GET status = %d, want %d", rec.Code, http.StatusOK)
+			}
+			if got := rec.Header().Get("Content-Type"); got != wantType {
+				t.Errorf("Content-Type = %q, want %q", got, wantType)
+			}
+			if got := rec.Header().Get("Cache-Control"); got != "public, max-age=86400" {
+				t.Errorf("Cache-Control = %q, want one day", got)
+			}
+			if want := dist[path[1:]].Data; !bytes.Equal(rec.Body.Bytes(), want) {
+				t.Errorf("body = %q, want %q", rec.Body.Bytes(), want)
+			}
+
+			head := httptest.NewRequestWithContext(t.Context(), http.MethodHead, path, nil)
+			hrec := httptest.NewRecorder()
+			handler.ServeHTTP(hrec, head)
+			if hrec.Code != http.StatusOK {
+				t.Errorf("HEAD status = %d, want %d", hrec.Code, http.StatusOK)
+			}
+
+			post := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, nil)
+			prec := httptest.NewRecorder()
+			handler.ServeHTTP(prec, post)
+			if prec.Code != http.StatusMethodNotAllowed {
+				t.Errorf("POST status = %d, want %d", prec.Code, http.StatusMethodNotAllowed)
+			}
+		})
+	}
+
+	t.Run("trailing slash", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/favicon.svg/", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
 }
 
 func TestNewPageServerFailsWithoutAPublicFile(t *testing.T) {

@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/ostendorf-cloud/govue/favicon"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/webapp"
 )
 
 func realFS(t *testing.T) (dist, prerendered fs.FS) {
@@ -31,6 +35,57 @@ func TestPrerenderedPagesCarryTheFavicon(t *testing.T) {
 	dist, prerendered := realFS(t)
 	if err := favicon.CheckPages(prerendered, dist); err != nil {
 		t.Fatalf("favicon.CheckPages() error = %v", err)
+	}
+}
+
+// TestAppServesTheLinkedIconsFromTheEmbeddedDist requests each linked icon
+// and the preview image through the real handler built from the real
+// embedded dist, and compares the answer with the embedded file.
+func TestAppServesTheLinkedIconsFromTheEmbeddedDist(t *testing.T) {
+	dist, prerendered := realFS(t)
+	cfg, err := config.Load(func(key string) string {
+		if key == "CSRF_KEY" {
+			return testCSRFKey
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatalf("config.Load() error = %v", err)
+	}
+	app, err := webapp.New(cfg, discardLogger(), dist, prerendered)
+	if err != nil {
+		t.Fatalf("webapp.New() error = %v", err)
+	}
+
+	files := map[string]string{
+		"/" + favicon.SVGFile:   "image/svg+xml",
+		"/" + favicon.PNGFile:   "image/png",
+		"/" + favicon.TouchFile: "image/png",
+		"/og-image.png":         "image/png",
+	}
+	for path, wantType := range files {
+		t.Run(path, func(t *testing.T) {
+			want, err := fs.ReadFile(dist, path[1:])
+			if err != nil {
+				t.Fatalf("fs.ReadFile(dist, %q) error = %v", path[1:], err)
+			}
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			app.Handler().ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+			}
+			if got := rec.Header().Get("Content-Type"); got != wantType {
+				t.Errorf("Content-Type = %q, want %q", got, wantType)
+			}
+			if got := rec.Header().Get("Cache-Control"); got != "public, max-age=86400" {
+				t.Errorf("Cache-Control = %q, want one day", got)
+			}
+			if !bytes.Equal(rec.Body.Bytes(), want) {
+				t.Errorf("body differs from the embedded %s (%d bytes, want %d)", path, rec.Body.Len(), len(want))
+			}
+		})
 	}
 }
 
