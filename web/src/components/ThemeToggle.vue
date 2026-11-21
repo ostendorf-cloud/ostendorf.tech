@@ -107,7 +107,7 @@ function onToggle(event: MouseEvent): void {
 <template>
   <GovueButton
     variant="quiet"
-    class="min-w-11 !px-2"
+    class="min-w-11 px-2!"
     :data-mode="mode"
     :title="label"
     :aria-label="label"

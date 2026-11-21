@@ -89,7 +89,7 @@ const aboutFacts = computed<Fact[]>(() => [
       </a>
     </section>
 
-    <section id="services" aria-labelledby="services-title" class="panel-section scroll-mt-20">
+    <section id="services" aria-labelledby="services-title" class="panel-section">
       <header class="panel-group-header flex flex-col gap-2">
         <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">
           {{ t('home.services.eyebrow') }}
@@ -142,7 +142,7 @@ const aboutFacts = computed<Fact[]>(() => [
          show; see InstagramFeed.vue. -->
     <InstagramFeed />
 
-    <section id="bands" aria-labelledby="bands-title" class="panel-section scroll-mt-20">
+    <section id="bands" aria-labelledby="bands-title" class="panel-section">
       <header class="panel-group-header flex flex-col gap-2">
         <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">
           {{ t('home.bands.eyebrow') }}
@@ -173,7 +173,7 @@ const aboutFacts = computed<Fact[]>(() => [
       </div>
     </section>
 
-    <section id="about" aria-labelledby="about-title" class="scroll-mt-20 py-8 sm:py-14">
+    <section id="about" aria-labelledby="about-title" class="py-8 sm:py-14">
       <div class="grid items-center gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <!-- The gradient is the frame itself: two pixels of padding under
              the picture, so the brand holds the portrait rather than
@@ -220,7 +220,7 @@ const aboutFacts = computed<Fact[]>(() => [
       </div>
     </section>
 
-    <section id="contact" aria-labelledby="contact-title" class="scroll-mt-20 py-8 sm:py-14">
+    <section id="contact" aria-labelledby="contact-title" class="py-8 sm:py-14">
       <header class="mb-6 flex flex-col gap-2">
         <p class="text-sm font-semibold tracking-wide text-text-muted uppercase">
           {{ t('home.contact.eyebrow') }}
