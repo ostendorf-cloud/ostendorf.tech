@@ -133,6 +133,59 @@ func TestPrerenderedPagesPinTheColourMode(t *testing.T) {
 	}
 }
 
+// TestPrerenderedIndexingTags reads the real output of "task prerender": a 404 page is
+// noindex with no canonical link, no og:url and no hreflang pair, since it is no copy of
+// the home page, and every other page is indexable with its own canonical link.
+func TestPrerenderedIndexingTags(t *testing.T) {
+	sub, err := fs.Sub(prerenderedFS, "prerendered")
+	if err != nil {
+		t.Fatalf("fs.Sub(prerenderedFS, \"prerendered\") error = %v", err)
+	}
+
+	pages := 0
+	err = fs.WalkDir(sub, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".html") {
+			return nil
+		}
+		pages++
+
+		data, err := fs.ReadFile(sub, p)
+		if err != nil {
+			return err
+		}
+		html := string(data)
+		has := func(s string) bool { return strings.Contains(html, s) }
+
+		if strings.HasSuffix(p, "404.html") {
+			if !has(`<meta name="robots" content="noindex">`) {
+				t.Errorf("%s: want a noindex robots tag", p)
+			}
+			for _, bad := range []string{`rel="canonical"`, `property="og:url"`, `rel="alternate"`} {
+				if has(bad) {
+					t.Errorf("%s: a 404 page must not carry %s", p, bad)
+				}
+			}
+			return nil
+		}
+		if !has(`<meta name="robots" content="index, follow">`) {
+			t.Errorf("%s: want an index, follow robots tag", p)
+		}
+		if !has(`rel="canonical"`) {
+			t.Errorf("%s: want a canonical link", p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("fs.WalkDir(prerendered) error = %v", err)
+	}
+	if pages == 0 {
+		t.Fatal("prerendered has no pages; run task prerender first")
+	}
+}
+
 // TestPrerenderedThemeBootScriptIsByteIdenticalAcrossPages guards the
 // assumption internal/webapp's themeBootScriptHash relies on: it computes
 // one CSP script-src 'sha256-' source from whichever prerendered page it
