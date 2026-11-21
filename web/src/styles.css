@@ -53,3 +53,14 @@
     --header-height: 6.75rem;
   }
 }
+
+/*
+ * The clip above would cut a long unbreakable string, a URL in the legal
+ * text for instance, at 360 px instead of letting it wrap. The legal pages
+ * and the 404 page are the pages in govue's reading width, the one
+ * "max-w-reading" main; the home page is "max-w-shell" and keeps normal
+ * wrapping.
+ */
+main.max-w-reading {
+  overflow-wrap: anywhere;
+}
