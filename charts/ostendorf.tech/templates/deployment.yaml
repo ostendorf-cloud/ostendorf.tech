@@ -29,6 +29,9 @@ spec:
   {{- if and .Values.ingress.enabled (not .Values.config.trustedProxies) }}
   {{ fail "config.trustedProxies must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md." }}
   {{- end }}
+  {{- if and .Values.config.allowPlainHttp (hasPrefix "https://" (.Values.config.siteUrl | toString)) }}
+  {{ fail "config.allowPlainHttp must not be true when config.siteUrl is https: it drops the session cookie's Secure attribute and turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http." }}
+  {{- end }}
   replicas: {{ .Values.replicaCount }}
   # Recreate, not the default RollingUpdate: a rolling update's maxSurge
   # would otherwise briefly run two pods, which is exactly the "two pods, two

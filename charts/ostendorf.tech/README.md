@@ -28,6 +28,11 @@ The chart has no usable default for `existingSecret.name`: no name could ever po
 and why it is needed, rather than installing a `Deployment` that crash-loops on a missing
 `CSRF_KEY`.
 
+`config.allowPlainHttp` must stay `false` while `config.siteUrl` is an `https` URL. It drops the
+session cookie's `Secure` attribute and turns HSTS off too, which a site served over `https`
+must keep. `templates/deployment.yaml` rejects that combination at render time. Set it only for
+a plain `http` development run, with a plain `http` `config.siteUrl`.
+
 `config.trustedProxies` must be set once `ingress.enabled` is true. Left empty behind this
 chart's own `Ingress`, every request is attributed to the ingress controller's pod IP, which
 collapses every rate limiter into one shared bucket for the whole site instead of one per
@@ -367,6 +372,15 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `httpRoute.parentRefs.sectionName` | Specific listener on the `Gateway` to attach to, when it exposes more than one | `""` |
 | `resources` | Pod resource requests/limits | see `values.yaml` |
 | `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
+| `config.listenAddr` | Address the public listener binds (`LISTEN_ADDR`); must match `service.port` | `:8080` |
+| `config.logLevel` | `debug`, `info`, `warn` or `error` (`LOG_LEVEL`) | `info` |
+| `config.allowPlainHttp` | Drops the session cookie's `Secure` attribute and turns HSTS off, for a plain `http` development run. Refused at render time while `config.siteUrl` is `https` | `false` |
+| `config.rateLimitBurst` / `config.rateLimitPer` | Requests one client address may make before waiting, and the burst's refill period | `120` / `1m` |
+| `config.challengeRateLimitBurst` / `config.challengeRateLimitPer` | Same, for `GET /api/v1/challenge` | `10` / `20s` |
+| `config.contactRateLimitBurst` / `config.contactRateLimitPer` | Same, for `POST /api/v1/contact` | `5` / `10m` |
+| `config.mailRateLimitBurst` / `config.mailRateLimitPer` | Contact mails sent in total, across every client address, and the refill period | `50` / `1h` |
+| `config.contactTo` | Recipient address of every contact mail | `simon@ostendorf.tech` |
+| `config.contactFrom` | Envelope sender address of every contact mail | `ostendorf.tech <no-reply@ostendorf.cloud>` |
 | `config.smtpAddr` | SMTP submission server | `mail.ostendorf.cloud:587` |
 | `config.adminListenAddr` | govue's admin listener address (`ADMIN_ADDR`); must match `service.adminPort` | `:8081` |
 | `config.trustedProxies` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |
@@ -379,6 +393,17 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `feed.service.port` | Feed service's one container and Service port | `8081` |
 | `feed.config.openBaoAddr` | OpenBao address the feed service authenticates against. Required when `feed.enabled` is true; see "Feed service" above | `""` (required) |
 | `feed.config.openBaoRole` | OpenBao Kubernetes auth role the feed service logs in as. Required when `feed.enabled` is true; see "Feed service" above | `""` (required) |
+| `feed.config.listenAddr` | Address the feed service binds (`LISTEN_ADDR`); must match `feed.service.port` | `:8081` |
+| `feed.config.logLevel` | `debug`, `info`, `warn` or `error` | `info` |
+| `feed.config.openBaoAuthPath` | Mount path of OpenBao's Kubernetes auth method | `kubernetes` |
+| `feed.config.openBaoJwtFile` | Path the projected service account token is mounted at | `/var/run/secrets/openbao/token` |
+| `feed.config.tokenPath` | OpenBao KV v2 data path the Instagram access token is stored at; the policy in "Feed service" grants access to it | `instagram.com/api-tokens/data/simonostendorf.vtech` |
+| `feed.config.syncInterval` | How often the feed is reloaded from Meta, `1m` to `24h` | `1h` |
+| `feed.config.tokenRefreshAge` | Token age after which a refresh is tried, `24h` to `50d` | `7d` |
+| `feed.config.apiVersion` | Graph API version calls are made against | `v23.0` |
+| `feed.config.postCount` | Posts asked for per sync, `1` to `100` | `20` |
+| `feed.serviceAccountToken.audience` | Audience of the projected token. Empty uses the API server's default | `""` |
+| `feed.serviceAccountToken.expirationSeconds` | Lifetime of the projected token | `3600` |
 | `feed.networkPolicy.enabled` | Create a `NetworkPolicy` restricting the feed service's traffic, once `feed.enabled` is also true; see "NetworkPolicy" above | `true` |
 | `feed.networkPolicy.openBaoPort` | Port OpenBao egress is allowed on; keep in sync with `feed.config.openBaoAddr` | `8200` |
 | `feed.networkPolicy.dns.namespaceSelector` / `.podSelector` | Destination scope for the DNS egress rule; see "NetworkPolicy" above | `kube-system` / `k8s-app: kube-dns` |
