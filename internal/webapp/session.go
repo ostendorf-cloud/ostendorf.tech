@@ -18,9 +18,10 @@ type sessionContextKey struct{}
 // This site has no login, so a session here carries no account, nothing
 // but an opaque id. Its only purpose is giving the CSRF protector's
 // Expected something to derive a token from, the same per-visitor binding
-// a logged in application already gets from its own login session. It runs
-// on every page request, which is what lets a visitor's browser carry a
-// valid token by the time it reaches the contact form's POST route.
+// a logged in application already gets from its own login session. It is
+// mounted on GET /api/v1/challenge only, so a session starts when the
+// contact form asks for its challenge, not on a page request. The response
+// carries the CSRF token the browser then sends with the form's POST.
 //
 // A session that cannot be started, the store unreachable, leaves the
 // request without one rather than failing it: a visitor reading a page

@@ -25,9 +25,9 @@ import (
 
 // Defaults applied to a field left unset in the environment.
 const (
-	// DefaultListenAddr is distinct from the website's ":8080" default so
-	// both can run side by side in local development without a port
-	// clash.
+	// DefaultListenAddr is distinct from the website's ":8080" public
+	// default. It is the same port as the website's default ADMIN_ADDR
+	// (":8081"), so both on one machine need one of the two changed.
 	DefaultListenAddr      = ":8081"
 	DefaultLogLevel        = "info"
 	DefaultOpenBaoAuthPath = "kubernetes"

@@ -328,9 +328,13 @@ four points changed as a result, the cookie point; the other three held up uncha
   port where present) and address shortened
   to /24 or /48 instead of the path, the referrer without parameters and the full address.
   The page title is no longer sent either.
-- The Instagram feed likewise does not exist on `feat/go-live` yet (also a later milestone); the
-  privacy text's Instagram section remains forward-looking, based on `old_simon-ostendorf.de`'s
-  `internal/instagram/client.go` and `feed.go`, and needs re-checking once that code lands.
+- The Instagram feed likewise did not exist on `feat/go-live` when this was written (also a later
+  milestone); the privacy text's Instagram section was then based on `old_simon-ostendorf.de`'s
+  `internal/instagram/client.go` and `feed.go`.
+  Update (factual note only, no legal conclusion): the feed has since landed. A separate feed
+  service (`cmd/feed`, `internal/instagram`) fetches the posts and pictures from Meta and the
+  website fetches them from that service and serves them from its own origin
+  (`internal/feedclient`). The privacy text has not been re-checked against this code here.
 - The site is not cookie-free. `feat/go-live` sets one real cookie, only once the contact form
   requests its task from the server, for the reason and with the attributes described above;
   the privacy policy no longer claims otherwise.
