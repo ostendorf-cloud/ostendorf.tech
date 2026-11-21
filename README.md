@@ -10,7 +10,7 @@ A Go service serves a Vue 3 single page application built on the organisation's 
 time, so a crawler or a browser's first paint gets real markup before the SPA takes
 over.
 
-The home page's hero, Leistungen, Bands, Über mich and Kontakt sections, and the
+The home page's hero, Leistungen, Impressionen, Bands, Über mich and Kontakt sections, and the
 imprint, privacy and AGB pages, are implemented in German (the source of truth) and
 English. The Kontakt section's contact form sends mail over SMTP, protected by a
 proof of work challenge, a per-session CSRF token and a per-address rate limit. See
@@ -149,6 +149,11 @@ controller's own address range.
 cp .env.example .env   # fill in CSRF_KEY at least; see .env.example
 docker compose up --build
 ```
+
+`CSRF_KEY` alone starts the site. The contact form needs `CHALLENGE_KEY`, `SMTP_USERNAME` and
+`SMTP_PASSWORD` too, and answers "unavailable" without them. Compose runs the website only, no
+feed service, so the Impressionen section stays off unless `FEED_SERVICE_URL` points at a feed
+service started some other way.
 
 Builds the multi-stage `Dockerfile` (frontend, prerender, static Go binary, then a
 minimal non-root runtime stage with no shell) and serves the site at

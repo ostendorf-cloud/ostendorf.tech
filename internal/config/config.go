@@ -112,7 +112,7 @@ type Config struct {
 	RateLimitPer   time.Duration
 
 	// AllowPlainHTTP drops the session cookie's Secure attribute, for a
-	// plain HTTP development run (docker compose, task run). Never set on
+	// plain HTTP development run (docker compose, or bin/website after task build). Never set on
 	// anything reachable from outside the machine it runs on.
 	AllowPlainHTTP bool
 
