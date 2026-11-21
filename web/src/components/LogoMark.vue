@@ -94,9 +94,15 @@ const maskId = `logo-mark-cut-${useId()}`
  * in travel together; the distances keep every cut-out inside the two
  * tracks it bridges, which is what the old site's own travel values were
  * chosen for.
+ *
+ * The slide plays once and then rests, and never runs longer than five
+ * seconds: moving content that starts by itself and goes on longer than
+ * that needs a pause control (WCAG 2.2.2), and a pause button on a logo
+ * would be worse than a logo that comes to rest. A looping version is
+ * what this replaced.
  */
 .logo-mark-animated .logo-knob {
-  animation: logo-fader 4s ease-in-out infinite;
+  animation: logo-fader 4s ease-in-out 1;
 }
 
 .knob-1 {

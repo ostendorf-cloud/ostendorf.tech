@@ -305,6 +305,17 @@ const aboutFacts = computed<Fact[]>(() => [
   max-width: 48rem;
   flex-direction: column;
   align-items: center;
+}
+
+/*
+ * The headline is the Largest Contentful Paint candidate for the text, so
+ * it paints at once, fully opaque. Only the decoration around it rises in:
+ * fading the whole block from opacity 0 held the headline back for the
+ * length of the animation.
+ */
+.hero-logo,
+.hero-tagline,
+.hero-actions {
   animation: hero-rise 800ms var(--ease-out) both;
 }
 
@@ -382,15 +393,35 @@ const aboutFacts = computed<Fact[]>(() => [
   margin-top: 2.375rem;
 }
 
-/* A mouse outline with a dot rolling down it. */
+/*
+ * A mouse outline with a dot rolling down it. The link itself is a 44 by
+ * 52 px target (WCAG 2.5.8 asks for 24, this site holds 44 everywhere);
+ * the outline is drawn by ::after, centred inside it, at its old 26 by
+ * 42 px, and the dot by ::before.
+ *
+ * The dot rolls twice, 3.6 seconds in all, and then rests: moving content
+ * that starts by itself and runs longer than five seconds needs a way to
+ * stop it (WCAG 2.2.2), and this one simply ends before that.
+ */
 .hero-cue {
   position: absolute;
   z-index: var(--hero-layer-content);
-  bottom: 1.75rem;
+  bottom: 1.25rem;
+  left: 50%;
+  width: 2.75rem;
+  height: 3.25rem;
+  margin-left: -1.375rem;
+}
+
+.hero-cue::after {
+  content: '';
+  position: absolute;
+  top: 50%;
   left: 50%;
   width: 1.625rem;
   height: 2.625rem;
-  margin-left: -0.8125rem;
+  margin: -1.3125rem 0 0 -0.8125rem;
+  box-sizing: border-box;
   border: 2px solid var(--color-accent);
   border-radius: 0.875rem;
 }
@@ -398,14 +429,14 @@ const aboutFacts = computed<Fact[]>(() => [
 .hero-cue::before {
   content: '';
   position: absolute;
-  top: 0.4375rem;
+  top: 50%;
   left: 50%;
   width: 0.25rem;
   height: 0.5rem;
-  margin-left: -0.125rem;
+  margin: -0.875rem 0 0 -0.125rem;
   border-radius: 0.125rem;
   background: var(--color-accent);
-  animation: hero-roll 1.8s ease-in-out infinite;
+  animation: hero-roll 1.8s ease-in-out 2;
 }
 
 @media (max-height: 40rem) {
@@ -546,7 +577,9 @@ const aboutFacts = computed<Fact[]>(() => [
 
 /* The stage stands still; hover keeps only its colour change. */
 @media (prefers-reduced-motion: reduce) {
-  .hero-inner,
+  .hero-logo,
+  .hero-tagline,
+  .hero-actions,
   .hero-cue::before {
     animation: none;
   }
