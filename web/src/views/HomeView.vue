@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   createClient,
@@ -13,6 +13,7 @@ import BandLogo from '../components/BandLogo.vue'
 import CardCarousel from '../components/CardCarousel.vue'
 import ContactChannels from '../components/ContactChannels.vue'
 import CountingFacts from '../components/CountingFacts.vue'
+import HeroMotionToggle from '../components/HeroMotionToggle.vue'
 import HeroStage from '../components/HeroStage.vue'
 import InstagramFeed from '../components/InstagramFeed.vue'
 import LogoMark from '../components/LogoMark.vue'
@@ -43,6 +44,19 @@ const privacyHref = computed(() =>
   legalPath('privacy', isLocale(locale.value) ? locale.value : 'de'),
 )
 
+// Whether the visitor stopped the hero's beams. Deliberately not stored:
+// a reload starts them again.
+const motionPaused = ref(false)
+
+// The pause button is rendered only once the script has run: before that
+// (the prerendered page, or no JavaScript at all) the beams are at rest and
+// there is nothing to pause. Set in onMounted, so server and first client
+// render agree.
+const mounted = ref(false)
+onMounted(() => {
+  mounted.value = true
+})
+
 // Annotated so the v-for below sees a real array type and a numeric
 // index, which tm's own return type does not provably give it.
 const tagline = computed<string[]>(() => tm('home.hero.tagline'))
@@ -71,7 +85,7 @@ const aboutFacts = computed<Fact[]>(() => [
 <template>
   <GovuePage width="shell">
     <section aria-labelledby="hero-title" class="hero">
-      <HeroStage />
+      <HeroStage :paused="motionPaused" />
 
       <div class="hero-inner">
         <LogoMark class="hero-logo" :size="104" animated />
@@ -86,7 +100,7 @@ const aboutFacts = computed<Fact[]>(() => [
         <div class="hero-actions">
           <a
             href="#contact"
-            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-accent-strong px-4 text-base font-medium text-accent-on transition-colors hover:bg-accent-strong-hover"
+            class="btn-gradient inline-flex min-h-11 items-center justify-center gap-2 px-6 text-base font-semibold"
           >
             {{ t('home.hero.ctaContact') }}
           </a>
@@ -103,6 +117,13 @@ const aboutFacts = computed<Fact[]>(() => [
       <a href="#services" class="hero-cue">
         <span class="sr-only">{{ t('home.hero.scrollCue') }}</span>
       </a>
+
+      <HeroMotionToggle
+        v-if="mounted"
+        class="hero-motion"
+        :paused="motionPaused"
+        @toggle="motionPaused = !motionPaused"
+      />
     </section>
 
     <section id="services" aria-labelledby="services-title" class="panel-section">
@@ -237,7 +258,7 @@ const aboutFacts = computed<Fact[]>(() => [
           <p class="mt-6">
             <a
               href="#contact"
-              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-accent-strong px-4 text-base font-medium text-accent-on transition-colors hover:bg-accent-strong-hover"
+              class="btn-gradient inline-flex min-h-11 items-center justify-center gap-2 px-6 text-base font-semibold"
             >
               {{ t('home.about.cta') }}
             </a>
@@ -392,7 +413,7 @@ const aboutFacts = computed<Fact[]>(() => [
    that keeps the flat colour above, which is a token in its own right. */
 @supports (background-clip: text) or (-webkit-background-clip: text) {
   .hero-title {
-    background: linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-to));
+    background: var(--brand-gradient-text);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -480,6 +501,15 @@ const aboutFacts = computed<Fact[]>(() => [
   animation: hero-roll 1.8s ease-in-out 2;
 }
 
+/* The pause control for the beams, in the hero's bottom right corner; its
+   look is HeroMotionToggle's own. */
+.hero-motion {
+  position: absolute;
+  z-index: var(--hero-layer-content);
+  right: 1rem;
+  bottom: 1.25rem;
+}
+
 @media (max-height: 40rem) {
   .hero-cue {
     display: none;
@@ -541,7 +571,7 @@ const aboutFacts = computed<Fact[]>(() => [
   --panel-padding: clamp(1.25rem, 0.95rem + 1.2vw, 2rem);
 
   position: relative;
-  border-radius: clamp(0.875rem, 0.7rem + 0.7vw, 1.25rem);
+  border-radius: clamp(var(--radius-lg), 0.8rem + 0.8vw, var(--radius-xl));
 }
 
 /*
@@ -602,7 +632,7 @@ const aboutFacts = computed<Fact[]>(() => [
   right: var(--panel-padding);
   left: var(--panel-padding);
   height: 1px;
-  background: linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-to));
+  background: var(--brand-gradient);
 }
 
 .service {
@@ -641,7 +671,7 @@ const aboutFacts = computed<Fact[]>(() => [
   margin: 0 auto;
   padding: 2px;
   border-radius: 1.625rem;
-  background: linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-to));
+  background: var(--brand-gradient);
   box-shadow: var(--shadow-dialog);
 }
 

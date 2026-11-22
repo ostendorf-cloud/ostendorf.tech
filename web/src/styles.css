@@ -36,6 +36,68 @@
 }
 
 /*
+ * The old site's primary button, defined once: a pill on the surface with
+ * the brand line gradient as its border. The fill is a token, so the pill
+ * reads on the dark stage and on a light page alike; the gradient is the
+ * theme's --brand-gradient, never a copy of its colours. Forced colours
+ * drops the background layers, so the border falls back to a system one.
+ *
+ * Hover keeps the surface fill and lifts the button: the purple end of the
+ * border has 3.2:1 on the surface but only 2.95:1 on the hover surface.
+ */
+.btn-gradient {
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+    var(--brand-gradient) border-box;
+  color: var(--color-text);
+  transition:
+    background-color var(--default-transition-duration) var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+
+.btn-gradient:is(:hover, :focus-visible) {
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-gradient {
+    transition: none;
+  }
+
+  .btn-gradient:is(:hover, :focus-visible) {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .btn-gradient {
+    border-color: ButtonText;
+  }
+}
+
+/*
+ * The header as on the old site: translucent with a blur. This overrides
+ * the bg-surface that GovueHeader sets on its root, because govue has no
+ * header background token to set instead: a token for the header's ground
+ * is the missing govue feature, and this one rule goes when it exists.
+ * --header-bg is the theme's token for it. A browser without backdrop-filter
+ * keeps govue's opaque ground, since a see-through bar over text is
+ * unreadable. The old site also made the bar transparent over the hero
+ * until the page scrolled; this one is a sticky row the hero starts below,
+ * whose measured height (--header-height) drives the anchors and the hero's
+ * own height, so it stays a bar.
+ */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .app-header {
+    background-color: var(--header-bg);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    backdrop-filter: blur(14px) saturate(1.2);
+  }
+}
+
+/*
  * The sticky header is as tall as its rows make it: one row from 480px up,
  * more below that. AppHeader measures it and writes the real height to
  * --header-height on the root element (src/lib/headerHeight.ts), and every

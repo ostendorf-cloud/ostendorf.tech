@@ -291,9 +291,10 @@ cannot read the page's design tokens.
 
 The fader mark alone (the icon, `LogoMark.vue`) is not
 generated: it is inline Vue markup ported from old_simon-ostendorf.de's `{{define
-"logo"}}` template block, recoloured through a gradient whose stops read this theme's
-own `--color-accent` and `--color-accent-text` tokens, so it never needs regenerating
-when the theme changes.
+"logo"}}` template block, with a gradient whose stops read the theme's `--logo-from` and
+`--logo-to` tokens: the favicon's `#0ff0ff` and `#803cff`, the same in light and dark mode
+and independent of the palette's accent roles, so it never needs regenerating when the
+theme changes.
 
 `web/src/assets/bands/herrenjedeck-logo.webp` is generated from the band's own logo,
 `https://www.herrenjedeck.de/assets/logo-dark.png` (1182x945, transparent background),
@@ -323,9 +324,15 @@ implemented. Left out, tracked as later milestones:
   `GET /api/v1/instagram`, not baked into the prerendered HTML: the feed changes while
   the binary does not, and `task prerender` runs at build time with no access token. A
   crawler that executes no JavaScript therefore does not see the section. That is
-  deliberate, since the section carries no content worth indexing, but it does mean the
-  nav has no Impressionen entry either, because a prerendered nav cannot know whether the
-  section will be there.
+  deliberate, since the section carries no content worth indexing. The nav's
+  Impressionen entry follows the section the same way: the prerendered nav has none,
+  because it cannot know whether the section will be there, and `InstagramFeed.vue` sets
+  `impressionsOnPage` (`web/src/lib/pageSections.ts`) once its section is rendered, which
+  makes `AppHeader.vue` add the entry between Leistungen and Bands. The entry shifts the
+  links after it sideways when it arrives; the header's height does not change. It is
+  left out of the row between 640 and 1023 px (`IMPRESSIONS_HIDDEN_QUERY`, the `sm` to
+  below `lg` range), where the one row has no room for a fifth German link; it is in
+  govue's menu below 640 px and in the row from 1024 px.
 
 ## Deviations
 

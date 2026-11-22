@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { GovueHeader, GovueNav, type NavItem } from '@ostendorf-cloud/govue'
 
 import { trackHeaderHeight } from '../lib/headerHeight'
+import { useMediaQuery } from '../lib/mediaQuery'
+import { IMPRESSIONS_HIDDEN_QUERY, IMPRESSIONS_ID, impressionsOnPage } from '../lib/pageSections'
 import LocaleSwitch from './LocaleSwitch.vue'
 import LogoMark from './LogoMark.vue'
 import ThemeToggle from './ThemeToggle.vue'
@@ -28,6 +30,8 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
+const impressionsHiddenInRow = useMediaQuery(IMPRESSIONS_HIDDEN_QUERY)
+
 /** Every nav item is an in-page anchor on the home page: this milestone
  *  has only one page with sections, so there is nowhere else to link a
  *  section heading to. GovueNav renders a plain anchor, not a router-link,
@@ -37,6 +41,14 @@ const items = computed<NavItem[]>(() => {
   const home = (hash: string) => router.resolve({ name: 'home', params: { locale }, hash }).href
   return [
     { href: home('#services'), label: t('nav.services') },
+    // Only while the section is on the page: it renders in the browser, after
+    // the feed answered, so the prerendered nav never has this entry. And not
+    // in the one-row range from 640 to 1023 px, where the row has no room for
+    // a fifth link: govue's menu below 640 px lists it, the row from 1024 px
+    // shows it.
+    ...(impressionsOnPage.value && !impressionsHiddenInRow.value
+      ? [{ href: home(`#${IMPRESSIONS_ID}`), label: t('nav.impressions') }]
+      : []),
     { href: home('#bands'), label: t('nav.bands') },
     { href: home('#about'), label: t('nav.about') },
     { href: home('#contact'), label: t('nav.contact') },
@@ -45,7 +57,7 @@ const items = computed<NavItem[]>(() => {
 </script>
 
 <template>
-  <GovueHeader ref="header">
+  <GovueHeader ref="header" class="app-header">
     <template #brand>
       <router-link
         :to="{ name: 'home', params: { locale: route.params.locale } }"

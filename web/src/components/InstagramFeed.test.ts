@@ -66,6 +66,32 @@ describe('InstagramFeed', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
+  it('puts a decorative overlay with the Instagram glyph in every tile', async () => {
+    const { container } = renderFeed(() => Promise.resolve({ posts }))
+
+    await waitFor(() => {
+      expect(container.querySelectorAll('.insta-overlay')).toHaveLength(2)
+    })
+
+    for (const overlay of container.querySelectorAll('.insta-overlay')) {
+      expect(overlay).toHaveAttribute('aria-hidden', 'true')
+      const glyph = overlay.querySelector('svg')
+      expect(glyph).not.toBeNull()
+      expect(glyph).toHaveAttribute('aria-hidden', 'true')
+      expect(glyph?.querySelector('circle')).not.toBeNull()
+    }
+  })
+
+  it('keeps the link named by the picture, not by the glyph', async () => {
+    renderFeed(() => Promise.resolve({ posts }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Lichtpult im Saal' })).toBeVisible()
+    })
+    expect(screen.getByRole('link', { name: 'Bühne von hinten' })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Lichtpult im Saal' }).textContent?.trim()).toBe('')
+  })
+
   it('offers the account to follow', async () => {
     renderFeed(() => Promise.resolve({ posts }))
 

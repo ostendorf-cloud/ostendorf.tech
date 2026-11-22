@@ -31,11 +31,26 @@
  * whole element is hidden from assistive technology: every word the hero
  * says is in the markup next to it.
  */
+import { onMounted, ref } from 'vue'
+
 import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '../lib/heroImage'
+
+defineProps<{
+  /** Freezes the beams where they are; the visitor's own pause button. */
+  paused?: boolean
+}>()
+
+// The beams sway only once the script has run, because only then does the
+// pause button exist. The server render and the first client render both
+// leave this off, so there is no hydration mismatch.
+const live = ref(false)
+onMounted(() => {
+  live.value = true
+})
 </script>
 
 <template>
-  <div class="hero-stage" aria-hidden="true">
+  <div class="hero-stage" :class="{ 'is-live': live, 'is-paused': paused }" aria-hidden="true">
     <picture>
       <source type="image/avif" :srcset="heroAvif" :sizes="HERO_SIZES" />
       <source type="image/webp" :srcset="heroWebp" :sizes="HERO_SIZES" />
@@ -126,11 +141,24 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
   mix-blend-mode: var(--hero-beam-blend);
   opacity: 0.75;
   will-change: transform;
-  /* Each beam sways once, from --from to --to in under five seconds, and
-     stays where it ends: moving content that starts by itself and goes on
-     longer than that needs a pause control (WCAG 2.2.2), and decoration is
-     not exempt. */
-  animation: hero-sway 4s ease-in-out 1 both;
+  --sway: 12s;
+  --sway-delay: 0s;
+}
+
+/* Each beam sways between --from and --to for as long as the page is open,
+   slowly, as on the old site (12 to 17 seconds a leg). Moving content that
+   starts by itself and goes on longer than five seconds needs a pause
+   control (WCAG 2.2.2), decoration included: that is HeroMotionToggle, which
+   sets .is-paused on the stage. The control exists only once the script ran,
+   so the sway starts only then too, under .is-live: the prerendered page, and
+   a visitor without JavaScript, get the beams at rest. */
+.hero-stage.is-live .hero-beam {
+  animation: hero-sway var(--sway) ease-in-out infinite alternate both;
+  animation-delay: var(--sway-delay);
+}
+
+.hero-stage.is-live.is-paused .hero-beam {
+  animation-play-state: paused;
 }
 
 .hero-beam::before {
@@ -153,7 +181,8 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
   --beam: color-mix(in srgb, var(--color-accent-text) 70%, transparent);
   --from: 14deg;
   --to: -10deg;
-  animation-duration: 5s;
+  --sway: 15s;
+  --sway-delay: -4s;
 }
 
 .hero-beam:nth-child(3) {
@@ -161,7 +190,8 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
   --beam: color-mix(in srgb, var(--color-accent) 50%, transparent);
   --from: -12deg;
   --to: 14deg;
-  animation-duration: 4.5s;
+  --sway: 13s;
+  --sway-delay: -7s;
 }
 
 .hero-beam:nth-child(4) {
@@ -169,7 +199,8 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
   --beam: color-mix(in srgb, var(--color-accent-text) 70%, transparent);
   --from: 28deg;
   --to: 8deg;
-  animation-duration: 3.5s;
+  --sway: 17s;
+  --sway-delay: -2s;
 }
 
 @keyframes hero-sway {
@@ -200,7 +231,7 @@ import { HERO_INTRINSIC, HERO_SIZES, heroAvif, heroFallback, heroWebp } from '..
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-beam {
+  .hero-stage.is-live .hero-beam {
     animation: none;
   }
 }

@@ -46,6 +46,15 @@ const TEXT_PAIRS: Array<[fg: string, bg: string]> = [
   ['danger-text', 'danger-subtle'],
   ['info-text', 'surface'],
   ['info-text', 'info-subtle'],
+  // The old site's palette: text on its raised ground and on the violet tint,
+  // and the two semantic colours it also used on the stage ground itself.
+  ['text', 'accent-subtle'],
+  ['text-muted', 'bg-subtle'],
+  ['text-muted', 'surface-hover'],
+  ['accent-text', 'bg-subtle'],
+  ['success-text', 'bg'],
+  ['danger-text', 'bg'],
+  ['danger-text', 'surface'],
 ]
 
 const NON_TEXT_PAIRS: Array<[fg: string, bg: string]> = [
@@ -53,6 +62,9 @@ const NON_TEXT_PAIRS: Array<[fg: string, bg: string]> = [
   ['border-strong', 'surface'],
   ['accent', 'bg'],
   ['accent', 'surface'],
+  // The far end of the line gradient, which paints button borders and lit edges.
+  ['accent-strong', 'bg'],
+  ['accent-strong', 'surface'],
   ['focus', 'bg'],
   ['focus', 'surface'],
   ['focus', 'surface-hover'],
@@ -135,6 +147,112 @@ describe('the vtech theme', () => {
 
   it('declares every non-text pair at 3:1 in dark mode', () => {
     expect(failures(dark, NON_TEXT_PAIRS, NON_TEXT_MINIMUM)).toEqual([])
+  })
+})
+
+/*
+ * The header. Its ground is --header-bg, the page background at a declared
+ * alpha, and what scrolls under it shows through the blur. White and black
+ * are the two worst cases in each mode (a white page, or the dark hero under
+ * a light header), so the text roles the header paints, the links, the
+ * language switch's accent text and the muted text, are measured over both.
+ */
+const HEADER_TEXT_ROLES = ['text', 'text-muted', 'accent-text']
+const headerAlpha = (() => {
+  const match = /--header-bg:\s*color-mix\(in srgb, var\(--color-bg\) (\d+)%, transparent\)/.exec(
+    css,
+  )
+  if (!match) {
+    throw new Error('contrast: vtech.css declares no --header-bg over --color-bg')
+  }
+  return Number(match[1]) / 100
+})()
+
+describe('the header ground', () => {
+  for (const [mode, palette] of [
+    ['light', light],
+    ['dark', dark],
+  ] as const) {
+    for (const [name, behind] of [
+      ['white', 255],
+      ['black', 0],
+    ] as const) {
+      it(`carries every header text role at 4.5:1 over ${name} in ${mode} mode`, () => {
+        const ground = heroGround(palette.bg, headerAlpha, behind)
+        const failed = HEADER_TEXT_ROLES.flatMap((role) => {
+          const value = ratio(palette[role], ground)
+          return value < TEXT_MINIMUM ? [`${role} is ${round(value)}:1 over ${name}`] : []
+        })
+        expect(failed).toEqual([])
+      })
+    }
+  }
+
+  it('is at least 86% opaque', () => {
+    expect(headerAlpha).toBeGreaterThanOrEqual(0.86)
+  })
+})
+
+/*
+ * Two pairs that are below 3:1 on purpose. accent-strong is the purple end
+ * of the gradient button's border: 2.95:1 on surface-hover and 2.87:1 on
+ * accent-subtle in dark mode. Neither is a ground that border sits on: the
+ * button keeps the surface fill on hover (styles.css, .btn-gradient), and no
+ * gradient button sits on an accent-subtle tint. The button's label, not its
+ * border, identifies it, and the border holds on the surface, below.
+ */
+describe('the gradient border exceptions', () => {
+  it('are the measured ratios, so a change to either token shows up here', () => {
+    expect(ratio(dark['accent-strong'], dark['surface-hover'])).toBeLessThan(3)
+    expect(ratio(dark['accent-strong'], dark['accent-subtle'])).toBeLessThan(3)
+  })
+
+  it('hold on the surface, the only ground the button is painted on', () => {
+    expect(ratio(dark['accent-strong'], dark.surface)).toBeGreaterThanOrEqual(3)
+    expect(ratio(light['accent-strong'], light.surface)).toBeGreaterThanOrEqual(3)
+  })
+})
+
+/*
+ * The old site's palette (its style.css :root) in dark mode. These are the
+ * owner's colours; the test fails if a later edit drifts away from them
+ * without saying so.
+ */
+describe('the old site palette in dark mode', () => {
+  const expected: Record<string, string> = {
+    bg: '#07060f',
+    'bg-subtle': '#0d0b1c',
+    surface: '#15122a',
+    text: '#f2f1fb',
+    accent: '#1ee3f5',
+    'accent-strong': '#7b3cf5',
+    'accent-text': '#a47cff',
+    'success-text': '#3ee6a8',
+    'danger-text': '#ff8fa3',
+  }
+  for (const [token, value] of Object.entries(expected)) {
+    it(`keeps ${token} at ${value}`, () => {
+      expect(dark[token]).toBe(value)
+    })
+  }
+
+  it('declares the line and the text gradient from tokens, cyan first', () => {
+    expect(css).toMatch(
+      /--brand-gradient:\s*linear-gradient\(\s*90deg,\s*var\(--color-accent\),\s*var\(--color-accent-strong\)\s*\)/,
+    )
+    expect(css).toMatch(
+      /--brand-gradient-text:\s*linear-gradient\(\s*90deg,\s*var\(--brand-gradient-from\),\s*var\(--brand-gradient-to\)\s*\)/,
+    )
+  })
+
+  it('keeps the old radii and easing', () => {
+    expect(css).toMatch(/--radius-lg:\s*1rem;/)
+    expect(css).toMatch(/--radius-xl:\s*1\.375rem;/)
+    expect(css).toMatch(/--ease-out:\s*cubic-bezier\(0\.22, 1, 0\.36, 1\);/)
+  })
+
+  it('keeps the navy light text the light wordmark carries as a literal', () => {
+    expect(light.text).toBe('#0f1a2e')
   })
 })
 
