@@ -20,6 +20,7 @@ import { useI18n } from 'vue-i18n'
 import { createClient } from '@ostendorf-cloud/govue'
 
 import { IMPRESSIONS_ID, impressionsOnPage } from '../lib/pageSections'
+import ChannelIcon from './ChannelIcon.vue'
 
 /** The account the "follow" button links to, the one the feed shows. */
 const PROFILE_URL = 'https://www.instagram.com/simonostendorf.vtech/'
@@ -98,12 +99,7 @@ onMounted(async () => {
 
     <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" role="list">
       <li v-for="post in posts" :key="post.id">
-        <a
-          :href="post.permalink"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="block overflow-hidden rounded-lg border border-border bg-surface transition-colors hover:bg-surface-hover"
-        >
+        <a :href="post.permalink" target="_blank" rel="noopener noreferrer" class="insta-tile">
           <img
             :src="imageUrl(post)"
             :alt="post.alt"
@@ -113,6 +109,10 @@ onMounted(async () => {
             decoding="async"
             class="aspect-square w-full object-cover"
           />
+          <!-- Decorative: the link is named by the picture's alt text. -->
+          <span class="insta-overlay" aria-hidden="true">
+            <ChannelIcon name="instagram" />
+          </span>
         </a>
       </li>
     </ul>
@@ -129,3 +129,65 @@ onMounted(async () => {
     </p>
   </section>
 </template>
+
+<style scoped>
+/*
+ * A tile as on the old site: on hover or keyboard focus the picture grows
+ * to 1.06 over 600 ms while the brand gradient fades in over it, 250 ms,
+ * with the Instagram glyph in the middle. The overlay's two colours are
+ * --ig-overlay-from and --ig-overlay-to from the theme, not values of
+ * their own.
+ */
+.insta-tile {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+
+.insta-tile img {
+  transition: transform 600ms var(--ease-out);
+}
+
+.insta-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--ig-overlay-from), var(--ig-overlay-to));
+  color: var(--color-accent-on);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms ease;
+}
+
+.insta-overlay svg {
+  width: 34px;
+  height: 34px;
+}
+
+.insta-tile:hover img,
+.insta-tile:focus-visible img {
+  transform: scale(1.06);
+}
+
+.insta-tile:hover .insta-overlay,
+.insta-tile:focus-visible .insta-overlay {
+  opacity: 1;
+}
+
+/* No scale and no fade: the overlay simply appears. */
+@media (prefers-reduced-motion: reduce) {
+  .insta-tile img,
+  .insta-overlay {
+    transition: none;
+  }
+
+  .insta-tile:hover img,
+  .insta-tile:focus-visible img {
+    transform: none;
+  }
+}
+</style>

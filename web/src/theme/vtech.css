@@ -183,6 +183,10 @@
    */
   --brand-gradient-from: var(--color-accent);
   --brand-gradient-to: var(--color-accent-text);
+  /* The two ends of the Instagram tile's hover overlay: the cyan at 35% and
+     the purple at 55%, as on the old site, painted at 135 degrees. */
+  --ig-overlay-from: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  --ig-overlay-to: color-mix(in srgb, var(--color-accent-strong) 55%, transparent);
   --brand-gradient: linear-gradient(90deg, var(--color-accent), var(--color-accent-strong));
   --brand-gradient-text: linear-gradient(
     90deg,
