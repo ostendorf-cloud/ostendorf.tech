@@ -140,6 +140,34 @@ USER 65532:65532
 
 ENTRYPOINT ["/usr/local/bin/feed"]
 
+# Development only: the fake feed service for the local compose stack
+# (docker-compose.yaml, profile "feed"). Its two stages sit after "feed" and
+# before "website" so that "website" stays the last stage, and neither
+# "website" nor "feed" depends on them: BuildKit never evaluates them for
+# those two targets. No workflow builds or publishes this target;
+# internal/envsync checks both. It reuses the pinned bases above, so it adds
+# no new digest. cmd/fakefeed imports nothing from internal/, so only its own
+# directory is copied.
+FROM go-deps AS build-fakefeed
+
+COPY cmd/fakefeed/ cmd/fakefeed/
+
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/fakefeed ./cmd/fakefeed
+
+# Same distroless base as the two runtime stages around it, so there is no
+# shell and no curl: a compose healthcheck has nothing to run, and this
+# stage declares none.
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS fakefeed
+
+COPY --from=build-fakefeed /out/fakefeed /usr/local/bin/fakefeed
+
+# Matches the default LISTEN_ADDR of cmd/fakefeed (":9081").
+EXPOSE 9081
+
+USER 65532:65532
+
+ENTRYPOINT ["/usr/local/bin/fakefeed"]
+
 # Runtime stage for cmd/website: same distroless base and the same
 # ca-certificates/no-shell reasoning as cmd/feed's own runtime stage
 # above. ca-certificates is what this image needs it for here: the

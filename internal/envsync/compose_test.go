@@ -49,8 +49,12 @@ func expand(value string, env map[string]string) (string, error) {
 // composeFile is the part of docker-compose.yaml this package reads.
 type composeFile struct {
 	Services map[string]struct {
+		Build struct {
+			Target string `yaml:"target"`
+		} `yaml:"build"`
 		Environment map[string]string `yaml:"environment"`
 		Ports       []string          `yaml:"ports"`
+		Profiles    []string          `yaml:"profiles"`
 	} `yaml:"services"`
 }
 
