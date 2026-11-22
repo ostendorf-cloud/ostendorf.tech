@@ -1,9 +1,10 @@
 import { createSSRApp } from 'vue'
 import { createWebHistory } from 'vue-router'
-import { createGovueI18n, useTheme } from '@ostendorf-cloud/govue'
+import { useTheme } from '@ostendorf-cloud/govue'
 
 import App from './App.vue'
 import { createAppI18n, detectPreferredLocale, isLocale } from './i18n'
+import { createSiteGovueI18n } from './i18n/govue'
 import { DEFAULT_MODE, STORAGE_KEY, THEME_NAME } from './lib/theme'
 import { attachLocaleSync, createAppRouter } from './router'
 import './styles.css'
@@ -34,8 +35,9 @@ app.use(i18n)
 // govue's language layer shares the site's own vue-i18n instance: it adds
 // the govue catalogues (the footer's legal link labels, the legal page
 // shell) and tells those components the active language. The route's own
-// :locale still decides the locale, see attachLocaleSync.
-app.use(createGovueI18n({ i18n, locale: initialLocale }))
+// :locale still decides the locale, see attachLocaleSync. The site's own
+// German contact form texts ("Sie") are merged over govue's.
+app.use(createSiteGovueI18n({ i18n, locale: initialLocale }))
 
 // router.isReady() resolves after the initial navigation, including the
 // async route components above, which is what the hydration this app

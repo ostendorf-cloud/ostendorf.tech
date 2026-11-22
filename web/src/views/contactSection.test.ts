@@ -5,12 +5,12 @@
  * body and the errors.
  */
 import { render, screen } from '@testing-library/vue'
-import { createGovueI18n } from '@ostendorf-cloud/govue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory } from 'vue-router'
 
 import App from '../App.vue'
 import { createAppI18n, type Locale } from '../i18n'
+import { createSiteGovueI18n } from '../i18n/govue'
 import de from '../i18n/locales/de.json'
 import en from '../i18n/locales/en.json'
 import { attachLocaleSync, createAppRouter } from '../router'
@@ -27,7 +27,7 @@ async function renderHome(locale: Locale) {
   await router.push({ name: 'home', params: { locale } })
   await router.isReady()
   return render(App, {
-    global: { plugins: [router, i18n, createGovueI18n({ i18n, locale })] },
+    global: { plugins: [router, i18n, createSiteGovueI18n({ i18n, locale })] },
   })
 }
 
@@ -77,6 +77,11 @@ describe.each(['de', 'en'] as const)('the contact section in %s', (locale) => {
     // The site's heading of the form.
     expect(section?.querySelector('h3')?.textContent?.trim()).toBe(
       locale === 'de' ? 'Nachricht senden' : 'Send a message',
+    )
+
+    // The site's formal German text, merged over govue's "du".
+    expect(form?.textContent).toContain(
+      locale === 'de' ? 'So gehen wir mit Ihren Angaben um:' : 'How your details are handled:',
     )
   })
 })

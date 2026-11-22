@@ -16,10 +16,11 @@ import { fileURLToPath } from 'node:url'
 import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { createMemoryHistory } from 'vue-router'
-import { createGovueI18n, sitemapXml, useTheme } from '@ostendorf-cloud/govue'
+import { sitemapXml, useTheme } from '@ostendorf-cloud/govue'
 
 import App from '../src/App.vue'
 import { createAppI18n, SUPPORTED_LOCALES, type Locale } from '../src/i18n'
+import { createSiteGovueI18n } from '../src/i18n/govue'
 import { HERO_SIZES } from '../src/lib/heroImage'
 import { iconLinks, socialImageMeta } from '../src/lib/icons'
 import { siteRouteDefs } from '../src/lib/legal'
@@ -230,8 +231,9 @@ async function renderBody(locale: Locale, routerName: string): Promise<string> {
   app.use(router)
   app.use(i18n)
   // The same language layer main.ts installs, so the footer's legal links
-  // and the legal page shell render in this page's language.
-  app.use(createGovueI18n({ i18n, locale }))
+  // and the legal page shell render in this page's language, with the
+  // site's own German contact form texts.
+  app.use(createSiteGovueI18n({ i18n, locale }))
 
   await router.push({ name: routerName, params: { locale } })
   await router.isReady()
