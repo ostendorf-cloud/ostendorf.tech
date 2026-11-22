@@ -504,16 +504,17 @@ const germanHref = computed(
         keine Informationen in Ihrem Endgerät gespeichert und keine Dienste von Drittanbietern
         eingebunden. Unser Server speichert die ausgegebenen Aufgaben nicht. Damit jede Lösung nur
         einmal verwendet werden kann, hält er von jeder gelösten Aufgabe eine Prüfsumme im
-        Arbeitsspeicher, bis die Aufgabe abläuft, höchstens 10 Minuten; diese Prüfsumme lässt sich
-        keiner Person zuordnen. Um Missbrauch zu verhindern, verarbeitet unser Server außerdem Ihre
-        IP-Adresse (bei IPv6 die ersten 64 Bit) kurzzeitig im Arbeitsspeicher, um die Zahl der
-        Anfragen je Adresse zu begrenzen; dafür wird sie nicht dauerhaft gespeichert, sondern
-        verworfen, sobald die Begrenzung für diese Adresse abgelaufen ist. Im Zugriffsprotokoll
-        (siehe „Server-Log-Dateien“) erscheint eine Anfrage des Kontaktformulars wie jede andere
-        Anfrage. Darüber hinaus protokolliert unser Server zum Kontaktformular höchstens einen
-        technischen Fehlercode, nie Ihren Namen, Ihre E-Mail-Adresse oder Ihre Nachricht.
-        Rechtsgrundlage hierfür ist unser berechtigtes Interesse am Schutz vor Spam und Missbrauch
-        (Art. 6 Abs. 1 lit. f DSGVO).
+        Arbeitsspeicher. Diese Prüfsumme enthält keine personenbezogenen Daten und lässt sich keiner
+        Person zuordnen. Sie bleibt im Arbeitsspeicher, bis diese Liste voll ist und abgelaufene
+        Einträge entfernt werden, oder bis unser Server neu startet. Um Missbrauch zu verhindern,
+        verarbeitet unser Server außerdem Ihre IP-Adresse (bei IPv6 die ersten 64 Bit) kurzzeitig im
+        Arbeitsspeicher, um die Zahl der Anfragen je Adresse zu begrenzen; dafür wird sie nicht
+        dauerhaft gespeichert, sondern nach Ablauf der Begrenzung bei der nächsten Bereinigung aus
+        dem Arbeitsspeicher entfernt. Im Zugriffsprotokoll (siehe „Server-Log-Dateien“) erscheint
+        eine Anfrage des Kontaktformulars wie jede andere Anfrage. Darüber hinaus protokolliert
+        unser Server zum Kontaktformular höchstens einen technischen Fehlercode, nie Ihren Namen,
+        Ihre E-Mail-Adresse oder Ihre Nachricht. Rechtsgrundlage hierfür ist unser berechtigtes
+        Interesse am Schutz vor Spam und Missbrauch (Art. 6 Abs. 1 lit. f DSGVO).
       </p>
       <p>
         Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern
@@ -1093,15 +1094,16 @@ const germanHref = computed(
         and sends the solution back together with the form. This sets no cookies, stores no
         information on your device, and uses no third-party services. Our server does not store the
         tasks it issues. So that each solution can be used only once, it keeps a checksum of every
-        solved task in memory until the task expires, after 10 minutes at most; this checksum cannot
-        be linked to any person. To prevent misuse, our server also processes your IP address (for
-        IPv6, its first 64 bits) briefly in memory in order to limit the number of requests per
-        address; it is not stored permanently for this purpose, but discarded once the limit for
-        that address has run out. In the access log (see "Server log files"), a contact form request
-        appears like any other request. Beyond that, our server logs at most a technical error code
-        for the contact form, never your name, your email address or your message. The legal basis
-        for this is our legitimate interest in protection against spam and misuse (Art. 6(1)(f)
-        GDPR).
+        solved task in memory. This checksum contains no personal data and cannot be linked to any
+        person. It stays in memory until this list is full and expired entries are removed, or until
+        our server restarts. To prevent misuse, our server also processes your IP address (for IPv6,
+        its first 64 bits) briefly in memory in order to limit the number of requests per address;
+        it is not stored permanently for this purpose, but dropped from memory after the limit has
+        run out, at the next cleanup. In the access log (see "Server log files"), a contact form
+        request appears like any other request. Beyond that, our server logs at most a technical
+        error code for the contact form, never your name, your email address or your message. The
+        legal basis for this is our legitimate interest in protection against spam and misuse (Art.
+        6(1)(f) GDPR).
       </p>
       <p>
         Processing of this data is carried out on the basis of Art. 6(1)(b) GDPR, where your enquiry

@@ -105,6 +105,9 @@ describe('legal pages', () => {
 
       // govue's contact form sets no cookie and keeps no session.
       expect(text).not.toMatch(/__Host-session|Sitzungs-Cookie|session cookie|SameSite|HttpOnly/i)
+      // govue's replay set drops expired entries only once it is full, so no
+      // fixed retention may be claimed for the checksum.
+      expect(text).not.toMatch(/höchstens 10 Minuten|10 minutes at most/i)
       expect(text).toContain(
         locale === 'de'
           ? 'Diese Website setzt keine Cookies, auch nicht beim Kontaktformular.'
@@ -123,7 +126,8 @@ describe('legal pages', () => {
             'aber weder Ihre IP-Adresse noch Angaben zu Ihrem Browser',
             'diese Angabe wird nicht an unseren Server übertragen',
             'Unser Server speichert die ausgegebenen Aufgaben nicht.',
-            'bis die Aufgabe abläuft, höchstens 10 Minuten',
+            'bis diese Liste voll ist und abgelaufene Einträge entfernt werden, oder bis unser Server neu startet',
+            'nach Ablauf der Begrenzung bei der nächsten Bereinigung aus dem Arbeitsspeicher entfernt',
             'IP-Adresse (bei IPv6 die ersten 64 Bit)',
             'nie Ihren Namen, Ihre E-Mail-Adresse oder Ihre Nachricht',
             'für die beiden Schritte des Kontaktformulars und für Anfragen an Adressen',
@@ -132,7 +136,8 @@ describe('legal pages', () => {
             'but neither your IP address nor any details about your browser',
             'this information is not transmitted to our server',
             'Our server does not store the tasks it issues.',
-            'until the task expires, after 10 minutes at most',
+            'until this list is full and expired entries are removed, or until our server restarts',
+            'dropped from memory after the limit has run out, at the next cleanup',
             'IP address (for IPv6, its first 64 bits)',
             'never your name, your email address or your message',
             'to the two steps of the contact form, and to requests for addresses',
