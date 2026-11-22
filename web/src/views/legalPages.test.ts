@@ -189,13 +189,23 @@ describe('legal pages', () => {
       expect(text).not.toMatch(/anonym/i)
     })
 
-    it('has no consumer dispute resolution section in the imprint', async () => {
+    it('states the dispute resolution position and the editorial responsibility in the imprint', async () => {
       const { container } = await renderPage(locale, 'imprint')
-      const text = container.textContent ?? ''
+      const text = (container.textContent ?? '').replace(/\s+/g, ' ')
 
-      expect(text).not.toMatch(
-        /streitbeilegung|schlichtung|dispute resolution|arbitration|odr-plattform/i,
-      )
+      if (locale === 'de') {
+        expect(text).toContain('Streitbeilegung')
+        expect(text).toContain(
+          'zur Teilnahme an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle weder verpflichtet noch bereit',
+        )
+        expect(text).toContain('Redaktionell verantwortlich nach § 18 Abs. 2 MStV')
+      } else {
+        expect(text).toContain('Dispute resolution')
+        expect(text).toContain(
+          'neither obliged nor willing to take part in dispute resolution proceedings before a consumer arbitration board',
+        )
+        expect(text).toContain('Editorially responsible under Section 18(2)')
+      }
     })
   })
 

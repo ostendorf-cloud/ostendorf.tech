@@ -41,6 +41,19 @@ const germanHref = computed(
 
       <h2 class="text-xl font-semibold">Umsatzsteuer-ID</h2>
       <p>Umsatzsteuer-Identifikationsnummer gemäß §27a Umsatzsteuergesetz: DE362164357</p>
+
+      <h2 class="text-xl font-semibold">Redaktionell verantwortlich nach § 18 Abs. 2 MStV</h2>
+      <p>
+        Simon Ostendorf<br />
+        Frankenstr. 8<br />
+        52070 Aachen
+      </p>
+
+      <h2 class="text-xl font-semibold">Streitbeilegung</h2>
+      <p>
+        Wir sind zur Teilnahme an einem Streitbeilegungsverfahren vor einer
+        Verbraucherschlichtungsstelle weder verpflichtet noch bereit.
+      </p>
     </div>
 
     <div v-else class="flex flex-col gap-4 text-text">
@@ -70,6 +83,21 @@ const germanHref = computed(
 
       <h2 class="text-xl font-semibold">VAT ID</h2>
       <p>VAT identification number per Section 27a of the German VAT Act: DE362164357</p>
+
+      <h2 class="text-xl font-semibold">
+        Editorially responsible under Section 18(2) of the German Interstate Media Treaty (MStV)
+      </h2>
+      <p>
+        Simon Ostendorf<br />
+        Frankenstr. 8<br />
+        52070 Aachen, Germany
+      </p>
+
+      <h2 class="text-xl font-semibold">Dispute resolution</h2>
+      <p>
+        We are neither obliged nor willing to take part in dispute resolution proceedings before a
+        consumer arbitration board.
+      </p>
     </div>
   </GovueLegalPage>
 </template>
