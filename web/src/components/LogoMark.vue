@@ -94,33 +94,38 @@ const maskId = `logo-mark-cut-${useId()}`
  * in travel together; the distances keep every cut-out inside the two
  * tracks it bridges, which is what the old site's own travel values were
  * chosen for.
+ *
+ * The slide plays once and then rests, and never runs longer than five
+ * seconds: moving content that starts by itself and goes on longer than
+ * that needs a pause control (WCAG 2.2.2), and a pause button on a logo
+ * would be worse than a logo that comes to rest. A looping version is
+ * what this replaced.
  */
 .logo-mark-animated .logo-knob {
-  animation: logo-fader 4s ease-in-out infinite;
+  animation: logo-fader 4s ease-in-out 1;
 }
 
+/*
+ * Only the travel differs per knob. The old rules also carried a duration
+ * and a delay each, but the shared rule above sets the animation shorthand
+ * with higher specificity, so those never applied and all four knobs have
+ * always slid together over 4 seconds. They are gone rather than made
+ * live, so the animation looks as it always did.
+ */
 .knob-1 {
   --travel: 5px;
-  animation-duration: 4.2s;
-  animation-delay: -0.6s;
 }
 
 .knob-2 {
   --travel: -6px;
-  animation-duration: 5.1s;
-  animation-delay: -2.4s;
 }
 
 .knob-3 {
   --travel: 6px;
-  animation-duration: 3.7s;
-  animation-delay: -1.3s;
 }
 
 .knob-4 {
   --travel: -5px;
-  animation-duration: 4.6s;
-  animation-delay: -3.1s;
 }
 
 @keyframes logo-fader {

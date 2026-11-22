@@ -4,10 +4,17 @@
     "socialImageAlt": "Simon Ostendorf Veranstaltungstechnik: das Fader-Zeichen und der Schriftzug auf dunklem Hintergrund",
     "skipToContent": "Zum Inhalt springen",
     "switchLocale": "English",
+    "carousel": {
+      "slide": "{n} von {total}",
+      "region": "{label}, seitlich scrollbar"
+    },
     "theme": {
-      "light": "Zu hellem Modus wechseln",
-      "dark": "Zu dunklem Modus wechseln",
-      "system": "Systemeinstellung übernehmen"
+      "switch": "Farbmodus: {current}. Wechseln zu: {next}.",
+      "modes": {
+        "light": "Hell",
+        "dark": "Dunkel",
+        "system": "Systemeinstellung"
+      }
     }
   },
   "nav": {
@@ -88,7 +95,9 @@
       "eyebrow": "Auf der Bühne",
       "title": "Bands",
       "lead": "Bands und Ensembles, die ich technisch begleite.",
-      "instagramLabel": "Auf Instagram ansehen"
+      "instagramLabel": "Auf Instagram ansehen",
+      "previous": "Vorherige Bands",
+      "next": "Nächste Bands"
     },
     "about": {
       "eyebrow": "Wer dahinter steht",

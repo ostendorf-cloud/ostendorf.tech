@@ -12,5 +12,14 @@ const src = computed(() => (resolvedMode.value === 'dark' ? wordmarkDark : wordm
 </script>
 
 <template>
-  <img :src="src" :alt="alt" width="160" height="36" />
+  <!-- 160 px is the design width. Below 480 px the header has to hold the
+       mark, this and the actions in one row of 288 to 448 px, so the
+       wordmark steps down; the height follows the aspect ratio. -->
+  <img
+    class="h-auto w-24 min-[360px]:w-32 min-[400px]:w-36 min-[480px]:w-40"
+    :src="src"
+    :alt="alt"
+    width="160"
+    height="36"
+  />
 </template>
