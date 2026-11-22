@@ -10,6 +10,7 @@ import {
 } from '@ostendorf-cloud/govue'
 
 import BandLogo from '../components/BandLogo.vue'
+import BandPhoto from '../components/BandPhoto.vue'
 import CardCarousel from '../components/CardCarousel.vue'
 import ContactChannels from '../components/ContactChannels.vue'
 import CountingFacts from '../components/CountingFacts.vue'
@@ -199,6 +200,10 @@ const aboutFacts = computed<Fact[]>(() => [
         <template #slide="{ item: band }">
           <GovueCard class="panel-lit band-card" :class="`band-accent-${band.accent}`">
             <BandLogo :logo="band.logo" :alt="band.logo ? t(`bands.${band.slug}.logoAlt`) : ''" />
+            <BandPhoto
+              :photo="band.photo"
+              :alt="band.photo ? t(`bands.${band.slug}.photoAlt`) : ''"
+            />
             <h3 class="band-name mb-3 self-start text-lg font-semibold">
               {{ t(`bands.${band.slug}.name`) }}
             </h3>

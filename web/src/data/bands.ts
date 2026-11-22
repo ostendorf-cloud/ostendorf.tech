@@ -1,4 +1,6 @@
+import bademeisterPhoto from '../assets/bands/bademeister.webp'
 import herrenjedeckLogo from '../assets/bands/herrenjedeck-logo.webp'
+import rubikPhoto from '../assets/bands/rubik.webp'
 
 /**
  * The bands and ensembles shown on the home page, in the order of the cards.
@@ -21,6 +23,10 @@ import herrenjedeckLogo from '../assets/bands/herrenjedeck-logo.webp'
  * into src/assets/bands/, import it here and set { src, width, height }
  * with the file's real pixel size, then add bands.<slug>.logoAlt to both
  * locales. Get the band's permission before a logo goes on the site.
+ *
+ * photo is optional too, for a square profile picture or photo. Unlike a
+ * logo it needs no plate: BandPhoto.vue shows it as a rounded square. Same
+ * steps as for a logo, with bands.<slug>.photoAlt as the alt text.
  */
 export type BandAccent = 'accent' | 'info' | 'success'
 
@@ -30,6 +36,8 @@ export interface BandLogo {
   height: number
 }
 
+export type BandPhoto = BandLogo
+
 export interface Band {
   slug: string
   instagramHandle: string
@@ -37,6 +45,7 @@ export interface Band {
   hasDescription: boolean
   accent: BandAccent
   logo?: BandLogo
+  photo?: BandPhoto
 }
 
 export const bands: Band[] = [
@@ -55,6 +64,8 @@ export const bands: Band[] = [
     instagramUrl: 'https://www.instagram.com/wirsindrubik/',
     hasDescription: true,
     accent: 'info',
+    // Shown with the band's permission (see NOTICE); the file is 315 px square.
+    photo: { src: rubikPhoto, width: 315, height: 315 },
   },
   {
     slug: 'singingLittleBigBand',
@@ -69,6 +80,8 @@ export const bands: Band[] = [
     instagramUrl: 'https://www.instagram.com/bademeister.band',
     hasDescription: true,
     accent: 'accent',
+    // The band's profile picture, shown with its permission (see NOTICE).
+    photo: { src: bademeisterPhoto, width: 640, height: 640 },
   },
   {
     slug: 'fourfold',

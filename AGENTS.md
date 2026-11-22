@@ -312,6 +312,21 @@ The mark is a dark badge on a transparent ground, so `BandLogo.vue` sets it on a
 `--color-accent-on`, which is near white in both modes. Further band logos follow the same
 pattern; see the comment in `web/src/data/bands.ts`.
 
+`web/src/assets/bands/bademeister.webp` and `rubik.webp` are generated from the bands' own
+pictures, never hand edited: `bademeister-source.jpg` (the band's profile picture,
+1080x1080) and `rubik-source.jpg` (the band's photo, 315x315). The sources are not
+committed: put them in `web/src/assets/bands/`, where `.gitignore` keeps `*-source.jpg`
+out. Rubik's file is not scaled up, so it stays 315x315 and looks soft on high density
+screens. Both stay under 60 KB. The commands, needing ImageMagick from `mise.toml`:
+
+```sh
+magick bademeister-source.jpg -resize 640x640 -strip -define webp:method=6 -quality 80 bademeister.webp
+magick rubik-source.jpg -strip -define webp:method=6 -quality 85 rubik.webp
+```
+
+They are square pictures without transparency, so `BandPhoto.vue` shows them as rounded
+squares with no plate, through the `photo` field in `web/src/data/bands.ts`.
+
 ## Scope of this milestone
 
 The home page's hero, Leistungen, Impressionen, Bands, Über mich and Kontakt sections,

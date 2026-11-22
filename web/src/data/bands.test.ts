@@ -81,6 +81,37 @@ describe('bands data', () => {
     }
   })
 
+  it('gives a photo to Rubik and Bademeister only', () => {
+    expect(bands.filter((band) => band.photo).map((band) => band.slug)).toEqual([
+      'rubik',
+      'bademeister',
+    ])
+  })
+
+  it('states the real pixel size of every photo file and keeps it under 60 KB', () => {
+    for (const band of bands.filter((entry) => entry.photo)) {
+      const bytes = readFileSync(`${process.cwd()}/src/assets/bands/${band.slug}.webp`)
+      expect(bytes.toString('ascii', 0, 4)).toBe('RIFF')
+      expect(bytes.toString('ascii', 8, 12)).toBe('WEBP')
+      // A lossy file without alpha: the VP8 frame header holds 14 bit width
+      // and height as little endian numbers at bytes 26 and 28.
+      expect(bytes.toString('ascii', 12, 16), 'VP8 header').toBe('VP8 ')
+      const width = bytes.readUInt16LE(26) & 0x3fff
+      const height = bytes.readUInt16LE(28) & 0x3fff
+      expect({ width: band.photo?.width, height: band.photo?.height }).toEqual({ width, height })
+      expect(bytes.length).toBeLessThan(60 * 1024)
+    }
+  })
+
+  it('names every photo in both locales', () => {
+    for (const band of bands.filter((entry) => entry.photo)) {
+      for (const catalogue of [de, en]) {
+        const entry = (catalogue.bands as Record<string, { photoAlt?: string }>)[band.slug]
+        expect(entry.photoAlt ?? '').not.toBe('')
+      }
+    }
+  })
+
   it('names every logo in both locales', () => {
     for (const band of bands.filter((entry) => entry.logo)) {
       for (const catalogue of [de, en]) {

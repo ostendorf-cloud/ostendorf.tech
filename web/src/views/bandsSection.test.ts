@@ -36,6 +36,38 @@ describe('the bands section logos', () => {
     })
   }
 
+  for (const [locale, slug, alt, size] of [
+    ['de', 'bademeister', 'Profilbild der Band Bademeister', '640'],
+    ['en', 'bademeister', 'Profile picture of the band Bademeister', '640'],
+    ['de', 'rubik', 'Foto der Band Rubik', '315'],
+    ['en', 'rubik', 'Photo of the band Rubik', '315'],
+  ] as const) {
+    it(`shows the ${slug} photo with alt text, size and lazy loading in ${locale}`, async () => {
+      await renderHome(locale)
+
+      const photo = screen.getByRole('img', { name: alt })
+      expect(photo).toHaveAttribute('width', size)
+      expect(photo).toHaveAttribute('height', size)
+      expect(photo).toHaveAttribute('loading', 'lazy')
+      expect(photo).toHaveClass('band-photo')
+    })
+  }
+
+  it('renders a photo for exactly Rubik and Bademeister, a logo for Herrenjedeck, nothing else', async () => {
+    const { container } = await renderHome('de')
+
+    const slides = container.querySelectorAll('[aria-roledescription="slide"]')
+    bands.forEach((band, index) => {
+      expect(slides[index].querySelectorAll('img'), band.slug).toHaveLength(
+        band.photo || band.logo ? 1 : 0,
+      )
+      expect(slides[index].querySelector('.band-photo') !== null, band.slug).toBe(
+        ['rubik', 'bademeister'].includes(band.slug),
+      )
+    })
+    expect(container.querySelectorAll('.band-photo')).toHaveLength(2)
+  })
+
   it('renders no logo for the six bands that have none', async () => {
     const { container } = await renderHome('de')
 

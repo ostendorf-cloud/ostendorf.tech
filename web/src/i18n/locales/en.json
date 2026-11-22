@@ -131,6 +131,7 @@
   "bands": {
     "rubik": {
       "name": "Rubik",
+      "photoAlt": "Photo of the band Rubik",
       "paragraphs": [
         "We cover music our own way. Sometimes unplugged, sometimes flat out. We play (almost) everything you know, from Queen, the Beatles, Sting and Stevie Wonder to more special, less familiar songs by Florence and the Machine or Alicia Keys. If you don't find something you like here, that's on you!",
         "With our own interpretations and ideas we give the classic cover songs a whole new coat of paint, colourful, different and unexpected. We scramble the finished Rubik's cube again, every time. Come by, dance along, have fun!"
@@ -138,6 +139,7 @@
     },
     "bademeister": {
       "name": "Die Bademeister",
+      "photoAlt": "Profile picture of the band Bademeister",
       "paragraphs": [
         "We are a cover band made up of current and former students of FH Aachen. We got our start at the first summer festival of the Electrical Engineering and Information Technology department (2022). What was meant as a one-off show quickly grew into something more: we rehearse regularly and have played, among other things, the joint Christmas market of the AStA student councils at FH Aachen.",
         "Musically we offer a varied mix of international and German rock and pop songs, from classics like Zombie by the Cranberries to tracks by Måneskin, Kraftklub and Alligatoah."
