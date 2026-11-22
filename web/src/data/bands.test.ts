@@ -22,6 +22,22 @@ describe('bands data', () => {
     }
   })
 
+  it('lists the bands in the agreed order', () => {
+    expect(bands.map((band) => band.slug)).toEqual([
+      'herrenjedeck',
+      'rubik',
+      'singingLittleBigBand',
+      'bademeister',
+      'fourfold',
+      'bigBand',
+      'jazzCombo',
+    ])
+  })
+
+  it('keeps the hero headline on one line from 1280 px', () => {
+    expect(home).toMatch(/<h1[^>]*class="[^"]*\bhero-title\b[^"]*\bxl:whitespace-nowrap\b/)
+  })
+
   // Three roles for seven bands: the last card cannot differ from the
   // first, but any three bands in a row, a full row on a wide screen, can.
   it('gives any three consecutive bands three different accents', () => {

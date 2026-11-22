@@ -1,10 +1,10 @@
 import herrenjedeckLogo from '../assets/bands/herrenjedeck-logo.webp'
 
 /**
- * The bands and ensembles shown on the home page. Only the facts that do
- * not translate live here: the slug ties a band to its i18n messages under
- * bands.<slug>.name and bands.<slug>.paragraphs, and the Instagram link is
- * the same in both locales.
+ * The bands and ensembles shown on the home page, in the order of the cards.
+ * Only the facts that do not translate live here: the slug ties a band to
+ * its i18n messages under bands.<slug>.name and bands.<slug>.paragraphs, and
+ * the Instagram link is the same in both locales.
  *
  * hasDescription is false for a band with no description text yet, in
  * which case only the name and the Instagram link are rendered.
@@ -41,48 +41,6 @@ export interface Band {
 
 export const bands: Band[] = [
   {
-    slug: 'rubik',
-    instagramHandle: '@wirsindrubik',
-    instagramUrl: 'https://www.instagram.com/wirsindrubik/',
-    hasDescription: true,
-    accent: 'accent',
-  },
-  {
-    slug: 'bademeister',
-    instagramHandle: '@bademeister.band',
-    instagramUrl: 'https://www.instagram.com/bademeister.band',
-    hasDescription: true,
-    accent: 'info',
-  },
-  {
-    slug: 'fourfold',
-    instagramHandle: '@fourfoldband',
-    instagramUrl: 'https://www.instagram.com/fourfoldband/',
-    hasDescription: true,
-    accent: 'success',
-  },
-  {
-    slug: 'singingLittleBigBand',
-    instagramHandle: '@fhaachenbigband',
-    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
-    hasDescription: true,
-    accent: 'accent',
-  },
-  {
-    slug: 'bigBand',
-    instagramHandle: '@fhaachenbigband',
-    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
-    hasDescription: true,
-    accent: 'info',
-  },
-  {
-    slug: 'jazzCombo',
-    instagramHandle: '@fhaachenbigband',
-    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
-    hasDescription: true,
-    accent: 'success',
-  },
-  {
     slug: 'herrenjedeck',
     instagramHandle: '@herrenjedeck',
     instagramUrl: 'https://www.instagram.com/herrenjedeck/',
@@ -90,5 +48,47 @@ export const bands: Band[] = [
     accent: 'accent',
     // The band's own logo; the owner confirmed the band's permission (see NOTICE).
     logo: { src: herrenjedeckLogo, width: 480, height: 489 },
+  },
+  {
+    slug: 'rubik',
+    instagramHandle: '@wirsindrubik',
+    instagramUrl: 'https://www.instagram.com/wirsindrubik/',
+    hasDescription: true,
+    accent: 'info',
+  },
+  {
+    slug: 'singingLittleBigBand',
+    instagramHandle: '@fhaachenbigband',
+    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
+    hasDescription: true,
+    accent: 'success',
+  },
+  {
+    slug: 'bademeister',
+    instagramHandle: '@bademeister.band',
+    instagramUrl: 'https://www.instagram.com/bademeister.band',
+    hasDescription: true,
+    accent: 'accent',
+  },
+  {
+    slug: 'fourfold',
+    instagramHandle: '@fourfoldband',
+    instagramUrl: 'https://www.instagram.com/fourfoldband/',
+    hasDescription: true,
+    accent: 'info',
+  },
+  {
+    slug: 'bigBand',
+    instagramHandle: '@fhaachenbigband',
+    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
+    hasDescription: true,
+    accent: 'success',
+  },
+  {
+    slug: 'jazzCombo',
+    instagramHandle: '@fhaachenbigband',
+    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
+    hasDescription: true,
+    accent: 'accent',
   },
 ]

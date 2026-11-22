@@ -90,7 +90,7 @@ const aboutFacts = computed<Fact[]>(() => [
       <div class="hero-inner">
         <LogoMark class="hero-logo" :size="104" animated />
         <p class="hero-eyebrow">{{ t('home.hero.eyebrow') }}</p>
-        <h1 id="hero-title" class="hero-title">{{ t('home.hero.title') }}</h1>
+        <h1 id="hero-title" class="hero-title xl:whitespace-nowrap">{{ t('home.hero.title') }}</h1>
         <p class="hero-tagline">
           <template v-for="(item, index) in tagline" :key="item">
             <span v-if="index > 0" aria-hidden="true" class="hero-separator">|</span>
