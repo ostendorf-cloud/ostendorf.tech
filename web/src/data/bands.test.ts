@@ -39,7 +39,12 @@ describe('bands data', () => {
     }
   })
 
-  it('ships no logo until the owner adds one', () => {
-    expect(bands.every((band) => band.logo === undefined)).toBe(true)
+  it('names every logo in both locales', () => {
+    for (const band of bands.filter((entry) => entry.logo)) {
+      for (const catalogue of [de, en]) {
+        const entry = (catalogue.bands as Record<string, { logoAlt?: string }>)[band.slug]
+        expect(entry.logoAlt ?? '').not.toBe('')
+      }
+    }
   })
 })

@@ -279,6 +279,22 @@ generated: it is inline Vue markup ported from old_simon-ostendorf.de's `{{defin
 own `--color-accent` and `--color-accent-text` tokens, so it never needs regenerating
 when the theme changes.
 
+`web/src/assets/bands/herrenjedeck-logo.webp` is generated from the band's own logo,
+`https://www.herrenjedeck.de/assets/logo-dark.png` (1182x945, transparent background),
+never hand edited. The source is not committed: download it to
+`web/src/assets/bands/herrenjedeck-logo-dark.png`, which `.gitignore` keeps out. The
+command, needing ImageMagick from `mise.toml`, trims the transparent margin and scales to
+480 px wide (480x489, about 28 KB):
+
+```sh
+magick herrenjedeck-logo-dark.png -trim +repage -resize 480x -strip \
+  -define webp:method=6 -define webp:alpha-quality=90 -quality 80 herrenjedeck-logo.webp
+```
+
+The mark is a dark badge on a transparent ground, so `BandLogo.vue` sets it on a plate of
+`--color-accent-on`, which is near white in both modes. Further band logos follow the same
+pattern; see the comment in `web/src/data/bands.ts`.
+
 ## Scope of this milestone
 
 The home page's hero, Leistungen, Impressionen, Bands, Über mich and Kontakt sections,

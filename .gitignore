@@ -40,3 +40,6 @@ web/playwright-report/
 # Task's scratch directory. `task test:helm` builds a helm plugin directory here
 # rather than relying on helm's own, which a cached tool install never populates.
 .task/
+
+# Band logo sources, downloaded by hand; see AGENTS.md, "Generated files".
+web/src/assets/bands/*-logo-dark.png

@@ -163,7 +163,7 @@ const aboutFacts = computed<Fact[]>(() => [
       >
         <template #slide="{ item: band }">
           <GovueCard class="panel-lit band-card" :class="`band-accent-${band.accent}`">
-            <BandLogo :logo="band.logo" />
+            <BandLogo :logo="band.logo" :alt="band.logo ? t(`bands.${band.slug}.logoAlt`) : ''" />
             <h3 class="band-name mb-3 self-start text-lg font-semibold">
               {{ t(`bands.${band.slug}.name`) }}
             </h3>

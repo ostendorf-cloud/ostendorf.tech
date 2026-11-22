@@ -5,20 +5,22 @@ import BandLogo from './BandLogo.vue'
 
 describe('BandLogo', () => {
   it('renders nothing without a logo', () => {
-    const { container } = render(BandLogo, { props: {} })
+    const { container } = render(BandLogo, { props: { alt: 'Logo' } })
 
     expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('.band-logo-plate')).toBeNull()
   })
 
-  it('renders a lazy image with alt text and its size', () => {
-    render(BandLogo, {
-      props: { logo: { src: '/logo.svg', alt: 'Logo of Rubik', width: 120, height: 40 } },
+  it('renders a lazy image with alt text and its size on a plate', () => {
+    const { container } = render(BandLogo, {
+      props: { logo: { src: '/logo.webp', width: 120, height: 40 }, alt: 'Logo of Rubik' },
     })
 
     const img = screen.getByRole('img', { name: 'Logo of Rubik' })
-    expect(img).toHaveAttribute('src', '/logo.svg')
+    expect(img).toHaveAttribute('src', '/logo.webp')
     expect(img).toHaveAttribute('width', '120')
     expect(img).toHaveAttribute('height', '40')
     expect(img).toHaveAttribute('loading', 'lazy')
+    expect(img.parentElement).toBe(container.querySelector('.band-logo-plate'))
   })
 })

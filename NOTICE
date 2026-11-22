@@ -40,6 +40,10 @@ files next to it, `favicon-32x32.png`, `apple-touch-icon.png` and
 AGENTS.md. The icon, the wordmark and the preview image are part of the brand
 and are not licensed to anyone.
 
+`web/src/assets/bands/herrenjedeck-logo.webp` is the logo of the band
+Herrenjedeck. It belongs to the band and is shown with the band's permission:
+permission to be confirmed by the owner. No other third party logo is shipped.
+
 ## Page texts
 
 The German texts on the site are the copyright of Simon Ostendorf, with two

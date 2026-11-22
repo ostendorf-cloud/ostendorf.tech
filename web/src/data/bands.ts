@@ -1,3 +1,5 @@
+import herrenjedeckLogo from '../assets/bands/herrenjedeck-logo.webp'
+
 /**
  * The bands and ensembles shown on the home page. Only the facts that do
  * not translate live here: the slug ties a band to its i18n messages under
@@ -14,15 +16,14 @@
  * five roles for seven bands, so two roles repeat; neighbours differ.
  *
  * logo is optional and rendered only when given. To add one, put the file
- * into src/assets/bands/, import it here and set { src, alt, width, height }
- * with the file's real pixel size. The alt text names the band. Get the
- * band's permission before a logo goes on the site.
+ * into src/assets/bands/, import it here and set { src, width, height }
+ * with the file's real pixel size, then add bands.<slug>.logoAlt to both
+ * locales. Get the band's permission before a logo goes on the site.
  */
 export type BandAccent = 'accent' | 'info' | 'success' | 'warning' | 'danger'
 
 export interface BandLogo {
   src: string
-  alt: string
   width: number
   height: number
 }
@@ -85,5 +86,7 @@ export const bands: Band[] = [
     instagramUrl: 'https://www.instagram.com/herrenjedeck/',
     hasDescription: true,
     accent: 'info',
+    // The band's own logo, with the band's permission (see NOTICE).
+    logo: { src: herrenjedeckLogo, width: 480, height: 489 },
   },
 ]

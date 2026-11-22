@@ -164,6 +164,15 @@ describe('the band cards', () => {
       expect(failures(palette, BAND_TEXT_PAIRS, TEXT_MINIMUM)).toEqual([])
       expect(failures(palette, BAND_EDGE_PAIRS, NON_TEXT_MINIMUM)).toEqual([])
     })
+
+    // A band logo sits on a plate of --color-accent-on (see BandLogo.vue),
+    // because a band's mark is often a dark badge on a transparent ground
+    // that would vanish on a dark card. The plate must stay light in both
+    // modes, and a dark mark must keep 7:1 against it.
+    it(`keeps the band logo plate light in ${mode} mode`, () => {
+      expect(luminance(palette['accent-on'])).toBeGreaterThan(0.85)
+      expect(ratio(light.text, palette['accent-on'])).toBeGreaterThanOrEqual(7)
+    })
   }
 })
 
