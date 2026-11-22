@@ -49,7 +49,9 @@
       "tagline": ["Full Service", "Live Sound / Bands", "Sound Engineering", "Lighting", "Video"],
       "ctaContact": "Contact",
       "ctaServices": "Services",
-      "scrollCue": "Continue to the services"
+      "scrollCue": "Continue to the services",
+      "pauseMotion": "Pause animation",
+      "startMotion": "Start animation"
     },
     "services": {
       "eyebrow": "What I offer",

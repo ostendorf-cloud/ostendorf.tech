@@ -55,7 +55,9 @@
       ],
       "ctaContact": "Kontakt",
       "ctaServices": "Leistungen",
-      "scrollCue": "Weiter zu den Leistungen"
+      "scrollCue": "Weiter zu den Leistungen",
+      "pauseMotion": "Animation pausieren",
+      "startMotion": "Animation starten"
     },
     "services": {
       "eyebrow": "Was ich biete",

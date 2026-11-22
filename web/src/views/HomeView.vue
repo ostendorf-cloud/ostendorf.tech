@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { GovueCard, GovuePage } from '@ostendorf-cloud/govue'
 
@@ -8,6 +8,7 @@ import CardCarousel from '../components/CardCarousel.vue'
 import ContactChannels from '../components/ContactChannels.vue'
 import ContactForm from '../components/ContactForm.vue'
 import CountingFacts from '../components/CountingFacts.vue'
+import HeroMotionToggle from '../components/HeroMotionToggle.vue'
 import HeroStage from '../components/HeroStage.vue'
 import InstagramFeed from '../components/InstagramFeed.vue'
 import LogoMark from '../components/LogoMark.vue'
@@ -28,6 +29,10 @@ import {
 // warning about it does not apply, tm never reads `this`.
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const { t, tm, rt } = useI18n()
+
+// Whether the visitor stopped the hero's beams. Deliberately not stored:
+// a reload starts them again.
+const motionPaused = ref(false)
 
 // Annotated so the v-for below sees a real array type and a numeric
 // index, which tm's own return type does not provably give it.
@@ -57,7 +62,7 @@ const aboutFacts = computed<Fact[]>(() => [
 <template>
   <GovuePage width="shell">
     <section aria-labelledby="hero-title" class="hero">
-      <HeroStage />
+      <HeroStage :paused="motionPaused" />
 
       <div class="hero-inner">
         <LogoMark class="hero-logo" :size="104" animated />
@@ -89,6 +94,12 @@ const aboutFacts = computed<Fact[]>(() => [
       <a href="#services" class="hero-cue">
         <span class="sr-only">{{ t('home.hero.scrollCue') }}</span>
       </a>
+
+      <HeroMotionToggle
+        class="hero-motion"
+        :paused="motionPaused"
+        @toggle="motionPaused = !motionPaused"
+      />
     </section>
 
     <section id="services" aria-labelledby="services-title" class="panel-section">
@@ -449,6 +460,15 @@ const aboutFacts = computed<Fact[]>(() => [
   border-radius: 0.125rem;
   background: var(--color-accent);
   animation: hero-roll 1.8s ease-in-out 2;
+}
+
+/* The pause control for the beams, in the hero's bottom right corner; its
+   look is HeroMotionToggle's own. */
+.hero-motion {
+  position: absolute;
+  z-index: var(--hero-layer-content);
+  right: 1rem;
+  bottom: 1.25rem;
 }
 
 @media (max-height: 40rem) {
