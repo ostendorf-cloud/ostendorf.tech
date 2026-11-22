@@ -466,13 +466,28 @@ feed:
   tolerations: []
   affinity: {}
 
-  # Plain, non-secret configuration; see internal/feedconfig's own comment
-  # for why none of these ten is secret-shaped. The one actual secret, the
-  # Meta access token, lives in OpenBao, never in a value here or in a
-  # Kubernetes Secret.
+  # The OpenBao token of the token auth method, as a reference to an
+  # existing Secret only. There is deliberately no field for the token
+  # itself: values.schema.json refuses any other key here. Set only with
+  # feed.config.openBaoAuthMethod=token, where both keys are required; the
+  # kubernetes method refuses existingSecret at render time. The token is
+  # never renewed by the feed service.
+  openBaoToken:
+    existingSecret: ""
+    existingSecretKey: "token"
+
+  # Plain, non-secret configuration. The Meta access token lives in OpenBao,
+  # never in a value here or in a Kubernetes Secret; the only secret the feed
+  # service can be given through the chart is the OpenBao token above.
   config:
     listenAddr: ":8081"
     logLevel: "info"
+    # How the feed service logs in to OpenBao: "kubernetes" (the default,
+    # the method for a cluster, with the projected ServiceAccount token
+    # below) or "token" (a token from feed.openBaoToken, meant for tests;
+    # it is never renewed). With "token" the role, auth path and JWT file
+    # below are not rendered, and openBaoRole must stay empty.
+    openBaoAuthMethod: "kubernetes"
     # Required: the OpenBao address the feed service authenticates against.
     # Left empty here because no default could ever point at an OpenBao
     # installation that actually exists; templates/_helpers.tpl's
@@ -481,8 +496,8 @@ feed:
     # own comment above.
     openBaoAddr: ""
     openBaoAuthPath: "kubernetes"
-    # Required: the OpenBao Kubernetes auth role the feed service logs in
-    # as. Left empty for the same reason as openBaoAddr above: the role and
+    # Required with the kubernetes method, refused with the token method:
+    # the OpenBao Kubernetes auth role the feed service logs in as. Left empty for the same reason as openBaoAddr above: the role and
     # its policy are created once, by hand, in OpenBao itself, and no
     # default here could ever name one that actually exists.
     openBaoRole: ""
@@ -493,7 +508,13 @@ feed:
     # source's own path), so this one value can never drift out of sync
     # with what is actually mounted.
     openBaoJwtFile: "/var/run/secrets/openbao/token"
-    tokenPath: "instagram.com/api-tokens/data/simonostendorf.vtech"
+    # KV v2 data path of the secret that holds the Instagram access token,
+    # and the names of the two keys inside it: the token and the RFC 3339
+    # time it was last refreshed. A refresh rewrites only these two keys and
+    # keeps every other key of the secret.
+    openBaoSecretPath: "instagram.com/api-tokens/data/simonostendorf.vtech"
+    openBaoSecretKeyAccessToken: "access_token"
+    openBaoSecretKeyRefreshedAt: "refreshed_at"
     syncInterval: "1h"
     tokenRefreshAge: "7d"
     apiVersion: "v23.0"

@@ -1,0 +1,233 @@
+suite: feed deployment OpenBao auth method and secret location
+templates:
+  - templates/deployment-feed.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+  feed:
+    enabled: true
+    config:
+      openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+tests:
+  - it: wires the token method from an existing Secret and renders no Kubernetes login
+    set:
+      feed:
+        config:
+          openBaoAuthMethod: token
+        openBaoToken:
+          existingSecret: feed-openbao-token
+          existingSecretKey: bao-token
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_AUTH_METHOD
+            value: "token"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: feed-openbao-token
+                key: bao-token
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_ROLE
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_JWT_FILE
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_AUTH_PATH
+          any: true
+      - isNull:
+          path: spec.template.spec.volumes
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  - it: uses the default Secret key token when only the Secret name is set
+    set:
+      feed:
+        config:
+          openBaoAuthMethod: token
+        openBaoToken:
+          existingSecret: feed-openbao-token
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: feed-openbao-token
+                key: token
+
+  - it: keeps the kubernetes method with its projected token when the method is set explicitly
+    set:
+      feed:
+        config:
+          openBaoAuthMethod: kubernetes
+          openBaoRole: ostendorf-tech-feed
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_ROLE
+            value: "ostendorf-tech-feed"
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: openbao-token
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_TOKEN
+          any: true
+
+  - it: fails the render when the token method has no Secret reference
+    set:
+      feed:
+        config:
+          openBaoAuthMethod: token
+    asserts:
+      - failedTemplate:
+          errorMessage: >-
+            feed.openBaoToken.existingSecret is required with
+            feed.config.openBaoAuthMethod=token: set it to the name of an existing
+            Secret holding the OpenBao token.
+
+  - it: fails the render when the token method has an empty Secret key
+    set:
+      feed:
+        config:
+          openBaoAuthMethod: token
+        openBaoToken:
+          existingSecret: feed-openbao-token
+          existingSecretKey: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: >-
+            feed.openBaoToken.existingSecretKey is required with
+            feed.config.openBaoAuthMethod=token: set it to the key of the OpenBao
+            token inside that Secret.
+
+  - it: fails the render when the token method also sets a Kubernetes role
+    set:
+      feed:
+        config:
+          openBaoAuthMethod: token
+          openBaoRole: ostendorf-tech-feed
+        openBaoToken:
+          existingSecret: feed-openbao-token
+    asserts:
+      - failedTemplate:
+          errorMessage: >-
+            feed.config.openBaoRole must not be set with
+            feed.config.openBaoAuthMethod=token: the role belongs to the kubernetes
+            method.
+
+  - it: fails the render when the kubernetes method has a token Secret reference
+    set:
+      feed:
+        config:
+          openBaoRole: ostendorf-tech-feed
+        openBaoToken:
+          existingSecret: feed-openbao-token
+    asserts:
+      - failedTemplate:
+          errorMessage: >-
+            feed.openBaoToken.existingSecret must not be set with
+            feed.config.openBaoAuthMethod=kubernetes: the token belongs to the token
+            method.
+
+  - it: fails schema validation for an unknown auth method
+    set:
+      feed:
+        config:
+          openBaoAuthMethod: approle
+          openBaoRole: ostendorf-tech-feed
+    asserts:
+      - failedTemplate:
+          errorPattern: "/feed/config/openBaoAuthMethod': value must be one of 'kubernetes', 'token'"
+
+  - it: fails schema validation for a plain token value under feed.openBaoToken
+    set:
+      feed:
+        config:
+          openBaoAuthMethod: token
+        openBaoToken:
+          existingSecret: feed-openbao-token
+          value: not-a-real-token
+    asserts:
+      - failedTemplate:
+          errorPattern: "/feed/openBaoToken': additional properties 'value' not allowed"
+
+  - it: fails schema validation for a plain token value under feed.config
+    set:
+      feed:
+        config:
+          openBaoRole: ostendorf-tech-feed
+          openBaoToken: not-a-real-token
+    asserts:
+      - failedTemplate:
+          errorPattern: "/feed/config/openBaoToken': false schema"
+
+  - it: fails schema validation for the removed tokenPath value
+    set:
+      feed:
+        config:
+          openBaoRole: ostendorf-tech-feed
+          tokenPath: old/data/path
+    asserts:
+      - failedTemplate:
+          errorPattern: "/feed/config/tokenPath': false schema"
+
+  - it: passes a custom secret path and custom key names through
+    set:
+      feed:
+        config:
+          openBaoRole: ostendorf-tech-feed
+          openBaoSecretPath: kv/data/instagram
+          openBaoSecretKeyAccessToken: ig_token
+          openBaoSecretKeyRefreshedAt: ig_refreshed
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_SECRET_PATH
+            value: "kv/data/instagram"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_SECRET_KEY_ACCESS_TOKEN
+            value: "ig_token"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_SECRET_KEY_REFRESHED_AT
+            value: "ig_refreshed"
+
+  - it: fails schema validation for a key name with a slash
+    set:
+      feed:
+        config:
+          openBaoRole: ostendorf-tech-feed
+          openBaoSecretKeyAccessToken: ig/token
+    asserts:
+      - failedTemplate:
+          errorPattern: "/feed/config/openBaoSecretKeyAccessToken': .* does not match pattern"
+
+  - it: fails schema validation for an empty key name
+    set:
+      feed:
+        config:
+          openBaoRole: ostendorf-tech-feed
+          openBaoSecretKeyRefreshedAt: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "/feed/config/openBaoSecretKeyRefreshedAt': .* does not match pattern"

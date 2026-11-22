@@ -1,4 +1,5 @@
 {{- if .Values.feed.enabled -}}
+{{- $kubernetes := eq (include "ostendorf-tech.feed.openBaoAuthMethod" .) "kubernetes" -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -62,14 +63,30 @@ spec:
               value: {{ .Values.feed.config.logLevel | quote }}
             - name: OPENBAO_ADDR
               value: {{ include "ostendorf-tech.feed.openBaoAddr" . | quote }}
+            - name: OPENBAO_AUTH_METHOD
+              value: {{ include "ostendorf-tech.feed.openBaoAuthMethod" . | quote }}
+            {{- if $kubernetes }}
             - name: OPENBAO_AUTH_PATH
               value: {{ .Values.feed.config.openBaoAuthPath | quote }}
             - name: OPENBAO_ROLE
               value: {{ include "ostendorf-tech.feed.openBaoRole" . | quote }}
             - name: OPENBAO_JWT_FILE
               value: {{ .Values.feed.config.openBaoJwtFile | quote }}
-            - name: TOKEN_PATH
-              value: {{ .Values.feed.config.tokenPath | quote }}
+            {{- else }}
+            # The token comes from an existing Secret only, never from a
+            # value: values.schema.json has no field that could carry it.
+            - name: OPENBAO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.feed.openBaoToken.existingSecret }}
+                  key: {{ .Values.feed.openBaoToken.existingSecretKey }}
+            {{- end }}
+            - name: OPENBAO_SECRET_PATH
+              value: {{ .Values.feed.config.openBaoSecretPath | quote }}
+            - name: OPENBAO_SECRET_KEY_ACCESS_TOKEN
+              value: {{ .Values.feed.config.openBaoSecretKeyAccessToken | quote }}
+            - name: OPENBAO_SECRET_KEY_REFRESHED_AT
+              value: {{ .Values.feed.config.openBaoSecretKeyRefreshedAt | quote }}
             - name: SYNC_INTERVAL
               value: {{ .Values.feed.config.syncInterval | quote }}
             - name: TOKEN_REFRESH_AGE
@@ -78,10 +95,12 @@ spec:
               value: {{ .Values.feed.config.apiVersion | quote }}
             - name: POST_COUNT
               value: {{ .Values.feed.config.postCount | quote }}
+          {{- if $kubernetes }}
           volumeMounts:
             - name: openbao-token
               mountPath: {{ dir .Values.feed.config.openBaoJwtFile }}
               readOnly: true
+          {{- end }}
           {{- if .Values.feed.startupProbe.enabled }}
           startupProbe:
             httpGet:
@@ -116,6 +135,7 @@ spec:
             failureThreshold: {{ .Values.feed.readinessProbe.failureThreshold }}
           resources:
             {{- toYaml .Values.feed.resources | nindent 12 }}
+      {{- if $kubernetes }}
       volumes:
         # dir/base of the same feed.config.openBaoJwtFile value drive both the
         # mount path above and the projected source's path below, so
@@ -130,6 +150,7 @@ spec:
                   {{- with .Values.feed.serviceAccountToken.audience }}
                   audience: {{ . }}
                   {{- end }}
+      {{- end }}
       {{- with .Values.feed.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

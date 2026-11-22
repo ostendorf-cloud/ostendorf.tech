@@ -125,6 +125,32 @@ point at an OpenBao installation that actually exists.
 {{- end -}}
 
 {{/*
+OpenBao auth method of the feed service, after the render time guards that
+refuse a mixed configuration: the token method needs a token Secret
+reference and no Kubernetes role, the kubernetes method takes no token
+Secret reference. values.schema.json already limits the value to the two
+methods. A token itself is never a value: it comes from an existing Secret.
+*/}}
+{{- define "ostendorf-tech.feed.openBaoAuthMethod" -}}
+{{- $method := .Values.feed.config.openBaoAuthMethod | default "kubernetes" -}}
+{{- $ref := .Values.feed.openBaoToken | default dict -}}
+{{- if eq $method "token" -}}
+{{- if not $ref.existingSecret -}}
+{{- fail "feed.openBaoToken.existingSecret is required with feed.config.openBaoAuthMethod=token: set it to the name of an existing Secret holding the OpenBao token." -}}
+{{- end -}}
+{{- if not $ref.existingSecretKey -}}
+{{- fail "feed.openBaoToken.existingSecretKey is required with feed.config.openBaoAuthMethod=token: set it to the key of the OpenBao token inside that Secret." -}}
+{{- end -}}
+{{- if .Values.feed.config.openBaoRole -}}
+{{- fail "feed.config.openBaoRole must not be set with feed.config.openBaoAuthMethod=token: the role belongs to the kubernetes method." -}}
+{{- end -}}
+{{- else if $ref.existingSecret -}}
+{{- fail "feed.openBaoToken.existingSecret must not be set with feed.config.openBaoAuthMethod=kubernetes: the token belongs to the token method." -}}
+{{- end -}}
+{{- $method -}}
+{{- end -}}
+
+{{/*
 OpenBao Kubernetes auth role the feed service logs in as. Required for the same reason
 as openBaoAddr: the role and its policy are created once, by hand, in OpenBao itself (see
 issue #24's plan), and no default here could ever name one that actually exists.
