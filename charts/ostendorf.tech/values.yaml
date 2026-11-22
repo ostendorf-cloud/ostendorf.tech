@@ -196,9 +196,11 @@ config:
   mailRateLimitPer: "1h"
   # The SMTP submission server, read by govue's mail.LoadConfig: a bare
   # host name (SMTP_HOST) and a port (SMTP_PORT). 587 requires STARTTLS,
-  # 465 means TLS from the first byte. Empty smtpHost leaves both unset and
-  # the contact form answers 503. The credentials come from existingSecret.
-  smtpHost: "mail.ostendorf.cloud"
+  # 465 means TLS from the first byte. Empty, the default, leaves both
+  # unset and the contact form answers 503 not_configured: an install sets
+  # the host together with the credentials in existingSecret, never the host
+  # alone, which would send without SMTP AUTH.
+  smtpHost: ""
   smtpPort: 587
   contactTo: "simon@ostendorf.tech"
   contactFrom: "ostendorf.tech <no-reply@ostendorf.cloud>"

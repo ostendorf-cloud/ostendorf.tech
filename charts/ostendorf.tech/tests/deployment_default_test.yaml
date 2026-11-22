@@ -62,16 +62,6 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
-            name: SMTP_HOST
-            value: "mail.ostendorf.cloud"
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: SMTP_PORT
-            value: "587"
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
             name: CONTACT_TO
             value: "simon@ostendorf.tech"
       - contains:

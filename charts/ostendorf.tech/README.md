@@ -68,12 +68,14 @@ by name.
 | `SMTP_PASSWORD` | `existingSecret.smtpPasswordKey` | unset (omitted) | No |
 
 Every key left unset omits the corresponding environment variable entirely, rather than
-referencing a key that may not exist in your `Secret`. The contact form answers 503
-`not_configured` while `CHALLENGE_KEY` or `config.smtpHost` is missing, and every other page
-keeps working. `SMTP_USERNAME` and `SMTP_PASSWORD` go together: one without the other stops the
-website at startup. With `config.smtpHost` set and neither credential, govue sends without
-SMTP AUTH, which a submission server that requires it refuses. The website holds no CSRF key
-and no session any more: the contact form is govue's stateless one.
+referencing a key that may not exist in your `Secret`. `config.smtpHost` is empty by
+default, so a default install answers 503 `not_configured` on both contact routes, and every
+other page keeps working. The contact form needs `CHALLENGE_KEY`, `config.smtpHost` and, for a
+server with SMTP AUTH, both credentials. `SMTP_USERNAME` and `SMTP_PASSWORD` go together: one
+without the other stops the website at startup. With `config.smtpHost` set and neither
+credential, govue sends without SMTP AUTH, which a submission server that requires it
+refuses. The website holds no CSRF key and no session any more: the contact form is govue's
+stateless one.
 
 This chart never handles the Meta access token the feed service needs at all any more: it
 lives in OpenBao, read by the feed service itself through the Kubernetes auth method, never
@@ -377,7 +379,7 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `config.mailRateLimitBurst` / `config.mailRateLimitPer` | Contact mails sent in total, across every client address, and the refill period | `50` / `1h` |
 | `config.contactTo` | Recipient address of every contact mail | `simon@ostendorf.tech` |
 | `config.contactFrom` | Envelope sender address of every contact mail | `ostendorf.tech <no-reply@ostendorf.cloud>` |
-| `config.smtpHost` | SMTP submission server, a bare host name (`SMTP_HOST`). Empty leaves the contact form unconfigured | `mail.ostendorf.cloud` |
+| `config.smtpHost` | SMTP submission server, a bare host name (`SMTP_HOST`). Empty leaves the contact form unconfigured (503) | `""` |
 | `config.smtpPort` | Its port (`SMTP_PORT`): 587 requires STARTTLS, 465 means TLS from the first byte | `587` |
 | `config.adminListenAddr` | govue's admin listener address (`ADMIN_ADDR`); must match `service.adminPort` | `:8081` |
 | `config.trustedProxies` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |

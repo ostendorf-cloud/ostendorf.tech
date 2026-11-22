@@ -68,11 +68,19 @@ httproute_valid="${httproute_valid},httpRoute.parentRefs.name=shared-gateway,htt
 # once feed.enabled is true, so this combination sets all three together.
 feed_valid="feed.enabled=true,feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200,feed.config.openBaoRole=ostendorf-tech-feed"
 
+# config.smtpHost defaults to empty, so the default values combination renders without
+# SMTP settings (the contact form answers 503); this one sets the server and the secret
+# keys the contact form needs.
+contact_valid="config.smtpHost=mail.ostendorf.cloud,config.smtpPort=587"
+contact_valid="${contact_valid},existingSecret.challengeKeyKey=CHALLENGE_KEY"
+contact_valid="${contact_valid},existingSecret.smtpUsernameKey=SMTP_USERNAME,existingSecret.smtpPasswordKey=SMTP_PASSWORD"
+
 names=(
   "default values"
   "ingress enabled"
   "httpRoute enabled"
   "feed enabled"
+  "contact form configured"
 )
 
 # Each entry is one combination's --set arguments, matching the corresponding
@@ -83,6 +91,7 @@ sets=(
   "${baseline},${ingress_valid}"
   "${baseline},${httproute_valid}"
   "${baseline},${feed_valid}"
+  "${baseline},${contact_valid}"
 )
 
 # kubeconform's default schema location carries no Gateway API schemas. This second

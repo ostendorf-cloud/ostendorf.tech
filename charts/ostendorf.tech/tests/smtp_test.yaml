@@ -22,10 +22,7 @@ tests:
             name: SMTP_PORT
             value: "465"
 
-  - it: leaves SMTP_HOST and SMTP_PORT unset with an empty host, so the form answers 503
-    set:
-      config:
-        smtpHost: ""
+  - it: leaves SMTP_HOST and SMTP_PORT unset by default, so the form answers 503
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
