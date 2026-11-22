@@ -139,6 +139,35 @@ describe('the vtech theme', () => {
 })
 
 /*
+ * The band cards. Each band's accent maps a colour role to a text colour
+ * and a subtle tint (see the band-accent classes in HomeView.vue). The
+ * name is that text colour on the tint, the link is it on the surface, the
+ * lit edge is it on the surface at 3:1. Every role a band uses is checked
+ * here in both modes, not only the five the lists above happen to hold.
+ */
+const BAND_ROLES = ['accent', 'info', 'success', 'warning', 'danger']
+const BAND_TEXT_PAIRS: Array<[string, string]> = BAND_ROLES.flatMap((role) => [
+  [`${role}-text`, 'surface'],
+  [`${role}-text`, `${role}-subtle`],
+])
+const BAND_EDGE_PAIRS: Array<[string, string]> = BAND_ROLES.map((role) => [
+  `${role}-text`,
+  'surface',
+])
+
+describe('the band cards', () => {
+  for (const [mode, palette] of [
+    ['light', light],
+    ['dark', dark],
+  ] as const) {
+    it(`carries every band accent at 4.5:1 for text and 3:1 for the edge in ${mode} mode`, () => {
+      expect(failures(palette, BAND_TEXT_PAIRS, TEXT_MINIMUM)).toEqual([])
+      expect(failures(palette, BAND_EDGE_PAIRS, NON_TEXT_MINIMUM)).toEqual([])
+    })
+  }
+})
+
+/*
  * The hero stage.
  *
  * HeroStage.vue layers a photograph, the haze and the light beams under
