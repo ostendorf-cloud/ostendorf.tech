@@ -307,9 +307,12 @@ implemented. Left out, tracked as later milestones:
   `GET /api/v1/instagram`, not baked into the prerendered HTML: the feed changes while
   the binary does not, and `task prerender` runs at build time with no access token. A
   crawler that executes no JavaScript therefore does not see the section. That is
-  deliberate, since the section carries no content worth indexing, but it does mean the
-  nav has no Impressionen entry either, because a prerendered nav cannot know whether the
-  section will be there.
+  deliberate, since the section carries no content worth indexing. The nav's
+  Impressionen entry follows the section the same way: the prerendered nav has none,
+  because it cannot know whether the section will be there, and `InstagramFeed.vue` sets
+  `impressionsOnPage` (`web/src/lib/pageSections.ts`) once its section is rendered, which
+  makes `AppHeader.vue` add the entry between Leistungen and Bands. The entry shifts the
+  links after it sideways when it arrives; the header's height does not change.
 
 ## Deviations
 

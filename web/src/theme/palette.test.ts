@@ -25,14 +25,24 @@ describe('the gradient button', () => {
   const styles = source('src/styles.css')
 
   it('is defined once, from the brand gradient and the surface tokens', () => {
-    expect(styles.match(/^\.btn-gradient\s*\{/gm)).toHaveLength(1)
-    expect(styles).toMatch(/\.btn-gradient\s*\{[^}]*var\(--brand-gradient\) border-box/)
-    expect(styles).toMatch(/\.btn-gradient\s*\{[^}]*var\(--color-surface\)/)
+    expect(styles.match(/^:is\(\.btn-gradient, [^)]*\]\)\s*\{/gm)).toHaveLength(1)
+    expect(styles).toMatch(/^:is\(\.btn-gradient, [^{]*\{[^}]*var\(--brand-gradient\) border-box/m)
+    expect(styles).toMatch(/^:is\(\.btn-gradient, [^{]*\{[^}]*var\(--color-surface\)/m)
   })
 
   it('does not lift or animate for reduced motion', () => {
     expect(styles).toMatch(
-      /prefers-reduced-motion: reduce\)\s*\{\s*\.btn-gradient\s*\{\s*transition: none;[\s\S]*?transform: none;/,
+      /prefers-reduced-motion: reduce\)\s*\{\s*:is\(\.btn-gradient, [^{]*\{\s*transition: none;[\s\S]*?transform: none;/,
+    )
+  })
+
+  it('also dresses the header link to the contact section, as the old nav-cta', () => {
+    expect(styles).toContain(".app-header nav a[href$='#contact']")
+  })
+
+  it('makes the header translucent with a blur only where backdrop-filter exists', () => {
+    expect(styles).toMatch(
+      /@supports \(backdrop-filter: blur\(1px\)\)[^{]*\{\s*\.app-header\s*\{[^}]*color-mix\(in srgb, var\(--color-bg\) 82%, transparent\)[^}]*backdrop-filter: blur\(14px\)/,
     )
   })
 

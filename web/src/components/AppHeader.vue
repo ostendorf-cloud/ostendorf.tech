@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { GovueHeader, GovueNav, type NavItem } from '@ostendorf-cloud/govue'
 
 import { trackHeaderHeight } from '../lib/headerHeight'
+import { IMPRESSIONS_ID, impressionsOnPage } from '../lib/pageSections'
 import LocaleSwitch from './LocaleSwitch.vue'
 import LogoMark from './LogoMark.vue'
 import ThemeToggle from './ThemeToggle.vue'
@@ -37,6 +38,11 @@ const items = computed<NavItem[]>(() => {
   const home = (hash: string) => router.resolve({ name: 'home', params: { locale }, hash }).href
   return [
     { href: home('#services'), label: t('nav.services') },
+    // Only while the section is on the page: it renders in the browser, after
+    // the feed answered, so the prerendered nav never has this entry.
+    ...(impressionsOnPage.value
+      ? [{ href: home(`#${IMPRESSIONS_ID}`), label: t('nav.impressions') }]
+      : []),
     { href: home('#bands'), label: t('nav.bands') },
     { href: home('#about'), label: t('nav.about') },
     { href: home('#contact'), label: t('nav.contact') },
@@ -45,7 +51,7 @@ const items = computed<NavItem[]>(() => {
 </script>
 
 <template>
-  <GovueHeader ref="header">
+  <GovueHeader ref="header" class="app-header">
     <template #brand>
       <router-link
         :to="{ name: 'home', params: { locale: route.params.locale } }"

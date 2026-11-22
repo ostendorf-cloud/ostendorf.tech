@@ -41,8 +41,12 @@
  * reads on the dark stage and on a light page alike; the gradient is the
  * theme's --brand-gradient, never a copy of its colours. Forced colours
  * drops the background layers, so the border falls back to a system one.
+ *
+ * The header's Kontakt link is the old site's nav-cta and takes the same
+ * look from the same rules: GovueNav renders a plain anchor with no class
+ * hook of its own, so it is selected by where it points.
  */
-.btn-gradient {
+:is(.btn-gradient, .app-header nav a[href$='#contact']) {
   border: 1.5px solid transparent;
   border-radius: 999px;
   background:
@@ -54,8 +58,7 @@
     transform 200ms var(--ease-out);
 }
 
-.btn-gradient:hover,
-.btn-gradient:focus-visible {
+:is(.btn-gradient, .app-header nav a[href$='#contact']):is(:hover, :focus-visible) {
   background:
     linear-gradient(var(--color-surface-hover), var(--color-surface-hover)) padding-box,
     var(--brand-gradient) border-box;
@@ -63,19 +66,36 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn-gradient {
+  :is(.btn-gradient, .app-header nav a[href$='#contact']) {
     transition: none;
   }
 
-  .btn-gradient:hover,
-  .btn-gradient:focus-visible {
+  :is(.btn-gradient, .app-header nav a[href$='#contact']):is(:hover, :focus-visible) {
     transform: none;
   }
 }
 
 @media (forced-colors: active) {
-  .btn-gradient {
+  :is(.btn-gradient, .app-header nav a[href$='#contact']) {
     border-color: ButtonText;
+  }
+}
+
+/*
+ * The header as on the old site: translucent over what scrolls under it,
+ * with a blur and a border. A browser without backdrop-filter keeps the
+ * opaque ground govue gives it, since a see-through bar over text is
+ * unreadable. The old site also made the bar transparent over the hero
+ * until the page scrolled; that needs the header to float over the hero,
+ * and this one is a sticky row the hero starts below, whose measured height
+ * (--header-height) the anchors and the hero's own height depend on, so it
+ * stays a bar.
+ */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .app-header {
+    background-color: color-mix(in srgb, var(--color-bg) 82%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    backdrop-filter: blur(14px) saturate(1.2);
   }
 }
 
