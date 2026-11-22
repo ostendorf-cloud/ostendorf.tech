@@ -118,15 +118,16 @@ function pixelsOfSeconds(value: string): number {
 describe('hero light beams', () => {
   const stage = styleBlock(source('src/components/HeroStage.vue'))
 
-  /** The duration each beam really runs with: the shared one, unless the
-   *  beam's own rule overrides it. */
+  /** The duration each beam really runs with: --sway on the shared rule,
+   *  unless the beam's own rule overrides it. The animation itself is set
+   *  once, under .is-live, from that variable. */
   function durations(): number[] {
-    const shared = declaration(rule(stage, '.hero-beam'), 'animation')
-    const base = /hero-sway\s+([\d.]+)s\s+ease-in-out\s+infinite\s+alternate\b/.exec(shared)
-    expect(base, shared).not.toBeNull()
+    const live = declaration(rule(stage, '.hero-stage.is-live .hero-beam'), 'animation')
+    expect(live).toMatch(/^hero-sway var\(--sway\) ease-in-out infinite alternate both$/)
+    const base = pixelsOfSeconds(declaration(rule(stage, '.hero-beam'), '--sway'))
     return [1, 2, 3, 4].map((n) => {
-      const own = /animation-duration:\s*([^;]+);/.exec(rule(stage, `.hero-beam:nth-child(${n})`))
-      return own ? pixelsOfSeconds(own[1].trim()) : Number(base?.[1])
+      const own = /--sway:\s*([^;]+);/.exec(rule(stage, `.hero-beam:nth-child(${n})`))
+      return own ? pixelsOfSeconds(own[1].trim()) : base
     })
   }
 
@@ -141,19 +142,32 @@ describe('hero light beams', () => {
   // Endless motion is only allowed because the visitor can stop it.
   it('only run endlessly while a pause control exists and can stop them', () => {
     expect(stage).toMatch(
-      /\.hero-stage\.is-paused \.hero-beam\s*\{\s*animation-play-state:\s*paused;/,
+      /\.hero-stage\.is-live\.is-paused \.hero-beam\s*\{\s*animation-play-state:\s*paused;/,
     )
     const home = source('src/views/HomeView.vue')
-    expect(home).toContain('<HeroMotionToggle')
+    expect(home).toMatch(/<HeroMotionToggle\s+v-if="mounted"/)
     expect(home).toMatch(/<HeroStage :paused="motionPaused"/)
   })
 
   it('stays still for reduced motion', () => {
     expect(stage).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.hero-beam\s*\{\s*animation: none;/,
+      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.hero-stage\.is-live \.hero-beam\s*\{\s*animation: none;/,
     )
   })
+
+  it('have no animation of their own before the script has run', () => {
+    expect(declarationOrNone(rule(stage, '.hero-beam'), 'animation')).toBeNull()
+    expect(stage.match(/animation:\s*hero-sway/g)).toHaveLength(1)
+  })
 })
+
+function declarationOrNone(block: string, property: string): string | null {
+  try {
+    return declaration(block, property)
+  } catch {
+    return null
+  }
+}
 
 describe('hero entrance', () => {
   it('does not fade the headline in from opacity 0', () => {

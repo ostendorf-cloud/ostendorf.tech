@@ -187,7 +187,7 @@ describe('the hero paint layers', () => {
   })
 
   it('names the stage as the element the stage layer is declared on', () => {
-    expect(heroStage).toContain(`<div class="${STAGE_SELECTOR.slice(1)}"`)
+    expect(heroStage).toMatch(new RegExp(`<div\\s+class="${STAGE_SELECTOR.slice(1)}"`))
   })
 
   it('holds the stage on the stage layer', () => {

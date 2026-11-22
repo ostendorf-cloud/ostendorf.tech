@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { GovueCard, GovuePage } from '@ostendorf-cloud/govue'
 
@@ -33,6 +33,15 @@ const { t, tm, rt } = useI18n()
 // Whether the visitor stopped the hero's beams. Deliberately not stored:
 // a reload starts them again.
 const motionPaused = ref(false)
+
+// The pause button is rendered only once the script has run: before that
+// (the prerendered page, or no JavaScript at all) the beams are at rest and
+// there is nothing to pause. Set in onMounted, so server and first client
+// render agree.
+const mounted = ref(false)
+onMounted(() => {
+  mounted.value = true
+})
 
 // Annotated so the v-for below sees a real array type and a numeric
 // index, which tm's own return type does not provably give it.
@@ -96,6 +105,7 @@ const aboutFacts = computed<Fact[]>(() => [
       </a>
 
       <HeroMotionToggle
+        v-if="mounted"
         class="hero-motion"
         :paused="motionPaused"
         @toggle="motionPaused = !motionPaused"
