@@ -178,7 +178,12 @@ The global baseline already applies here and is not repeated below.
   the two binaries share `go.mod`/`go.sum` and the pinned base image digests; see the
   comment at the top of `Dockerfile` itself for why a build of one target never triggers
   the other's own stages. `docker-compose.yaml` is a local development stack for the
-  website alone.
+  website, plus `fakefeed` (`cmd/fakefeed`, standard library only) under the `feed`
+  profile: sample posts with generated pictures on the real feed service's routes, so
+  the Impressionen section can be seen locally. It is a third `Dockerfile` target that
+  neither `website` nor `feed` depends on and no workflow builds; `internal/envsync`
+  proves both, and that its port agrees across the compose file, the program and
+  `.env.example`.
 
 ## A build needs the frontend first
 

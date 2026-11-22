@@ -3,10 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Dockerfile now builds two final stages, "website" and "feed";
-      # without this, a plain "docker build ." would still resolve to
-      # "website" since it is the last stage in the file, but naming it
-      # here keeps that from being implicit.
+      # Dockerfile builds the final stages "website" and "feed", plus the
+      # development only "fakefeed" below; without this, a plain
+      # "docker build ." would still resolve to "website" since it is the
+      # last stage in the file, but naming it here keeps that from being
+      # implicit.
       target: website
     restart: unless-stopped
     environment:
@@ -38,6 +39,29 @@ services:
       # Empty values count as unset.
       UMAMI_URL: "${UMAMI_URL:-}"
       UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
+      # Empty without the "feed" profile, which switches the Impressionen
+      # section off. With "docker compose --profile feed up", put
+      # FEED_SERVICE_URL=http://fakefeed:9081 in .env; the port must be the
+      # one fakefeed listens on below. internal/envsync checks that.
+      FEED_SERVICE_URL: "${FEED_SERVICE_URL:-}"
     ports:
       # Loopback only. The admin listener (ADMIN_ADDR, 8081) is not published.
       - "127.0.0.1:${LISTEN_PORT:-8080}:${LISTEN_PORT:-8080}"
+
+  # Development only: sample posts with generated pictures, no real Instagram
+  # content. Not started by a plain "docker compose up", only with
+  # "docker compose --profile feed up". The real feed service needs OpenBao and
+  # a Meta token and cannot run here. Not published to the host: the website
+  # reaches it on the compose network at http://fakefeed:9081. The image is
+  # distroless, with no shell or curl, so there is no healthcheck.
+  fakefeed:
+    profiles: ["feed"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: fakefeed
+    restart: unless-stopped
+    environment:
+      LISTEN_ADDR: ":9081"
+      # Number of sample posts, 1 to 100. Empty means the default, 20.
+      POST_COUNT: "${POST_COUNT:-}"
