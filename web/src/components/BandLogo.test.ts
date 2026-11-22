@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 
@@ -22,5 +23,14 @@ describe('BandLogo', () => {
     expect(img).toHaveAttribute('height', '40')
     expect(img).toHaveAttribute('loading', 'lazy')
     expect(img.parentElement).toBe(container.querySelector('.band-logo-plate'))
+  })
+
+  it('sizes the image by a fixed height so the card does not grow when it loads', () => {
+    const source = readFileSync(`${process.cwd()}/src/components/BandLogo.vue`, 'utf-8')
+    const rule = /\.band-logo\s*\{([^}]*)\}/.exec(source)?.[1] ?? ''
+
+    expect(rule).toMatch(/\bheight:\s*5\.5rem/)
+    expect(rule).not.toMatch(/\bheight:\s*auto/)
+    expect(rule).not.toMatch(/max-height/)
   })
 })

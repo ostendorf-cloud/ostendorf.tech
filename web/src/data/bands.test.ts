@@ -49,6 +49,22 @@ describe('bands data', () => {
     }
   })
 
+  it('states the real pixel size of every logo file', () => {
+    for (const band of bands.filter((entry) => entry.logo)) {
+      const file = `${process.cwd()}/src/assets/bands/${band.slug}-logo.webp`
+      const bytes = readFileSync(file)
+      expect(bytes.toString('ascii', 0, 4)).toBe('RIFF')
+      expect(bytes.toString('ascii', 8, 12)).toBe('WEBP')
+      // The extended header (VP8X) holds width and height minus one as 24 bit
+      // little endian numbers at bytes 24 and 27. The command in AGENTS.md
+      // writes that header because the logo has an alpha channel.
+      expect(bytes.toString('ascii', 12, 16), 'VP8X header').toBe('VP8X')
+      const width = bytes.readUIntLE(24, 3) + 1
+      const height = bytes.readUIntLE(27, 3) + 1
+      expect({ width: band.logo?.width, height: band.logo?.height }).toEqual({ width, height })
+    }
+  })
+
   it('names every logo in both locales', () => {
     for (const band of bands.filter((entry) => entry.logo)) {
       for (const catalogue of [de, en]) {

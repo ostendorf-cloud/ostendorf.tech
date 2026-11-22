@@ -43,11 +43,13 @@ defineProps<{
 }
 
 .band-logo {
+  /* A fixed height with the width following from the file's own aspect
+     ratio, which the width and height attributes carry: the card keeps its
+     size while the lazy image loads. */
   display: block;
   width: auto;
   max-width: 100%;
-  height: auto;
-  max-height: 5.5rem;
+  height: 5.5rem;
   object-fit: contain;
 }
 </style>

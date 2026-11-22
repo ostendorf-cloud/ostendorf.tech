@@ -88,7 +88,7 @@ export const bands: Band[] = [
     instagramUrl: 'https://www.instagram.com/herrenjedeck/',
     hasDescription: true,
     accent: 'accent',
-    // The band's own logo, with the band's permission (see NOTICE).
+    // The band's own logo; permission to be confirmed by the owner (see NOTICE).
     logo: { src: herrenjedeckLogo, width: 480, height: 489 },
   },
 ]
