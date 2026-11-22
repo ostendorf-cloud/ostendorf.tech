@@ -219,7 +219,7 @@ onBeforeUnmount(() => {
         class="carousel-arrow carousel-pause"
         :aria-label="userPaused ? t('common.carousel.play') : t('common.carousel.pause')"
         :title="userPaused ? t('common.carousel.play') : t('common.carousel.pause')"
-        :aria-pressed="userPaused ? 'true' : 'false'"
+        type="button"
         data-action="pause"
         @click="togglePause"
       >

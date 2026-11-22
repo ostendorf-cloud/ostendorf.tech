@@ -405,21 +405,23 @@ describe('CardCarousel automatic scrolling', () => {
     expect(screen.queryByRole('button', { name: START })).toBeNull()
   })
 
-  it('stops for good with the pause button and flips its label and state', async () => {
+  it('stops for good with the pause button and flips its label, with no pressed state', async () => {
     await ready()
     const pause = screen.getByRole('button', { name: PAUSE })
-    expect(pause).toHaveAttribute('aria-pressed', 'false')
+    expect(pause).toHaveAttribute('type', 'button')
+    expect(pause).not.toHaveAttribute('aria-pressed')
 
     await fireEvent.click(pause)
 
     const start = screen.getByRole('button', { name: START })
-    expect(start).toHaveAttribute('aria-pressed', 'true')
+    expect(start).not.toHaveAttribute('aria-pressed')
     vi.advanceTimersByTime(60000)
     expect(scrollBy).not.toHaveBeenCalled()
 
     await fireEvent.click(start)
 
-    expect(screen.getByRole('button', { name: PAUSE })).toHaveAttribute('aria-pressed', 'false')
+    const again = screen.getByRole('button', { name: PAUSE })
+    expect(again).not.toHaveAttribute('aria-pressed')
     vi.advanceTimersByTime(6000)
     expect(scrollBy).toHaveBeenCalledTimes(1)
   })
