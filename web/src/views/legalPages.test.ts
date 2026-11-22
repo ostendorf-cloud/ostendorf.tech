@@ -93,15 +93,65 @@ describe('legal pages', () => {
           ? 'Die einzige Ausnahme von diesen 30 Tagen'
           : 'The only exception to these 30 days',
       )
-      expect(text).toContain(
-        locale === 'de'
-          ? 'das technische Sitzungs-Cookie, das erst gesetzt wird, wenn das Formular die Aufgabe bei unserem Server abruft'
-          : 'the technical session cookie, which is only set once the form requests the task from our server',
-      )
       expect(text).not.toMatch(/hetzner|gunzenhausen|rechenzentrum|data centre/i)
       expect(text).not.toMatch(
         /wenn die statistik|sofern die statistik|eingeschaltet|if set up|switched on|when the statistics are/i,
       )
+    })
+
+    it('describes the stateless contact form and no cookie', async () => {
+      const { container } = await renderPage(locale, 'privacy')
+      const text = (container.textContent ?? '').replace(/\s+/g, ' ')
+
+      // govue's contact form sets no cookie and keeps no session.
+      expect(text).not.toMatch(/__Host-session|Sitzungs-Cookie|session cookie|SameSite|HttpOnly/i)
+      expect(text).toContain(
+        locale === 'de'
+          ? 'Diese Website setzt keine Cookies, auch nicht beim Kontaktformular.'
+          : 'This website sets no cookies, not even for the contact form.',
+      )
+      expect(text).toContain(
+        locale === 'de'
+          ? 'Kurz vorab: Diese Website setzt keine Cookies'
+          : 'A brief summary up front: this website sets no cookies',
+      )
+      // The localStorage text of the colour scheme stays.
+      expect(text).toContain('govue-theme')
+
+      for (const fact of locale === 'de'
+        ? [
+            'aber weder Ihre IP-Adresse noch Angaben zu Ihrem Browser',
+            'diese Angabe wird nicht an unseren Server übertragen',
+            'Unser Server speichert die ausgegebenen Aufgaben nicht.',
+            'bis die Aufgabe abläuft, höchstens 10 Minuten',
+            'IP-Adresse (bei IPv6 die ersten 64 Bit)',
+            'nie Ihren Namen, Ihre E-Mail-Adresse oder Ihre Nachricht',
+            'für die beiden Schritte des Kontaktformulars und für Anfragen an Adressen',
+          ]
+        : [
+            'but neither your IP address nor any details about your browser',
+            'this information is not transmitted to our server',
+            'Our server does not store the tasks it issues.',
+            'until the task expires, after 10 minutes at most',
+            'IP address (for IPv6, its first 64 bits)',
+            'never your name, your email address or your message',
+            'to the two steps of the contact form, and to requests for addresses',
+          ]) {
+        expect(text).toContain(fact)
+      }
+    })
+
+    it('states which version is binding, once, in the language it belongs to', async () => {
+      for (const page of SITE_LEGAL_PAGES) {
+        const { container, unmount } = await renderPage(locale, page)
+        const text = (container.textContent ?? '').replace(/\s+/g, ' ')
+        const german = text.split('Rechtlich verbindlich ist die deutsche Fassung.').length - 1
+        const english = text.split('The German version is the legally binding one.').length - 1
+
+        expect(german, `${page} German notice`).toBe(locale === 'de' ? 1 : 0)
+        expect(english, `${page} English notice`).toBe(locale === 'en' ? 1 : 0)
+        unmount()
+      }
     })
 
     it('lists the application log and the ingress log fields exactly', async () => {

@@ -22,6 +22,8 @@ const germanHref = computed(
     :language-switch="false"
   >
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
+      <p class="text-text-muted">{{ t('legal.bindingNoticeDe') }}</p>
+
       <p>
         Simon Ostendorf<br />
         Frankenstr. 8<br />

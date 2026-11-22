@@ -287,6 +287,11 @@ This is now a finding, not a question answered by itself:
    the contact form milestone goes live; if the conclusion changes, both the German and the
    English "Cookies" section need a cookie banner added, not just different wording.
 
+Later note (#104): the contact form now runs on govue's stateless contact handlers. The site
+sets no session, no `__Host-session` cookie and no CSRF token any more, so the cookie described
+above no longer exists and finding 1 no longer applies. Both languages of `PrivacyView.vue` now
+say the site sets no cookies. The owner approves that wording; it is not legally reviewed.
+
 ## Translated pages
 
 `PrivacyView.vue` and `AgbView.vue` now carry a full English translation of the German privacy

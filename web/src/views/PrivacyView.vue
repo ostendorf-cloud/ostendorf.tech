@@ -22,14 +22,15 @@ const germanHref = computed(
     :language-switch="false"
   >
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
+      <p class="text-text-muted">{{ t('legal.bindingNoticeDe') }}</p>
+
       <p class="text-text-muted">
-        Kurz vorab: Diese Website setzt ein einziges, rein technisches Cookie zum Schutz des
-        Kontaktformulars (siehe Abschnitt „Cookies“). Wenn Sie die Farbdarstellung umstellen,
-        speichert Ihr Browser diese Wahl in seinem lokalen Speicher auf Ihrem Gerät. Ihr Browser
-        lädt keine Dienste von Drittanbietern und alle Inhalte ausschließlich von unserem eigenen
-        Server. Wir setzen keine Werbedienste ein. Seitenaufrufe zählt unser Server mit unserem
-        eigenen Umami, das wir auf eigener Hardware in Deutschland betreiben, ohne Skript in Ihrem
-        Browser (siehe „Besucherstatistik mit Umami“).
+        Kurz vorab: Diese Website setzt keine Cookies (siehe Abschnitt „Cookies“). Wenn Sie die
+        Farbdarstellung umstellen, speichert Ihr Browser diese Wahl in seinem lokalen Speicher auf
+        Ihrem Gerät. Ihr Browser lädt keine Dienste von Drittanbietern und alle Inhalte
+        ausschließlich von unserem eigenen Server. Wir setzen keine Werbedienste ein. Seitenaufrufe
+        zählt unser Server mit unserem eigenen Umami, das wir auf eigener Hardware in Deutschland
+        betreiben, ohne Skript in Ihrem Browser (siehe „Besucherstatistik mit Umami“).
       </p>
 
       <h2 class="text-xl font-semibold">1. Datenschutz auf einen Blick</h2>
@@ -323,28 +324,8 @@ const germanHref = computed(
 
       <h3 class="text-lg font-semibold">Cookies</h3>
       <p>
-        Diese Website setzt ein einziges Cookie: ein technisches Sitzungs-Cookie, und zwar erst
-        dann, wenn Sie das Kontaktformular benutzen. Es wird gesetzt, sobald Sie ein Feld des
-        Formulars auswählen, gleich ob mit der Maus oder mit der Tastatur. Wenn Sie die Seiten
-        dieser Website nur lesen und das Kontaktformular nicht benutzen, erhalten Sie kein Cookie.
-        Es enthält ausschließlich eine zufällige, nicht auf Sie persönlich zurückführbare Kennung
-        und dient dazu, unserem Server zu ermöglichen, das Kontaktformular vor
-        Cross-Site-Request-Forgery-Angriffen (CSRF) zu schützen; es wird nicht zu Tracking, Analyse
-        oder Werbung verwendet und nicht an Dritte übermittelt.
-      </p>
-      <p>
-        Das Cookie ist ein Sitzungs-Cookie ohne eigenes Speicherdauer-Attribut: Ihr Browser verwirft
-        es, sobald Sie ihn schließen. Zusätzlich ist es so gesetzt, dass kein Skript auf der Seite
-        es auslesen kann (HttpOnly), dass es nur über eine verschlüsselte Verbindung übertragen wird
-        (Secure) und dass es nicht an eine andere Website mitgesendet wird (SameSite=Lax). Das
-        Cookie heißt „__Host-session“. Unser Server hält die zugehörige Sitzung höchstens 12 Stunden
-        im Arbeitsspeicher vor.
-      </p>
-      <p>
-        Nach unserer Einschätzung ist dieses Cookie technisch notwendig im Sinne von § 25 Abs. 2 Nr.
-        2 TDDDG, weil ohne ein solches Sitzungs-Cookie das Kontaktformular nicht wirksam vor
-        Cross-Site-Request-Forgery geschützt werden kann; eine Einwilligung ist deshalb nicht
-        erforderlich, und wir zeigen kein Cookie-Banner an.
+        Diese Website setzt keine Cookies, auch nicht beim Kontaktformular. Wir zeigen deshalb kein
+        Cookie-Banner an.
       </p>
       <h3 class="text-lg font-semibold">Lokaler Speicher (Farbdarstellung)</h3>
       <p>
@@ -433,10 +414,10 @@ const germanHref = computed(
       </p>
       <p>
         Diese allgemeine Ratenbegrenzung gilt für Seitenaufrufe, für die zugehörigen Design- und
-        Bilddateien, für die Dateien, die Suchmaschinen auslesen, und für Anfragen an Adressen, die
-        es auf dieser Website nicht gibt. Für die beiden Schritte des Kontaktformulars gelten
-        stattdessen zwei eigene Begrenzungen, die im Abschnitt „Kontaktformular“ beschrieben sind.
-        Alle drei werden getrennt gezählt.
+        Bilddateien, für die Dateien, die Suchmaschinen auslesen, für die beiden Schritte des
+        Kontaktformulars und für Anfragen an Adressen, die es auf dieser Website nicht gibt. Für die
+        beiden Schritte des Kontaktformulars gelten zusätzlich zwei eigene Begrenzungen, die im
+        Abschnitt „Kontaktformular“ beschrieben sind. Alle drei werden getrennt gezählt.
       </p>
       <p>
         Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Wir haben ein
@@ -511,18 +492,26 @@ const germanHref = computed(
       <p>
         Ihre Angaben werden von unserem Webserver nicht in einer Datenbank gespeichert, sondern als
         E-Mail über unseren eigenen Mailserver an unser Postfach gesendet. Den Mailserver betreiben
-        wir selbst. Die Übertragung vom Webserver zum Mailserver erfolgt verschlüsselt.
+        wir selbst. Die Übertragung vom Webserver zum Mailserver erfolgt verschlüsselt. Die E-Mail
+        enthält Ihren Namen, Ihre E-Mail-Adresse und Ihre Nachricht, aber weder Ihre IP-Adresse noch
+        Angaben zu Ihrem Browser. Ob Sie das Kästchen zur Einwilligung angekreuzt haben, prüft Ihr
+        Browser vor dem Absenden; diese Angabe wird nicht an unseren Server übertragen.
       </p>
       <p>
         Zum Schutz vor Spam löst Ihr Browser beim Ausfüllen des Formulars eine kleine Rechenaufgabe
         (sogenannter Proof of Work). Dazu ruft er bei unserem Server eine zufällige Aufgabe ab und
-        sendet die Lösung zusammen mit dem Formular zurück. Dabei werden selbst keine weiteren
-        Cookies gesetzt, keine weiteren Informationen in Ihrem Endgerät gespeichert und keine
-        Dienste von Drittanbietern eingebunden; das technische Sitzungs-Cookie, das erst gesetzt
-        wird, wenn das Formular die Aufgabe bei unserem Server abruft (siehe Abschnitt „Cookies“),
-        schützt dabei dieses Formular vor Cross-Site-Request-Forgery. Um Missbrauch zu verhindern,
-        verarbeitet unser Server außerdem Ihre IP-Adresse kurzzeitig im Arbeitsspeicher, um die Zahl
-        der Anfragen je Adresse zu begrenzen; dafür wird sie nicht dauerhaft gespeichert.
+        sendet die Lösung zusammen mit dem Formular zurück. Dabei werden keine Cookies gesetzt,
+        keine Informationen in Ihrem Endgerät gespeichert und keine Dienste von Drittanbietern
+        eingebunden. Unser Server speichert die ausgegebenen Aufgaben nicht. Damit jede Lösung nur
+        einmal verwendet werden kann, hält er von jeder gelösten Aufgabe eine Prüfsumme im
+        Arbeitsspeicher, bis die Aufgabe abläuft, höchstens 10 Minuten; diese Prüfsumme lässt sich
+        keiner Person zuordnen. Um Missbrauch zu verhindern, verarbeitet unser Server außerdem Ihre
+        IP-Adresse (bei IPv6 die ersten 64 Bit) kurzzeitig im Arbeitsspeicher, um die Zahl der
+        Anfragen je Adresse zu begrenzen; dafür wird sie nicht dauerhaft gespeichert, sondern
+        verworfen, sobald die Begrenzung für diese Adresse abgelaufen ist. Im Zugriffsprotokoll
+        (siehe „Server-Log-Dateien“) erscheint eine Anfrage des Kontaktformulars wie jede andere
+        Anfrage. Darüber hinaus protokolliert unser Server zum Kontaktformular höchstens einen
+        technischen Fehlercode, nie Ihren Namen, Ihre E-Mail-Adresse oder Ihre Nachricht.
         Rechtsgrundlage hierfür ist unser berechtigtes Interesse am Schutz vor Spam und Missbrauch
         (Art. 6 Abs. 1 lit. f DSGVO).
       </p>
@@ -651,13 +640,12 @@ const germanHref = computed(
       </p>
 
       <p class="text-text-muted">
-        A brief summary up front: this website sets a single, purely technical cookie to protect the
-        contact form (see the "Cookies" section). If you change the colour scheme, your browser
-        stores that choice in its local storage on your device. Your browser loads no third-party
-        services and loads everything exclusively from our own server. We use no advertising
-        services. Our server counts page views with our own Umami, which we operate on our own
-        hardware in Germany, without any script running in your browser (see "Visitor statistics
-        with Umami").
+        A brief summary up front: this website sets no cookies (see the "Cookies" section). If you
+        change the colour scheme, your browser stores that choice in its local storage on your
+        device. Your browser loads no third-party services and loads everything exclusively from our
+        own server. We use no advertising services. Our server counts page views with our own Umami,
+        which we operate on our own hardware in Germany, without any script running in your browser
+        (see "Visitor statistics with Umami").
       </p>
 
       <h2 class="text-xl font-semibold">1. Data protection at a glance</h2>
@@ -933,26 +921,8 @@ const germanHref = computed(
 
       <h3 class="text-lg font-semibold">Cookies</h3>
       <p>
-        This website sets a single cookie: a technical session cookie, and only once you use the
-        contact form. It is set as soon as you select a field of the form, whether with the mouse or
-        with the keyboard. If you only read the pages of this website and do not use the contact
-        form, you receive no cookie at all. It contains only a random identifier that cannot be
-        traced back to you personally, and exists to let our server protect the contact form against
-        cross-site request forgery (CSRF) attacks; it is not used for tracking, analytics or
-        advertising, and is not transmitted to third parties.
-      </p>
-      <p>
-        The cookie is a session cookie with no storage-duration attribute of its own: your browser
-        discards it once you close it. It is also set so that no script on the page can read it
-        (HttpOnly), so that it is only transmitted over an encrypted connection (Secure), and so
-        that it is not sent along to another website (SameSite=Lax). The cookie is named
-        "__Host-session". Our server keeps the matching session in memory for 12 hours at most.
-      </p>
-      <p>
-        In our assessment, this cookie is technically necessary within the meaning of Section 25(2)
-        no. 2 TDDDG, because the contact form cannot be effectively protected against cross-site
-        request forgery without a session cookie of this kind; consent is therefore not required,
-        and we do not display a cookie banner.
+        This website sets no cookies, not even for the contact form. We therefore do not display a
+        cookie banner.
       </p>
       <h3 class="text-lg font-semibold">Local storage (colour scheme)</h3>
       <p>
@@ -1037,9 +1007,10 @@ const germanHref = computed(
       </p>
       <p>
         This general rate limiting applies to page views, to the design and image files that belong
-        to them, to the files search engines read, and to requests for addresses that do not exist
-        on this website. The two steps of the contact form have two separate limits of their own
-        instead, described in the "Contact form" section. All three are counted separately.
+        to them, to the files search engines read, to the two steps of the contact form, and to
+        requests for addresses that do not exist on this website. The two steps of the contact form
+        also have two separate limits of their own, described in the "Contact form" section. All
+        three are counted separately.
       </p>
       <p>
         This processing is carried out on the basis of Art. 6(1)(f) GDPR. We have a legitimate
@@ -1111,19 +1082,26 @@ const germanHref = computed(
       <p>
         Your details are not stored by our web server in a database, but sent as an email via our
         own mail server to our mailbox. We operate the mail server ourselves. Transmission from the
-        web server to the mail server is encrypted.
+        web server to the mail server is encrypted. The email contains your name, your email address
+        and your message, but neither your IP address nor any details about your browser. Whether
+        you ticked the consent box is checked by your browser before sending; this information is
+        not transmitted to our server.
       </p>
       <p>
         To protect against spam, your browser solves a small computational task (a so-called proof
         of work) when you fill in the form. To do this, it requests a random task from our server
-        and sends the solution back together with the form. This itself sets no further cookies,
-        stores no further information on your device, and uses no third-party services for this
-        purpose; the technical session cookie, which is only set once the form requests the task
-        from our server (see the "Cookies" section), protects this form against cross-site request
-        forgery. To prevent misuse, our server also processes your IP address briefly in memory in
-        order to limit the number of requests per address; it is not stored permanently for this
-        purpose. The legal basis for this is our legitimate interest in protection against spam and
-        misuse (Art. 6(1)(f) GDPR).
+        and sends the solution back together with the form. This sets no cookies, stores no
+        information on your device, and uses no third-party services. Our server does not store the
+        tasks it issues. So that each solution can be used only once, it keeps a checksum of every
+        solved task in memory until the task expires, after 10 minutes at most; this checksum cannot
+        be linked to any person. To prevent misuse, our server also processes your IP address (for
+        IPv6, its first 64 bits) briefly in memory in order to limit the number of requests per
+        address; it is not stored permanently for this purpose, but discarded once the limit for
+        that address has run out. In the access log (see "Server log files"), a contact form request
+        appears like any other request. Beyond that, our server logs at most a technical error code
+        for the contact form, never your name, your email address or your message. The legal basis
+        for this is our legitimate interest in protection against spam and misuse (Art. 6(1)(f)
+        GDPR).
       </p>
       <p>
         Processing of this data is carried out on the basis of Art. 6(1)(b) GDPR, where your enquiry
