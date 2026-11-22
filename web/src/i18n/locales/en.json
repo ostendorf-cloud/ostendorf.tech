@@ -149,9 +149,8 @@
     "bademeister": {
       "name": "Die Bademeister",
       "paragraphs": [
-        "We are a cover band made up of current and former students of FH Aachen. We got our start at the first summer festival of the Electrical Engineering and Information Technology department (2022). Back then the student council was still looking for acts, and since we were all involved with the council in some way already, the idea came up to perform together as a band.",
-        "What was originally meant as a one-off show quickly grew into something more. Playing together was so much fun that we decided to keep rehearsing regularly and play further shows. Among other things we have played the joint Christmas market of the AStA student councils at FH Aachen, as well as various private events that came our way by word of mouth.",
-        "Musically we offer a varied mix of international and German rock and pop songs. Starting with classics like Zombie by the Cranberries, we have steadily expanded our repertoire. These days our set also includes more recent tracks by artists such as Måneskin, Kraftklub and Alligatoah."
+        "We are a cover band made up of current and former students of FH Aachen. We got our start at the first summer festival of the Electrical Engineering and Information Technology department (2022). What was meant as a one-off show quickly grew into something more: we rehearse regularly and have played, among other things, the joint Christmas market of the AStA student councils at FH Aachen.",
+        "Musically we offer a varied mix of international and German rock and pop songs, from classics like Zombie by the Cranberries to tracks by Måneskin, Kraftklub and Alligatoah."
       ]
     },
     "fourfold": {
@@ -162,18 +161,21 @@
       ]
     },
     "singingLittleBigBand": {
-      "name": "Singing Little BigBand of FH Aachen"
+      "name": "Singing Little BigBand of FH Aachen",
+      "paragraphs": [
+        "The Singing Little BigBand is an ensemble of FH Aachen. It shares its Instagram channel with the BigBand and the Jazz Combo of FH Aachen."
+      ]
     },
     "bigBand": {
       "name": "BigBand of FH Aachen",
       "paragraphs": [
-        "Since 2007 the Full House Big Band of FH Aachen has performed at internal and public events under the direction of Boris Bansbach."
+        "Since 2007 the Full House Big Band of FH Aachen has performed at internal and public events under the direction of Boris Bansbach. The Jazz Combo of FH Aachen is its \"little brother\"."
       ]
     },
     "jazzCombo": {
       "name": "Jazz Combo of FH Aachen",
       "paragraphs": [
-        "As the \"little brother\" of the Big Band, the Jazz Combo of FH Aachen performs at internal and public events, also under the direction of Boris Bansbach."
+        "As the \"little brother\" of the Big Band, the Jazz Combo of FH Aachen performs at internal and public events, also under the direction of Boris Bansbach. The Full House Big Band of FH Aachen has played since 2007."
       ]
     },
     "herrenjedeck": {

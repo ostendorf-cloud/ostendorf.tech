@@ -158,9 +158,8 @@
     "bademeister": {
       "name": "Die Bademeister",
       "paragraphs": [
-        "Wir sind eine Coverband, bestehend aus aktuellen und ehemaligen Studierenden der FH Aachen. Unser Ursprung liegt im ersten Sommerfest des Fachbereichs Elektro- und Informationstechnik (2022). Damals suchte die Fachschaft noch nach Programmpunkten und da wir alle in irgendeiner Form bereits in der Fachschaft aktiv waren oder uns für sie engagiert hatten, entstand die Idee, gemeinsam als Band aufzutreten.",
-        "Was ursprünglich als einmaliger Auftritt geplant war, entwickelte sich schnell weiter. Das gemeinsame Musizieren bereitete uns so viel Freude, dass wir beschlossen, regelmäßig weiter zu proben und weitere Auftritte zu spielen. So standen wir unter anderem beim Weihnachtsmarkt der Fachschaften des AStAs der FH Aachen auf der Bühne, sowie bei verschiedenen privaten Veranstaltungen, die über Mundpropaganda zustande kamen.",
-        "Musikalisch bieten wir eine abwechslungsreiche Mischung aus internationalen und deutschen Rock- und Popsongs. Angefangen bei Klassikern wie Zombie von den Cranberries haben wir unser Repertoire stetig erweitert. Mittlerweile gehören auch modernere Titel von Künstlern wie Måneskin, Kraftklub oder Alligatoah zu unserem Programm."
+        "Wir sind eine Coverband aus aktuellen und ehemaligen Studierenden der FH Aachen. Unser Ursprung liegt im ersten Sommerfest des Fachbereichs Elektro- und Informationstechnik (2022). Was als einmaliger Auftritt geplant war, entwickelte sich schnell weiter: Wir proben regelmäßig und standen unter anderem beim Weihnachtsmarkt der Fachschaften des AStAs der FH Aachen auf der Bühne.",
+        "Musikalisch bieten wir eine abwechslungsreiche Mischung aus internationalen und deutschen Rock- und Popsongs, von Klassikern wie Zombie von den Cranberries bis zu Titeln von Måneskin, Kraftklub oder Alligatoah."
       ]
     },
     "fourfold": {
@@ -171,18 +170,21 @@
       ]
     },
     "singingLittleBigBand": {
-      "name": "Singing Little BigBand der Fachhochschule Aachen"
+      "name": "Singing Little BigBand der Fachhochschule Aachen",
+      "paragraphs": [
+        "Die Singing Little BigBand ist ein Ensemble der FH Aachen. Ihren Instagram-Kanal teilt sie mit der BigBand und der Jazz Combo der FH Aachen."
+      ]
     },
     "bigBand": {
       "name": "BigBand der Fachhochschule Aachen",
       "paragraphs": [
-        "Seit 2007 spielt die Full House Big Band der FH Aachen unter der Leitung von Boris Bansbach bei internen und öffentlichen Veranstaltungen."
+        "Seit 2007 spielt die Full House Big Band der FH Aachen unter der Leitung von Boris Bansbach bei internen und öffentlichen Veranstaltungen. Die Jazz Combo der FH Aachen ist ihr „kleiner Bruder“."
       ]
     },
     "jazzCombo": {
       "name": "Jazz Combo der Fachhochschule Aachen",
       "paragraphs": [
-        "Als „kleiner Bruder“ der Big Band spielt die Jazz Combo der FH Aachen, ebenfalls unter der Leitung von Boris Bansbach, bei internen und öffentlichen Veranstaltungen."
+        "Als „kleiner Bruder“ der Big Band spielt die Jazz Combo der FH Aachen, ebenfalls unter der Leitung von Boris Bansbach, bei internen und öffentlichen Veranstaltungen. Die Full House Big Band der FH Aachen spielt seit 2007."
       ]
     },
     "herrenjedeck": {

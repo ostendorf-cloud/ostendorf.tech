@@ -37,7 +37,7 @@ export const bands: Band[] = [
     slug: 'singingLittleBigBand',
     instagramHandle: '@fhaachenbigband',
     instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
-    hasDescription: false,
+    hasDescription: true,
   },
   {
     slug: 'bigBand',
