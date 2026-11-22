@@ -147,14 +147,19 @@ The global baseline already applies here and is not repeated below.
   each, which doubles every budget, the mail ceiling included, and lets a solved
   challenge be used once per pod. `charts/ostendorf.tech` enforces the single replica at
   render time and runs the Deployment with `strategy.type: Recreate`, so a rollout never
-  lets two pods coexist either. Lifts once those move to a shared store (govue's
-  `contact.Config` limiters and `pow.Config.Seen` take one).
+  lets two pods coexist either. Lifts only once all of them move to a shared store:
+  `pow.Config.Seen` is an interface that can take one, but `contact.Config`'s limiters
+  are `*ratelimit.Limiter`, a concrete in-memory type, so govue offers no shared limiter
+  in v0.6.0.
 - `web/` is the Vue SPA, consuming govue's Vue package as a pnpm git dependency. `web/src`
   holds the app. The contact section in `web/src/views/HomeView.vue` renders govue's
   `GovueContactForm` with a cookie free client (`createClient({ credentials: 'omit' })`),
   the site's own consent text (`home.contact.consent`), the form heading and the privacy
   link of the page's language; its fields, errors and success text come from govue's
-  catalogue, and its proof of work Worker is govue's, emitted by Vite as a same-origin
+  catalogue, except that `web/src/i18n/govue.ts` merges formal German ("Sie") texts over
+  govue's "du" through `createSiteGovueI18n`, which `main.ts` and the prerender script
+  both install; `web/src/i18n/govueI18n.test.ts` fails on a new or renamed govue contact
+  key. Its proof of work Worker is govue's, emitted by Vite as a same-origin
   file under `/assets/` that `worker-src 'self'` allows. `web/src/views/contactSection.test.ts`
   proves the section in both languages. `web/scripts/prerender.ts` is the static site
   generation step `task prerender` runs. `web/src/lib/routeTable.ts` is the one place the frontend reads
