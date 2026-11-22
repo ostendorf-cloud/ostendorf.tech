@@ -44,10 +44,6 @@ func TestCloseResult(t *testing.T) {
 	}
 }
 
-// testCSRFKey is a 32 byte key, hex encoded: 64 hex characters, long
-// enough for config.Load's CSRF_KEY, which has no usable default.
-var testCSRFKey = strings.Repeat("ab", 32)
-
 func discardLogger() *slog.Logger {
 	return slog.New(slog.DiscardHandler)
 }
@@ -66,12 +62,7 @@ func TestEmbeddedAssetsBuildAWorkingApp(t *testing.T) {
 		t.Fatalf("fs.Sub(prerenderedFS, \"prerendered\") error = %v", err)
 	}
 
-	cfg, err := config.Load(func(key string) string {
-		if key == "CSRF_KEY" {
-			return testCSRFKey
-		}
-		return ""
-	})
+	cfg, err := config.Load(func(string) string { return "" })
 	if err != nil {
 		t.Fatalf("config.Load() error = %v", err)
 	}
@@ -99,12 +90,7 @@ func TestContentSecurityPolicyAllowsTheThemeBootScript(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fs.Sub(prerenderedFS, \"prerendered\") error = %v", err)
 	}
-	cfg, err := config.Load(func(key string) string {
-		if key == "CSRF_KEY" {
-			return testCSRFKey
-		}
-		return ""
-	})
+	cfg, err := config.Load(func(string) string { return "" })
 	if err != nil {
 		t.Fatalf("config.Load() error = %v", err)
 	}

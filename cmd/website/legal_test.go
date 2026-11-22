@@ -44,12 +44,7 @@ func TestRuntimeSitemapMatchesPrerenderedSitemap(t *testing.T) {
 		t.Fatalf("prerendered sitemap.xml: %v; run task prerender first", err)
 	}
 
-	cfg, err := config.Load(func(key string) string {
-		if key == "CSRF_KEY" {
-			return testCSRFKey
-		}
-		return ""
-	})
+	cfg, err := config.Load(func(string) string { return "" })
 	if err != nil {
 		t.Fatalf("config.Load() error = %v", err)
 	}

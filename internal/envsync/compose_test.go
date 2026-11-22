@@ -115,11 +115,8 @@ func TestComposePublishedPortFollowsListenAddr(t *testing.T) {
 			}
 
 			cfg, err := config.Load(func(key string) string {
-				switch key {
-				case "LISTEN_ADDR":
+				if key == "LISTEN_ADDR" {
 					return addr
-				case "CSRF_KEY":
-					return strings.Repeat("ab", 32)
 				}
 				return ""
 			})

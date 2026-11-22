@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ostendorf-cloud/govue/analytics"
+	"github.com/ostendorf-cloud/govue/mail"
 )
 
 const envExamplePath = "../../.env.example"
@@ -15,14 +16,21 @@ const envExamplePath = "../../.env.example"
 // and so on) or through the resolved lookup.
 var envRead = regexp.MustCompile(`(?:loader\.(\w+)|resolved)\("([A-Z][A-Z0-9_]*)"`)
 
-// govueEnv lists the variables govue's analytics.LoadConfig reads on the website's
-// behalf. They never appear as a literal in this repository's own Go code, so a govue
-// upgrade that adds or renames one shows up here as a compile error or a failed test.
+// govueEnv lists the variables govue's analytics.LoadConfig and mail.LoadConfig read on
+// the website's behalf. They never appear as a literal in this repository's own Go code,
+// so a govue upgrade that adds or renames one shows up here as a compile error or a
+// failed test. mail.LoadConfig reads SMTP_PASSWORD through a _FILE twin, SMTP_USERNAME
+// without one.
 var govueEnv = []string{
 	analytics.EnvURL,
 	analytics.EnvWebsiteID,
 	analytics.EnvTimeout,
 	analytics.EnvQueueSize,
+	mail.EnvHost,
+	mail.EnvPort,
+	mail.EnvUsername,
+	mail.EnvPassword,
+	mail.EnvPassword + "_FILE",
 }
 
 // commentLine matches a whole YAML comment line, which may name ${VAR} forms as prose.

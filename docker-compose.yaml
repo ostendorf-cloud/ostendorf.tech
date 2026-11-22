@@ -12,10 +12,9 @@ services:
     environment:
       # ALLOW_PLAIN_HTTP: this compose file serves the site over plain
       # HTTP on localhost, with nothing terminating TLS in front of it;
-      # without this the session cookie's Secure attribute would keep a
-      # browser from ever sending it back, and the contact form's CSRF
-      # protection with it. Never set this on anything reachable from
-      # outside the machine it runs on.
+      # without this the Strict-Transport-Security header would tell the
+      # browser to upgrade every later visit to localhost to HTTPS. Never
+      # set this on anything reachable from outside the machine it runs on.
       ALLOW_PLAIN_HTTP: "true"
       # LISTEN_PORT in .env is the one value that sets both the address the
       # container listens on and the host port published below, so the two
@@ -26,9 +25,11 @@ services:
       # .env is not forwarded and has no effect through this stack.
       # internal/envsync checks that the two stay in step.
       LISTEN_ADDR: ":${LISTEN_PORT:-8080}"
-      CSRF_KEY: "${CSRF_KEY:?Set CSRF_KEY, e.g. via: openssl rand -hex 32}"
+      # The contact form answers 503 not_configured unless CHALLENGE_KEY and
+      # SMTP_HOST are set in .env or the shell. Empty values count as unset.
       CHALLENGE_KEY: "${CHALLENGE_KEY:-}"
-      SMTP_ADDR: "${SMTP_ADDR:-}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-}"
       SMTP_USERNAME: "${SMTP_USERNAME:-}"
       SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
       CONTACT_TO: "${CONTACT_TO:-}"

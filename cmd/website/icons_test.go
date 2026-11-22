@@ -43,12 +43,7 @@ func TestPrerenderedPagesCarryTheFavicon(t *testing.T) {
 // embedded dist, and compares the answer with the embedded file.
 func TestAppServesTheLinkedIconsFromTheEmbeddedDist(t *testing.T) {
 	dist, prerendered := realFS(t)
-	cfg, err := config.Load(func(key string) string {
-		if key == "CSRF_KEY" {
-			return testCSRFKey
-		}
-		return ""
-	})
+	cfg, err := config.Load(func(string) string { return "" })
 	if err != nil {
 		t.Fatalf("config.Load() error = %v", err)
 	}
