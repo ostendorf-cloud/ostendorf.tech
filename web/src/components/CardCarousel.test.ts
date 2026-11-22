@@ -278,10 +278,6 @@ describe('CardCarousel layout rules', () => {
     expect(css).toMatch(/scroll-snap-type:\s*x mandatory/)
     expect(css).toMatch(/scroll-snap-align:\s*start/)
   })
-
-  it('turns a page every 6 seconds', () => {
-    expect(css).toMatch(/AUTO_SCROLL_INTERVAL_MS = 6000/)
-  })
 })
 
 describe('CardCarousel automatic scrolling', () => {
@@ -290,7 +286,8 @@ describe('CardCarousel automatic scrolling', () => {
 
   beforeEach(() => {
     // Only the interval is faked: Testing Library's own waiting uses timeouts.
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    // Date is faked too: a tick looks at how long ago the last scroll was.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
   })
 
   afterEach(() => {
@@ -475,5 +472,163 @@ describe('CardCarousel automatic scrolling', () => {
     expect(remove).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
     vi.advanceTimersByTime(60000)
     expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  it('does not count a touch as hover', async () => {
+    const { group } = await ready()
+    const touchEnter = new Event('pointerenter')
+    Object.defineProperty(touchEnter, 'pointerType', { value: 'touch' })
+
+    await fireEvent(group, touchEnter)
+    vi.advanceTimersByTime(6000)
+
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+  })
+
+  it('holds still while a finger is on the track and restarts the countdown when it lifts', async () => {
+    const { track } = await ready()
+
+    await fireEvent.touchStart(track)
+    vi.advanceTimersByTime(18000)
+    expect(scrollBy).not.toHaveBeenCalled()
+
+    await fireEvent.touchEnd(track)
+    vi.advanceTimersByTime(5999)
+    expect(scrollBy).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a cancelled touch like a lifted finger', async () => {
+    const { track } = await ready()
+
+    await fireEvent.touchStart(track)
+    await fireEvent.touchCancel(track)
+    vi.advanceTimersByTime(6000)
+
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+  })
+
+  it('holds still while a mouse button is pressed on the track', async () => {
+    const { track } = await ready()
+
+    await fireEvent(track, new Event('pointerdown'))
+    vi.advanceTimersByTime(18000)
+    expect(scrollBy).not.toHaveBeenCalled()
+
+    await fireEvent(track, new Event('pointerup'))
+    vi.advanceTimersByTime(6000)
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+  })
+
+  it('restarts the countdown on a wheel scroll over the track', async () => {
+    const { track } = await ready()
+
+    vi.advanceTimersByTime(4000)
+    await fireEvent.wheel(track)
+    vi.advanceTimersByTime(4000)
+    expect(scrollBy).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(2000)
+
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips a tick that falls within 150 ms of a scroll event', async () => {
+    const { track } = await ready()
+
+    vi.advanceTimersByTime(5900)
+    await fireEvent.scroll(track)
+    vi.advanceTimersByTime(100)
+    expect(scrollBy).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(6000)
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops while scrolled out of view and resumes when it is back', async () => {
+    let notify: (entries: Array<{ isIntersecting: boolean }>) => void = () => {}
+    const disconnect = vi.fn()
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(callback: typeof notify) {
+          notify = callback
+        }
+        observe = vi.fn()
+        disconnect = disconnect
+      },
+    )
+    const view = await ready()
+
+    notify([{ isIntersecting: false }])
+    await nextTick()
+    vi.advanceTimersByTime(18000)
+    expect(scrollBy).not.toHaveBeenCalled()
+
+    notify([{ isIntersecting: true }])
+    await nextTick()
+    vi.advanceTimersByTime(6000)
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+
+    view.unmount()
+    expect(disconnect).toHaveBeenCalledOnce()
+  })
+
+  it('does not stop for focus on the pause button', async () => {
+    await ready()
+    const next = screen.getByRole('button', { name: 'Nächste Bands' })
+    const pause = screen.getByRole('button', { name: PAUSE })
+
+    await fireEvent.focusIn(next)
+    vi.advanceTimersByTime(18000)
+    expect(scrollBy).not.toHaveBeenCalled()
+
+    await fireEvent.focusIn(pause)
+    vi.advanceTimersByTime(6000)
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+  })
+
+  it('follows a change of the reduced motion setting at runtime', async () => {
+    const listeners = new Set<(event: { matches: boolean }) => void>()
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: (_type: string, listener: (event: { matches: boolean }) => void) =>
+        listeners.add(listener),
+      removeEventListener: (_type: string, listener: (event: { matches: boolean }) => void) =>
+        listeners.delete(listener),
+    }))
+    await ready()
+    expect(listeners.size).toBe(1)
+
+    listeners.forEach((listener) => listener({ matches: true }))
+    await nextTick()
+    expect(screen.queryByRole('button', { name: PAUSE })).toBeNull()
+    vi.advanceTimersByTime(18000)
+    expect(scrollBy).not.toHaveBeenCalled()
+
+    listeners.forEach((listener) => listener({ matches: false }))
+    await nextTick()
+    expect(screen.getByRole('button', { name: PAUSE })).toBeVisible()
+    vi.advanceTimersByTime(6000)
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops listening for reduced motion changes when removed', async () => {
+    const listeners = new Set<(event: { matches: boolean }) => void>()
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: (_type: string, listener: (event: { matches: boolean }) => void) =>
+        listeners.add(listener),
+      removeEventListener: (_type: string, listener: (event: { matches: boolean }) => void) =>
+        listeners.delete(listener),
+    }))
+    const view = await ready()
+    expect(listeners.size).toBe(1)
+
+    view.unmount()
+
+    expect(listeners.size).toBe(0)
   })
 })

@@ -18,8 +18,12 @@ import { prefersReducedMotion } from '../lib/motion'
  *
  * The row also advances by itself, one page every AUTO_SCROLL_INTERVAL_MS,
  * and wraps to the start after the last page. It holds still while the
- * pointer is over the carousel, while focus is inside it, while the page
- * is hidden, and it never runs for a visitor who prefers reduced motion.
+ * pointer is over the carousel, while focus is inside it (the pause button
+ * excepted), while a finger or a pressed pointer is on the track, while the
+ * page is hidden and while the carousel is scrolled out of view. A wheel
+ * scroll restarts the countdown, and no step starts within 150 ms of a
+ * scroll event, so a swipe's momentum is never fought. It never runs for a
+ * visitor who prefers reduced motion.
  * A pause button stops it for good (WCAG 2.2.2, moving content that lasts
  * longer than five seconds needs a way to pause it). A click on an arrow
  * restarts the countdown, so the row does not jump right after the visitor
@@ -47,6 +51,7 @@ defineSlots<{
 
 const { t } = useI18n()
 
+const root = ref<HTMLElement | null>(null)
 const track = ref<HTMLElement | null>(null)
 const mounted = ref(false)
 const atStart = ref(true)
@@ -95,6 +100,17 @@ const hovering = ref(false)
 const hasFocus = ref(false)
 const pageHidden = ref(false)
 const reducedMotion = ref(false)
+/** False while the carousel is scrolled out of view. Starts true so a
+ *  browser without IntersectionObserver keeps the movement. */
+const inView = ref(true)
+/** A finger is on the track, or a non touch pointer is pressed on it. */
+const touching = ref(false)
+const pressing = ref(false)
+
+/** A tick never starts while the row is still moving from a swipe's
+ *  momentum or a smooth scroll: scrollBy would fight the finger. */
+const SCROLL_SETTLE_MS = 150
+let lastScrollAt = Number.NEGATIVE_INFINITY
 
 const autoScrolling = computed(
   () =>
@@ -103,7 +119,10 @@ const autoScrolling = computed(
     !userPaused.value &&
     !hovering.value &&
     !hasFocus.value &&
-    !pageHidden.value,
+    !pageHidden.value &&
+    inView.value &&
+    !touching.value &&
+    !pressing.value,
 )
 
 let timer: ReturnType<typeof setInterval> | undefined
@@ -131,6 +150,9 @@ function advance(): void {
   if (!el || (atStart.value && atEnd.value)) {
     return
   }
+  if (Date.now() - lastScrollAt < SCROLL_SETTLE_MS) {
+    return
+  }
   if (atEnd.value) {
     el.scrollBy({ left: -el.scrollLeft, behavior: 'smooth' })
     return
@@ -145,6 +167,43 @@ function onArrow(direction: -1 | 1): void {
 
 function togglePause(): void {
   userPaused.value = !userPaused.value
+}
+
+/** Focus on the pause button does not stop the movement: after "Start"
+ *  the visitor has just asked for it, and the button keeps focus. */
+function onFocusIn(event: FocusEvent): void {
+  const target = event.target
+  const onPause = target instanceof Element && target.closest('[data-action="pause"]') !== null
+  hasFocus.value = !onPause
+}
+
+function onScroll(): void {
+  lastScrollAt = Date.now()
+  update()
+}
+
+/** A wheel or trackpad scroll over the track restarts the countdown, so a
+ *  tick does not land in the middle of it. */
+function onWheel(): void {
+  startTimer()
+}
+
+function onTouchStart(): void {
+  touching.value = true
+}
+
+function onTouchEnd(): void {
+  touching.value = false
+}
+
+function onPointerDown(event: PointerEvent): void {
+  if (event.pointerType !== 'touch') {
+    pressing.value = true
+  }
+}
+
+function onPointerUp(): void {
+  pressing.value = false
 }
 
 function onFocusOut(event: FocusEvent): void {
@@ -174,6 +233,7 @@ function onReducedMotionChange(event: MediaQueryListEvent): void {
 watch(autoScrolling, startTimer, { flush: 'sync' })
 
 let observer: ResizeObserver | undefined
+let visibility: IntersectionObserver | undefined
 let motionQuery: MediaQueryList | undefined
 
 onMounted(() => {
@@ -181,6 +241,13 @@ onMounted(() => {
   if (typeof ResizeObserver !== 'undefined' && track.value) {
     observer = new ResizeObserver(update)
     observer.observe(track.value)
+  }
+  if (typeof IntersectionObserver !== 'undefined' && root.value) {
+    visibility = new IntersectionObserver((entries) => {
+      const latest = entries[entries.length - 1]
+      inView.value = latest.isIntersecting
+    })
+    visibility.observe(root.value)
   }
   reducedMotion.value = prefersReducedMotion()
   if (typeof window.matchMedia === 'function') {
@@ -194,6 +261,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   observer?.disconnect()
+  visibility?.disconnect()
   stopTimer()
   document.removeEventListener('visibilitychange', onVisibilityChange)
   motionQuery?.removeEventListener?.('change', onReducedMotionChange)
@@ -202,13 +270,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div
+    ref="root"
     role="group"
     aria-roledescription="carousel"
     :aria-label="label"
     class="carousel"
     @pointerenter="onPointerEnter"
     @pointerleave="hovering = false"
-    @focusin="hasFocus = true"
+    @focusin="onFocusIn"
     @focusout="onFocusOut"
   >
     <div v-if="mounted" class="carousel-controls">
@@ -291,7 +360,14 @@ onBeforeUnmount(() => {
       role="region"
       :aria-label="t('common.carousel.region', { label })"
       tabindex="0"
-      @scroll.passive="update"
+      @scroll.passive="onScroll"
+      @wheel.passive="onWheel"
+      @touchstart.passive="onTouchStart"
+      @touchend="onTouchEnd"
+      @touchcancel="onTouchEnd"
+      @pointerdown="onPointerDown"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
     >
       <div
         v-for="(item, index) in props.items"
