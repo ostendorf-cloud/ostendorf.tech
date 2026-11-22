@@ -46,6 +46,15 @@ const TEXT_PAIRS: Array<[fg: string, bg: string]> = [
   ['danger-text', 'danger-subtle'],
   ['info-text', 'surface'],
   ['info-text', 'info-subtle'],
+  // The old site's palette: text on its raised ground and on the violet tint,
+  // and the two semantic colours it also used on the stage ground itself.
+  ['text', 'accent-subtle'],
+  ['text-muted', 'bg-subtle'],
+  ['text-muted', 'surface-hover'],
+  ['accent-text', 'bg-subtle'],
+  ['success-text', 'bg'],
+  ['danger-text', 'bg'],
+  ['danger-text', 'surface'],
 ]
 
 const NON_TEXT_PAIRS: Array<[fg: string, bg: string]> = [
@@ -53,6 +62,9 @@ const NON_TEXT_PAIRS: Array<[fg: string, bg: string]> = [
   ['border-strong', 'surface'],
   ['accent', 'bg'],
   ['accent', 'surface'],
+  // The far end of the line gradient, which paints button borders and lit edges.
+  ['accent-strong', 'bg'],
+  ['accent-strong', 'surface'],
   ['focus', 'bg'],
   ['focus', 'surface'],
   ['focus', 'surface-hover'],
@@ -135,6 +147,49 @@ describe('the vtech theme', () => {
 
   it('declares every non-text pair at 3:1 in dark mode', () => {
     expect(failures(dark, NON_TEXT_PAIRS, NON_TEXT_MINIMUM)).toEqual([])
+  })
+})
+
+/*
+ * The old site's palette (its style.css :root) in dark mode. These are the
+ * owner's colours; the test fails if a later edit drifts away from them
+ * without saying so.
+ */
+describe('the old site palette in dark mode', () => {
+  const expected: Record<string, string> = {
+    bg: '#07060f',
+    'bg-subtle': '#0d0b1c',
+    surface: '#15122a',
+    text: '#f2f1fb',
+    accent: '#1ee3f5',
+    'accent-strong': '#7b3cf5',
+    'accent-text': '#a47cff',
+    'success-text': '#3ee6a8',
+    'danger-text': '#ff8fa3',
+  }
+  for (const [token, value] of Object.entries(expected)) {
+    it(`keeps ${token} at ${value}`, () => {
+      expect(dark[token]).toBe(value)
+    })
+  }
+
+  it('declares the line and the text gradient from tokens, cyan first', () => {
+    expect(css).toMatch(
+      /--brand-gradient:\s*linear-gradient\(\s*90deg,\s*var\(--color-accent\),\s*var\(--color-accent-strong\)\s*\)/,
+    )
+    expect(css).toMatch(
+      /--brand-gradient-text:\s*linear-gradient\(\s*90deg,\s*var\(--brand-gradient-from\),\s*var\(--brand-gradient-to\)\s*\)/,
+    )
+  })
+
+  it('keeps the old radii and easing', () => {
+    expect(css).toMatch(/--radius-lg:\s*1rem;/)
+    expect(css).toMatch(/--radius-xl:\s*1\.375rem;/)
+    expect(css).toMatch(/--ease-out:\s*cubic-bezier\(0\.22, 1, 0\.36, 1\);/)
+  })
+
+  it('keeps the navy light text the light wordmark carries as a literal', () => {
+    expect(light.text).toBe('#0f1a2e')
   })
 })
 

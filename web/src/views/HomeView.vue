@@ -72,7 +72,7 @@ const aboutFacts = computed<Fact[]>(() => [
         <div class="hero-actions">
           <a
             href="#contact"
-            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-accent-strong px-4 text-base font-medium text-accent-on transition-colors hover:bg-accent-strong-hover"
+            class="btn-gradient inline-flex min-h-11 items-center justify-center gap-2 px-6 text-base font-semibold"
           >
             {{ t('home.hero.ctaContact') }}
           </a>
@@ -223,7 +223,7 @@ const aboutFacts = computed<Fact[]>(() => [
           <p class="mt-6">
             <a
               href="#contact"
-              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-accent-strong px-4 text-base font-medium text-accent-on transition-colors hover:bg-accent-strong-hover"
+              class="btn-gradient inline-flex min-h-11 items-center justify-center gap-2 px-6 text-base font-semibold"
             >
               {{ t('home.about.cta') }}
             </a>
@@ -363,7 +363,7 @@ const aboutFacts = computed<Fact[]>(() => [
    that keeps the flat colour above, which is a token in its own right. */
 @supports (background-clip: text) or (-webkit-background-clip: text) {
   .hero-title {
-    background: linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-to));
+    background: var(--brand-gradient-text);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -512,7 +512,7 @@ const aboutFacts = computed<Fact[]>(() => [
   --panel-padding: clamp(1.25rem, 0.95rem + 1.2vw, 2rem);
 
   position: relative;
-  border-radius: clamp(0.875rem, 0.7rem + 0.7vw, 1.25rem);
+  border-radius: clamp(var(--radius-lg), 0.8rem + 0.8vw, var(--radius-xl));
 }
 
 /*
@@ -573,7 +573,7 @@ const aboutFacts = computed<Fact[]>(() => [
   right: var(--panel-padding);
   left: var(--panel-padding);
   height: 1px;
-  background: linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-to));
+  background: var(--brand-gradient);
 }
 
 .service {
@@ -612,7 +612,7 @@ const aboutFacts = computed<Fact[]>(() => [
   margin: 0 auto;
   padding: 2px;
   border-radius: 1.625rem;
-  background: linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-to));
+  background: var(--brand-gradient);
   box-shadow: var(--shadow-dialog);
 }
 

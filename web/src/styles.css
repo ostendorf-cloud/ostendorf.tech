@@ -36,6 +36,50 @@
 }
 
 /*
+ * The old site's primary button, defined once: a pill on the surface with
+ * the brand line gradient as its border. The fill is a token, so the pill
+ * reads on the dark stage and on a light page alike; the gradient is the
+ * theme's --brand-gradient, never a copy of its colours. Forced colours
+ * drops the background layers, so the border falls back to a system one.
+ */
+.btn-gradient {
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+    var(--brand-gradient) border-box;
+  color: var(--color-text);
+  transition:
+    background-color var(--default-transition-duration) var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+
+.btn-gradient:hover,
+.btn-gradient:focus-visible {
+  background:
+    linear-gradient(var(--color-surface-hover), var(--color-surface-hover)) padding-box,
+    var(--brand-gradient) border-box;
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-gradient {
+    transition: none;
+  }
+
+  .btn-gradient:hover,
+  .btn-gradient:focus-visible {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .btn-gradient {
+    border-color: ButtonText;
+  }
+}
+
+/*
  * The sticky header is as tall as its rows make it: one row from 480px up,
  * more below that. AppHeader measures it and writes the real height to
  * --header-height on the root element (src/lib/headerHeight.ts), and every
