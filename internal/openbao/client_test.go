@@ -40,6 +40,7 @@ type fakeBao struct {
 	mu            sync.Mutex
 	lease         int // seconds; 0 means "send no lease_duration at all".
 	logins        int
+	requests      int // every request, logins included.
 	tokens        map[string]bool
 	secrets       map[string]map[string]any
 	versions      map[string]int
@@ -63,6 +64,7 @@ func newFakeBao() *fakeBao {
 func (f *fakeBao) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.requests++
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.URL.Path == "/v1/auth/"+testAuthPath+"/login" && r.Method == http.MethodPost {
@@ -142,9 +144,15 @@ func testLogger(buf *bytes.Buffer) *slog.Logger {
 func newTestClient(t *testing.T, bao http.Handler, buf *bytes.Buffer) *Client {
 	t.Helper()
 	jwt := writeJWT(t, testJWT)
-	c := New("https://bao.test/", "/"+testAuthPath+"/", testRole, jwt, testLogger(buf))
+	c := New("https://bao.test/", kube(testRole, jwt), testLogger(buf))
 	c.http = &http.Client{Transport: handlerTransport{bao}}
 	return c
+}
+
+// kube is the Kubernetes login against the fake's auth mount, written with
+// the surrounding slashes a configuration might carry.
+func kube(role, jwtFile string) Kubernetes {
+	return Kubernetes{AuthPath: "/" + testAuthPath + "/", Role: role, JWTFile: jwtFile}
 }
 
 func writeJWT(t *testing.T, value string) string {
@@ -418,7 +426,7 @@ func TestClient_jwtIsReReadFromDiskOnEveryLogin(t *testing.T) {
 	bao := newFakeBao()
 	bao.secrets["kv/data/x"] = map[string]any{"key": "v"}
 	jwtPath := writeJWT(t, "jwt-before-rotation")
-	c := New("https://bao.test/", "/"+testAuthPath+"/", testRole, jwtPath, testLogger(&bytes.Buffer{}))
+	c := New("https://bao.test/", kube(testRole, jwtPath), testLogger(&bytes.Buffer{}))
 	c.http = &http.Client{Transport: handlerTransport{bao}}
 
 	if _, err := c.Read(t.Context(), "kv/data/x"); err != nil {
@@ -485,13 +493,13 @@ func TestClient_errorsAndLogsNeverCarryTheTokenOrTheJWT(t *testing.T) {
 	// Login failure: wrong role, so the server's error body comes back,
 	// and the client's own "no client token" path is never exercised with
 	// a real secret in scope either way.
-	wrongRole := New("https://bao.test/", "/"+testAuthPath+"/", "not-"+testRole, writeJWT(t, testJWT), testLogger(&logs))
+	wrongRole := New("https://bao.test/", kube("not-"+testRole, writeJWT(t, testJWT)), testLogger(&logs))
 	wrongRole.http = &http.Client{Transport: handlerTransport{bao}}
 	_, err = wrongRole.Read(t.Context(), "kv/data/x")
 	record(err)
 
 	// Missing JWT file.
-	missingFile := New("https://bao.test/", "/"+testAuthPath+"/", testRole, filepath.Join(t.TempDir(), "absent"), testLogger(&logs))
+	missingFile := New("https://bao.test/", kube(testRole, filepath.Join(t.TempDir(), "absent")), testLogger(&logs))
 	missingFile.http = &http.Client{Transport: handlerTransport{bao}}
 	_, err = missingFile.Read(t.Context(), "kv/data/x")
 	record(err)

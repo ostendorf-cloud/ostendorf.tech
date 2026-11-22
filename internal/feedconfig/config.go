@@ -3,11 +3,12 @@
 // returned together, so a misconfigured deployment reports all of its
 // mistakes on the first start instead of one per restart.
 //
-// None of the ten fields below are secret-shaped: the one actual secret,
-// the Instagram access token, lives in OpenBao, read and written through
-// internal/openbao and internal/instagram, never here. That is deliberately
-// why there is no "_FILE" twin for any of these, unlike internal/config's
-// SMTP credentials or signing keys.
+// One field is a secret: OPENBAO_TOKEN, the OpenBao token of the token auth
+// method, which also accepts an OPENBAO_TOKEN_FILE twin the same way
+// internal/config's secrets do. It is held as an openbao.Token, which never
+// prints its value. The Instagram access token itself lives in OpenBao,
+// read and written through internal/openbao and internal/instagram, never
+// here. No error this package returns quotes a refused value.
 package feedconfig
 
 import (
@@ -15,12 +16,25 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/ostendorf-cloud/govue/envconf"
 	"github.com/ostendorf-cloud/govue/logging"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/instagram"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/openbao"
+)
+
+// The values OPENBAO_AUTH_METHOD accepts.
+const (
+	// AuthMethodKubernetes logs in with the pod's service account token. It
+	// is the default and the method for a cluster.
+	AuthMethodKubernetes = "kubernetes"
+	// AuthMethodToken uses a token handed to the process, for a local run.
+	// The token is never renewed.
+	AuthMethodToken = "token"
 )
 
 // Defaults applied to a field left unset in the environment.
@@ -28,11 +42,12 @@ const (
 	// DefaultListenAddr is distinct from the website's ":8080" public
 	// default. It is the same port as the website's default ADMIN_ADDR
 	// (":8081"), so both on one machine need one of the two changed.
-	DefaultListenAddr      = ":8081"
-	DefaultLogLevel        = "info"
-	DefaultOpenBaoAuthPath = "kubernetes"
-	// DefaultTokenPath is the same OpenBao path old_simon-ostendorf.de used.
-	DefaultTokenPath       = "instagram.com/api-tokens/data/simonostendorf.vtech"
+	DefaultListenAddr        = ":8081"
+	DefaultLogLevel          = "info"
+	DefaultOpenBaoAuthMethod = AuthMethodKubernetes
+	DefaultOpenBaoAuthPath   = "kubernetes"
+	// DefaultSecretPath is the same OpenBao path old_simon-ostendorf.de used.
+	DefaultSecretPath      = "instagram.com/api-tokens/data/simonostendorf.vtech"
 	DefaultSyncInterval    = time.Hour
 	DefaultTokenRefreshAge = 7 * 24 * time.Hour
 	// DefaultAPIVersion reads internal/instagram's own pinned version
@@ -62,10 +77,13 @@ type Config struct {
 	ListenAddr string
 	LogLevel   slog.Level
 
-	// OpenBaoAddr, OpenBaoAuthPath, OpenBaoRole and OpenBaoJWTFile are
-	// everything internal/openbao.New needs to log in with the Kubernetes
-	// auth method; see that package for what each one means.
-	OpenBaoAddr     *url.URL
+	// OpenBaoAddr is the OpenBao address, for every auth method.
+	OpenBaoAddr *url.URL
+	// OpenBaoAuthMethod is AuthMethodKubernetes or AuthMethodToken.
+	OpenBaoAuthMethod string
+
+	// OpenBaoAuthPath, OpenBaoRole and OpenBaoJWTFile are set with
+	// AuthMethodKubernetes only: everything openbao.Kubernetes needs.
 	OpenBaoAuthPath string
 	OpenBaoRole     string
 	// OpenBaoJWTFile is the path to the Kubernetes service account token,
@@ -73,9 +91,13 @@ type Config struct {
 	// internal/openbao, not here.
 	OpenBaoJWTFile string
 
-	// TokenPath is the OpenBao KV v2 data path the Instagram access token
-	// is stored at; see internal/instagram.TokenStore.
-	TokenPath string
+	// OpenBaoToken is set with AuthMethodToken only. It is a secret and
+	// prints as "[redacted]".
+	OpenBaoToken openbao.Token
+
+	// OpenBaoSecretPath is the OpenBao KV v2 data path of the secret that
+	// holds the Instagram access token; see internal/instagram.TokenStore.
+	OpenBaoSecretPath string
 	// SyncInterval is how often the feed is reloaded from Meta.
 	SyncInterval time.Duration
 	// TokenRefreshAge is how old the token may get before TokenStore tries
@@ -97,16 +119,13 @@ func Load(getenv func(string) string) (Config, error) {
 	loader := envconf.New(getenv)
 
 	cfg := Config{
-		ListenAddr:      loader.String("LISTEN_ADDR", DefaultListenAddr),
-		OpenBaoAddr:     loader.URL("OPENBAO_ADDR", ""),
-		OpenBaoAuthPath: loader.String("OPENBAO_AUTH_PATH", DefaultOpenBaoAuthPath),
-		OpenBaoRole:     loader.Required("OPENBAO_ROLE"),
-		OpenBaoJWTFile:  loader.Required("OPENBAO_JWT_FILE"),
-		TokenPath:       loader.String("TOKEN_PATH", DefaultTokenPath),
-		SyncInterval:    loader.Duration("SYNC_INTERVAL", DefaultSyncInterval, minSyncInterval, maxSyncInterval),
-		TokenRefreshAge: loader.Duration("TOKEN_REFRESH_AGE", DefaultTokenRefreshAge, minTokenRefreshAge, maxTokenRefreshAge),
-		APIVersion:      loader.String("API_VERSION", DefaultAPIVersion),
-		PostCount:       loader.Int("POST_COUNT", DefaultPostCount, minPostCount, maxPostCount),
+		ListenAddr:        loader.String("LISTEN_ADDR", DefaultListenAddr),
+		OpenBaoAddr:       loader.URL("OPENBAO_ADDR", ""),
+		OpenBaoSecretPath: loader.String("OPENBAO_SECRET_PATH", DefaultSecretPath),
+		SyncInterval:      loader.Duration("SYNC_INTERVAL", DefaultSyncInterval, minSyncInterval, maxSyncInterval),
+		TokenRefreshAge:   loader.Duration("TOKEN_REFRESH_AGE", DefaultTokenRefreshAge, minTokenRefreshAge, maxTokenRefreshAge),
+		APIVersion:        loader.String("API_VERSION", DefaultAPIVersion),
+		PostCount:         loader.Int("POST_COUNT", DefaultPostCount, minPostCount, maxPostCount),
 	}
 
 	var problems []error
@@ -120,10 +139,64 @@ func Load(getenv func(string) string) (Config, error) {
 	fail(wrap("LOG_LEVEL", err))
 	cfg.LogLevel = level
 
+	fail(loadAuth(&cfg, loader, resolvedGetenv(getenv)))
+
 	if err := errors.Join(append(problems, loader.Err())...); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// kubernetesOnly are the variables only the Kubernetes auth method reads;
+// tokenOnly the ones only the token method reads. Each set is refused next
+// to the other method, so a mixed configuration fails loudly instead of
+// silently ignoring half of itself.
+var (
+	kubernetesOnly = []string{"OPENBAO_AUTH_PATH", "OPENBAO_ROLE", "OPENBAO_JWT_FILE"}
+	tokenOnly      = []string{"OPENBAO_TOKEN", "OPENBAO_TOKEN_FILE"}
+)
+
+// loadAuth reads OPENBAO_AUTH_METHOD and the variables of the method it
+// names into cfg. Problems of the loader land in loader.Err; the method's
+// own refusals are returned joined. No message carries a given value: an
+// unknown method names the variable and the allowed values only, and a
+// refused variable is named, never quoted.
+func loadAuth(cfg *Config, loader *envconf.Loader, getenv func(string) string) error {
+	set := func(name string) bool { return strings.TrimSpace(getenv(name)) != "" }
+	refuse := func(names []string, method string) error {
+		var errs []error
+		for _, name := range names {
+			if set(name) {
+				errs = append(errs, wrap(name, fmt.Errorf("must not be set with OPENBAO_AUTH_METHOD=%s", method)))
+			}
+		}
+		return errors.Join(errs...)
+	}
+
+	cfg.OpenBaoAuthMethod = loader.String("OPENBAO_AUTH_METHOD", DefaultOpenBaoAuthMethod)
+	switch cfg.OpenBaoAuthMethod {
+	case AuthMethodKubernetes:
+		cfg.OpenBaoAuthPath = loader.String("OPENBAO_AUTH_PATH", DefaultOpenBaoAuthPath)
+		cfg.OpenBaoRole = loader.Required("OPENBAO_ROLE")
+		cfg.OpenBaoJWTFile = loader.Required("OPENBAO_JWT_FILE")
+		return refuse(tokenOnly, AuthMethodKubernetes)
+	case AuthMethodToken:
+		cfg.OpenBaoToken = openbao.Token(loader.RequiredSecretOrFile("OPENBAO_TOKEN"))
+		return refuse(kubernetesOnly, AuthMethodToken)
+	default:
+		cfg.OpenBaoAuthMethod = ""
+		return wrap("OPENBAO_AUTH_METHOD", fmt.Errorf("must be %s or %s (the value is not shown)",
+			AuthMethodKubernetes, AuthMethodToken))
+	}
+}
+
+// resolvedGetenv defaults a nil lookup function to the real process
+// environment, the same default envconf.New applies.
+func resolvedGetenv(getenv func(string) string) func(string) string {
+	if getenv == nil {
+		return os.Getenv
+	}
+	return getenv
 }
 
 // wrap names the variable a problem came from, or returns nil for no

@@ -55,8 +55,16 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.OpenBaoJWTFile != "/var/run/secrets/kubernetes.io/serviceaccount/token" {
 		t.Errorf("OpenBaoJWTFile = %q, want the required value", cfg.OpenBaoJWTFile)
 	}
-	if cfg.TokenPath != DefaultTokenPath {
-		t.Errorf("TokenPath = %q, want %q", cfg.TokenPath, DefaultTokenPath)
+	if cfg.OpenBaoAuthMethod != AuthMethodKubernetes {
+		t.Errorf("OpenBaoAuthMethod = %q, want %q", cfg.OpenBaoAuthMethod, AuthMethodKubernetes)
+	}
+	if cfg.OpenBaoToken != "" {
+		t.Error("OpenBaoToken is set with the Kubernetes method")
+	}
+	// The same path old_simon-ostendorf.de used, spelled out rather than
+	// read back from the constant, so a changed default fails here.
+	if cfg.OpenBaoSecretPath != "instagram.com/api-tokens/data/simonostendorf.vtech" {
+		t.Errorf("OpenBaoSecretPath = %q, want the old default", cfg.OpenBaoSecretPath)
 	}
 	if cfg.SyncInterval != DefaultSyncInterval {
 		t.Errorf("SyncInterval = %v, want %v", cfg.SyncInterval, DefaultSyncInterval)
@@ -76,14 +84,14 @@ func TestLoadOverrides(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := Load(env(requiredValues(map[string]string{
-		"LISTEN_ADDR":       ":9091",
-		"LOG_LEVEL":         "debug",
-		"OPENBAO_AUTH_PATH": "custom-kubernetes",
-		"TOKEN_PATH":        "custom/path",
-		"SYNC_INTERVAL":     "30m",
-		"TOKEN_REFRESH_AGE": "14d",
-		"API_VERSION":       "v24.0",
-		"POST_COUNT":        "8",
+		"LISTEN_ADDR":         ":9091",
+		"LOG_LEVEL":           "debug",
+		"OPENBAO_AUTH_PATH":   "custom-kubernetes",
+		"OPENBAO_SECRET_PATH": "custom/path",
+		"SYNC_INTERVAL":       "30m",
+		"TOKEN_REFRESH_AGE":   "14d",
+		"API_VERSION":         "v24.0",
+		"POST_COUNT":          "8",
 	})))
 	if err != nil {
 		t.Fatalf("Load() returned an unexpected error: %v", err)
@@ -97,8 +105,8 @@ func TestLoadOverrides(t *testing.T) {
 	if cfg.OpenBaoAuthPath != "custom-kubernetes" {
 		t.Errorf("OpenBaoAuthPath = %q, want custom-kubernetes", cfg.OpenBaoAuthPath)
 	}
-	if cfg.TokenPath != "custom/path" {
-		t.Errorf("TokenPath = %q, want custom/path", cfg.TokenPath)
+	if cfg.OpenBaoSecretPath != "custom/path" {
+		t.Errorf("OpenBaoSecretPath = %q, want custom/path", cfg.OpenBaoSecretPath)
 	}
 	if cfg.SyncInterval != 30*time.Minute {
 		t.Errorf("SyncInterval = %v, want 30m", cfg.SyncInterval)

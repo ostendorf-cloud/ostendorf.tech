@@ -57,13 +57,13 @@ type App struct {
 // IO; the OpenBao login and the first Meta call both happen lazily, on the
 // first call Start's background loop makes.
 func New(cfg feedconfig.Config, logger *slog.Logger) *App {
-	bao := openbao.New(cfg.OpenBaoAddr.String(), cfg.OpenBaoAuthPath, cfg.OpenBaoRole, cfg.OpenBaoJWTFile, logger)
+	bao := openbao.New(cfg.OpenBaoAddr.String(), login(cfg), logger)
 	client := instagram.NewClient(cfg.APIVersion)
 	f := &instagram.Feed{}
 	store := &instagram.TokenStore{
 		Store:      bao,
 		Refresher:  client,
-		Path:       cfg.TokenPath,
+		Path:       cfg.OpenBaoSecretPath,
 		RefreshAge: cfg.TokenRefreshAge,
 		Logger:     logger,
 		Now:        time.Now,
@@ -80,6 +80,16 @@ func New(cfg feedconfig.Config, logger *slog.Logger) *App {
 	a.health.Add("feed", readinessCheckTimeout, a.checkReady)
 	a.handler = a.buildHandler()
 	return a
+}
+
+// login is the OpenBao auth method cfg names. feedconfig.Load accepts no
+// other value than the two below, so anything else is the Kubernetes
+// default, the method for a cluster.
+func login(cfg feedconfig.Config) openbao.Login {
+	if cfg.OpenBaoAuthMethod == feedconfig.AuthMethodToken {
+		return openbao.StaticToken{Token: cfg.OpenBaoToken}
+	}
+	return openbao.Kubernetes{AuthPath: cfg.OpenBaoAuthPath, Role: cfg.OpenBaoRole, JWTFile: cfg.OpenBaoJWTFile}
 }
 
 // checkReady is the registered health check: a pure in-memory read, never a

@@ -124,7 +124,8 @@ func newTestClient(t *testing.T, bao *fakeBao, logs io.Writer) *openbao.Client {
 	if err := os.WriteFile(jwtPath, []byte("test-service-account-jwt\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return openbao.New(server.URL, testAuthPath, testRole, jwtPath, slog.New(slog.NewTextHandler(logs, nil)))
+	login := openbao.Kubernetes{AuthPath: testAuthPath, Role: testRole, JWTFile: jwtPath}
+	return openbao.New(server.URL, login, slog.New(slog.NewTextHandler(logs, nil)))
 }
 
 // newTestStore builds a TokenStore on top of newTestClient, with a fake
