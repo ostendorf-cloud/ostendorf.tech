@@ -275,9 +275,10 @@ cannot read the page's design tokens.
 
 The fader mark alone (the icon, `LogoMark.vue`) is not
 generated: it is inline Vue markup ported from old_simon-ostendorf.de's `{{define
-"logo"}}` template block, recoloured through a gradient whose stops read this theme's
-own `--color-accent` and `--color-accent-text` tokens, so it never needs regenerating
-when the theme changes.
+"logo"}}` template block, with a gradient whose stops read the theme's `--logo-from` and
+`--logo-to` tokens: the favicon's `#0ff0ff` and `#803cff`, the same in light and dark mode
+and independent of the palette's accent roles, so it never needs regenerating when the
+theme changes.
 
 `web/src/assets/bands/herrenjedeck-logo.webp` is generated from the band's own logo,
 `https://www.herrenjedeck.de/assets/logo-dark.png` (1182x945, transparent background),

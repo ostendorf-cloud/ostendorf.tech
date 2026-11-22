@@ -6,12 +6,11 @@ import { useId } from 'vue'
  * old_simon-ostendorf.de's cmd/website/templates/layout.html: five mixer
  * channel faders, four knobs cut out of the tracks they sit between.
  *
- * The gradient stops are bound to this theme's own accent tokens through
- * the stop-color rule in <style> below, rather than a fixed pair of hex
- * values, so the mark recolours itself with the theme and the light/dark
- * mode exactly like every other role coloured element on the page,
- * instead of carrying a colour of its own that could drift from the
- * token contract. That rule has to live in a stylesheet and not an
+ * The gradient stops are the theme's two logo tokens, --logo-from and
+ * --logo-to, read through the stop-color rule in <style> below. They are
+ * the favicon's cyan and violet and are the same in light and dark mode,
+ * independent of the palette's accent roles: the logo is the brand's own
+ * mark, not a role coloured element. That rule has to live in a stylesheet and not an
  * inline style attribute on each <stop>: middleware.DefaultSecurity's
  * Content-Security-Policy sets style-src 'self' with no 'unsafe-inline',
  * and a nonce only ever covers an inline <style> or <script> tag, never
@@ -82,11 +81,11 @@ const maskId = `logo-mark-cut-${useId()}`
 
 <style scoped>
 .logo-mark-stop-start {
-  stop-color: var(--color-accent);
+  stop-color: var(--logo-from);
 }
 
 .logo-mark-stop-end {
-  stop-color: var(--color-accent-text);
+  stop-color: var(--logo-to);
 }
 
 /*

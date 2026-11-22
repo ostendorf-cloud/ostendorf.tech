@@ -183,6 +183,13 @@
    */
   --brand-gradient-from: var(--color-accent);
   --brand-gradient-to: var(--color-accent-text);
+  /* The logo's own two stops, the favicon's values. A logo is not a text or
+     icon role and is exempt from the contrast rules, and it must not change
+     with the mode or with the palette, so these are plain colours, the same
+     in light and dark, and LogoMark.vue reads nothing else. */
+  --logo-from: #0ff0ff;
+  --logo-to: #803cff;
+
   /* The two ends of the Instagram tile's hover overlay: the cyan at 35% and
      the purple at 55%, as on the old site, painted at 135 degrees. */
   --ig-overlay-from: color-mix(in srgb, var(--color-accent) 35%, transparent);
