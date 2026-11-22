@@ -61,12 +61,14 @@ func New(cfg feedconfig.Config, logger *slog.Logger) *App {
 	client := instagram.NewClient(cfg.APIVersion)
 	f := &instagram.Feed{}
 	store := &instagram.TokenStore{
-		Store:      bao,
-		Refresher:  client,
-		Path:       cfg.OpenBaoSecretPath,
-		RefreshAge: cfg.TokenRefreshAge,
-		Logger:     logger,
-		Now:        time.Now,
+		Store:          bao,
+		Refresher:      client,
+		Path:           cfg.OpenBaoSecretPath,
+		AccessTokenKey: cfg.SecretKeyAccessToken,
+		RefreshedAtKey: cfg.SecretKeyRefreshedAt,
+		RefreshAge:     cfg.TokenRefreshAge,
+		Logger:         logger,
+		Now:            time.Now,
 	}
 	syncer := &instagram.Syncer{
 		Client: client,

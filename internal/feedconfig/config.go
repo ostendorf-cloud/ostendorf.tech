@@ -19,6 +19,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/ostendorf-cloud/govue/envconf"
 	"github.com/ostendorf-cloud/govue/logging"
@@ -47,9 +48,14 @@ const (
 	DefaultOpenBaoAuthMethod = AuthMethodKubernetes
 	DefaultOpenBaoAuthPath   = "kubernetes"
 	// DefaultSecretPath is the same OpenBao path old_simon-ostendorf.de used.
-	DefaultSecretPath      = "instagram.com/api-tokens/data/simonostendorf.vtech"
-	DefaultSyncInterval    = time.Hour
-	DefaultTokenRefreshAge = 7 * 24 * time.Hour
+	DefaultSecretPath = "instagram.com/api-tokens/data/simonostendorf.vtech"
+	// DefaultSecretKeyAccessToken and DefaultSecretKeyRefreshedAt name the
+	// two keys inside that secret: the Instagram access token and the RFC
+	// 3339 time it was last refreshed.
+	DefaultSecretKeyAccessToken = "access_token"
+	DefaultSecretKeyRefreshedAt = "refreshed_at"
+	DefaultSyncInterval         = time.Hour
+	DefaultTokenRefreshAge      = 7 * 24 * time.Hour
 	// DefaultAPIVersion reads internal/instagram's own pinned version
 	// rather than repeating it, so the two can never drift.
 	DefaultAPIVersion = instagram.DefaultVersion
@@ -98,6 +104,10 @@ type Config struct {
 	// OpenBaoSecretPath is the OpenBao KV v2 data path of the secret that
 	// holds the Instagram access token; see internal/instagram.TokenStore.
 	OpenBaoSecretPath string
+	// SecretKeyAccessToken and SecretKeyRefreshedAt name the two keys
+	// inside that secret; see instagram.TokenStore.
+	SecretKeyAccessToken string
+	SecretKeyRefreshedAt string
 	// SyncInterval is how often the feed is reloaded from Meta.
 	SyncInterval time.Duration
 	// TokenRefreshAge is how old the token may get before TokenStore tries
@@ -139,7 +149,16 @@ func Load(getenv func(string) string) (Config, error) {
 	fail(wrap("LOG_LEVEL", err))
 	cfg.LogLevel = level
 
-	fail(loadAuth(&cfg, loader, resolvedGetenv(getenv)))
+	resolved := resolvedGetenv(getenv)
+	fail(loadAuth(&cfg, loader, resolved))
+
+	cfg.SecretKeyAccessToken = loader.String("OPENBAO_SECRET_KEY_ACCESS_TOKEN", DefaultSecretKeyAccessToken)
+	fail(validateKey("OPENBAO_SECRET_KEY_ACCESS_TOKEN", resolved, cfg.SecretKeyAccessToken))
+	cfg.SecretKeyRefreshedAt = loader.String("OPENBAO_SECRET_KEY_REFRESHED_AT", DefaultSecretKeyRefreshedAt)
+	fail(validateKey("OPENBAO_SECRET_KEY_REFRESHED_AT", resolved, cfg.SecretKeyRefreshedAt))
+	if cfg.SecretKeyAccessToken == cfg.SecretKeyRefreshedAt {
+		fail(wrap("OPENBAO_SECRET_KEY_REFRESHED_AT", errors.New("must differ from OPENBAO_SECRET_KEY_ACCESS_TOKEN")))
+	}
 
 	if err := errors.Join(append(problems, loader.Err())...); err != nil {
 		return Config{}, err
@@ -188,6 +207,24 @@ func loadAuth(cfg *Config, loader *envconf.Loader, getenv func(string) string) e
 		return wrap("OPENBAO_AUTH_METHOD", fmt.Errorf("must be %s or %s (the value is not shown)",
 			AuthMethodKubernetes, AuthMethodToken))
 	}
+}
+
+// validateKey checks a key name inside the secret: not blank, no "/" and no
+// control character. Set to nothing but whitespace counts as empty, not as
+// unset. The control character check reads the raw value, so a newline the
+// loader would trim is refused too. The message names the variable only,
+// never the refused value.
+func validateKey(name string, getenv func(string) string, value string) error {
+	raw := getenv(name)
+	switch {
+	case raw != "" && strings.TrimSpace(raw) == "", value == "":
+		return wrap(name, errors.New("must not be empty"))
+	case strings.Contains(value, "/"):
+		return wrap(name, errors.New(`must not contain "/" (the value is not shown)`))
+	case strings.ContainsFunc(raw, unicode.IsControl), strings.ContainsFunc(value, unicode.IsControl):
+		return wrap(name, errors.New("must not contain a control character (the value is not shown)"))
+	}
+	return nil
 }
 
 // resolvedGetenv defaults a nil lookup function to the real process
