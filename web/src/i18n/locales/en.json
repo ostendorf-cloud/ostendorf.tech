@@ -6,7 +6,9 @@
     "switchLocale": "Deutsch",
     "carousel": {
       "slide": "{n} of {total}",
-      "region": "{label}, scrolls sideways"
+      "region": "{label}, scrolls sideways",
+      "pause": "Pause automatic scrolling",
+      "play": "Start automatic scrolling"
     },
     "theme": {
       "switch": "Colour mode: {current}. Switch to: {next}.",
@@ -134,9 +136,8 @@
     "bademeister": {
       "name": "Die Bademeister",
       "paragraphs": [
-        "We are a cover band made up of current and former students of FH Aachen. We got our start at the first summer festival of the Electrical Engineering and Information Technology department (2022). Back then the student council was still looking for acts, and since we were all involved with the council in some way already, the idea came up to perform together as a band.",
-        "What was originally meant as a one-off show quickly grew into something more. Playing together was so much fun that we decided to keep rehearsing regularly and play further shows. Among other things we have played the joint Christmas market of the AStA student councils at FH Aachen, as well as various private events that came our way by word of mouth.",
-        "Musically we offer a varied mix of international and German rock and pop songs. Starting with classics like Zombie by the Cranberries, we have steadily expanded our repertoire. These days our set also includes more recent tracks by artists such as Måneskin, Kraftklub and Alligatoah."
+        "We are a cover band made up of current and former students of FH Aachen. We got our start at the first summer festival of the Electrical Engineering and Information Technology department (2022). What was meant as a one-off show quickly grew into something more: we rehearse regularly and have played, among other things, the joint Christmas market of the AStA student councils at FH Aachen.",
+        "Musically we offer a varied mix of international and German rock and pop songs, from classics like Zombie by the Cranberries to tracks by Måneskin, Kraftklub and Alligatoah."
       ]
     },
     "fourfold": {
@@ -147,22 +148,26 @@
       ]
     },
     "singingLittleBigBand": {
-      "name": "Singing Little BigBand of FH Aachen"
+      "name": "Singing Little BigBand of FH Aachen",
+      "paragraphs": [
+        "The Singing Little BigBand is, like the Full House Big Band and the Jazz Combo, one of the jazz ensembles of FH Aachen. Its programme is vocal: it combines singing with a big band and plays well-known songs in exciting arrangements. It gives live concerts at university events."
+      ]
     },
     "bigBand": {
       "name": "BigBand of FH Aachen",
       "paragraphs": [
-        "Since 2007 the Full House Big Band of FH Aachen has performed at internal and public events under the direction of Boris Bansbach."
+        "Since 2007 the Full House Big Band of FH Aachen has performed at internal and public events under the direction of Boris Bansbach. Students, alumni and friends of FH Aachen play in it together and rehearse weekly. The Jazz Combo of FH Aachen is its \"little brother\"."
       ]
     },
     "jazzCombo": {
       "name": "Jazz Combo of FH Aachen",
       "paragraphs": [
-        "As the \"little brother\" of the Big Band, the Jazz Combo of FH Aachen performs at internal and public events, also under the direction of Boris Bansbach."
+        "As the \"little brother\" of the Big Band, the Jazz Combo of FH Aachen performs at internal and public events, also under the direction of Boris Bansbach. It was formed after the Full House Big Band and, like it, is one of the jazz ensembles of FH Aachen."
       ]
     },
     "herrenjedeck": {
       "name": "Herrenjedeck",
+      "logoAlt": "Herrenjedeck logo",
       "paragraphs": [
         "Herrenjedeck play Cologne's carnival classics in Kölsch, the local dialect, dialect and all, since that is the whole point. Their tagline, \"Kölsche Tön met Jeschmack\" (\"Cologne tunes with taste\"), sums up a band from Jülich playing the best of Kölsch music with real heart, from singalong songs to rocked-up versions of Cologne classics.",
         "As they put it themselves: \"Herrenjedeck, dat es Hejmat, Jesellichkejt un Stimmung. Dat jilt för et Jedränk jenau esu wie för uns Kapell.\" (\"Herrenjedeck is home, togetherness and atmosphere, true of the drinks just as much as of our band.\") Catch them at Carnival, at festivals, at corporate events and at private parties."

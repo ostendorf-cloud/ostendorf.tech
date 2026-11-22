@@ -6,7 +6,9 @@
     "switchLocale": "English",
     "carousel": {
       "slide": "{n} von {total}",
-      "region": "{label}, seitlich scrollbar"
+      "region": "{label}, seitlich scrollbar",
+      "pause": "Automatisches Scrollen pausieren",
+      "play": "Automatisches Scrollen starten"
     },
     "theme": {
       "switch": "Farbmodus: {current}. Wechseln zu: {next}.",
@@ -143,9 +145,8 @@
     "bademeister": {
       "name": "Die Bademeister",
       "paragraphs": [
-        "Wir sind eine Coverband, bestehend aus aktuellen und ehemaligen Studierenden der FH Aachen. Unser Ursprung liegt im ersten Sommerfest des Fachbereichs Elektro- und Informationstechnik (2022). Damals suchte die Fachschaft noch nach Programmpunkten und da wir alle in irgendeiner Form bereits in der Fachschaft aktiv waren oder uns für sie engagiert hatten, entstand die Idee, gemeinsam als Band aufzutreten.",
-        "Was ursprünglich als einmaliger Auftritt geplant war, entwickelte sich schnell weiter. Das gemeinsame Musizieren bereitete uns so viel Freude, dass wir beschlossen, regelmäßig weiter zu proben und weitere Auftritte zu spielen. So standen wir unter anderem beim Weihnachtsmarkt der Fachschaften des AStAs der FH Aachen auf der Bühne, sowie bei verschiedenen privaten Veranstaltungen, die über Mundpropaganda zustande kamen.",
-        "Musikalisch bieten wir eine abwechslungsreiche Mischung aus internationalen und deutschen Rock- und Popsongs. Angefangen bei Klassikern wie Zombie von den Cranberries haben wir unser Repertoire stetig erweitert. Mittlerweile gehören auch modernere Titel von Künstlern wie Måneskin, Kraftklub oder Alligatoah zu unserem Programm."
+        "Wir sind eine Coverband aus aktuellen und ehemaligen Studierenden der FH Aachen. Unser Ursprung liegt im ersten Sommerfest des Fachbereichs Elektro- und Informationstechnik (2022). Was als einmaliger Auftritt geplant war, entwickelte sich schnell weiter: Wir proben regelmäßig und standen unter anderem beim Weihnachtsmarkt der Fachschaften des AStAs der FH Aachen auf der Bühne.",
+        "Musikalisch bieten wir eine abwechslungsreiche Mischung aus internationalen und deutschen Rock- und Popsongs, von Klassikern wie Zombie von den Cranberries bis zu Titeln von Måneskin, Kraftklub oder Alligatoah."
       ]
     },
     "fourfold": {
@@ -156,22 +157,26 @@
       ]
     },
     "singingLittleBigBand": {
-      "name": "Singing Little BigBand der Fachhochschule Aachen"
+      "name": "Singing Little BigBand der Fachhochschule Aachen",
+      "paragraphs": [
+        "Die Singing Little BigBand gehört, wie die Full House Big Band und die Jazz Combo, zu den Jazz-Ensembles der FH Aachen. Ihr Programm ist vokal: Sie verbindet Gesang mit Big Band und spielt bekannte Songs in spannenden Arrangements. Live-Konzerte gibt sie bei Veranstaltungen der Hochschule."
+      ]
     },
     "bigBand": {
       "name": "BigBand der Fachhochschule Aachen",
       "paragraphs": [
-        "Seit 2007 spielt die Full House Big Band der FH Aachen unter der Leitung von Boris Bansbach bei internen und öffentlichen Veranstaltungen."
+        "Seit 2007 spielt die Full House Big Band der FH Aachen unter der Leitung von Boris Bansbach bei internen und öffentlichen Veranstaltungen. Studierende, Ehemalige und Freunde der FH spielen darin gemeinsam und proben wöchentlich. Die Jazz Combo der FH Aachen ist ihr „kleiner Bruder“."
       ]
     },
     "jazzCombo": {
       "name": "Jazz Combo der Fachhochschule Aachen",
       "paragraphs": [
-        "Als „kleiner Bruder“ der Big Band spielt die Jazz Combo der FH Aachen, ebenfalls unter der Leitung von Boris Bansbach, bei internen und öffentlichen Veranstaltungen."
+        "Als „kleiner Bruder“ der Big Band spielt die Jazz Combo der FH Aachen, ebenfalls unter der Leitung von Boris Bansbach, bei internen und öffentlichen Veranstaltungen. Sie entstand nach der Full House Big Band und gehört wie diese zu den Jazz-Ensembles der FH Aachen."
       ]
     },
     "herrenjedeck": {
       "name": "Herrenjedeck",
+      "logoAlt": "Logo von Herrenjedeck",
       "paragraphs": [
         "„Kölsche Tön met Jeschmack.“ Herrenjedeck aus Jülich spielen das Beste aus der kölschen Musik, immer met vell Hätzbloot. Von Liedern zum Schunkeln bis zur Rockversion des kölschen Klassikers.",
         "„Herrenjedeck, dat es Hejmat, Jesellichkejt un Stimmung. Dat jilt för et Jedränk jenau esu wie för uns Kapell.“ Zu hören an Fasteloovend, auf Festen, bei Firmenfeiern und auf privaten Partys."

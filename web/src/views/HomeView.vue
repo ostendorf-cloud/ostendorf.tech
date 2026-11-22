@@ -9,6 +9,7 @@ import {
   legalPath,
 } from '@ostendorf-cloud/govue'
 
+import BandLogo from '../components/BandLogo.vue'
 import CardCarousel from '../components/CardCarousel.vue'
 import ContactChannels from '../components/ContactChannels.vue'
 import CountingFacts from '../components/CountingFacts.vue'
@@ -175,8 +176,9 @@ const aboutFacts = computed<Fact[]>(() => [
         :next-label="t('home.bands.next')"
       >
         <template #slide="{ item: band }">
-          <GovueCard class="panel-lit">
-            <h3 class="mb-3 text-lg font-semibold text-text">
+          <GovueCard class="panel-lit band-card" :class="`band-accent-${band.accent}`">
+            <BandLogo :logo="band.logo" :alt="band.logo ? t(`bands.${band.slug}.logoAlt`) : ''" />
+            <h3 class="band-name mb-3 self-start text-lg font-semibold">
               {{ t(`bands.${band.slug}.name`) }}
             </h3>
             <div v-if="band.hasDescription" class="flex flex-col gap-2 text-sm text-text-muted">
@@ -188,7 +190,7 @@ const aboutFacts = computed<Fact[]>(() => [
               :href="band.instagramUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="mt-auto inline-flex min-h-11 items-center gap-1 self-start pt-3 text-sm text-accent-text hover:underline"
+              class="band-link mt-auto inline-flex min-h-11 items-center gap-1 self-start pt-3 text-sm hover:underline"
             >
               {{ t('home.bands.instagramLabel') }}: {{ band.instagramHandle }}
             </a>
@@ -540,6 +542,45 @@ const aboutFacts = computed<Fact[]>(() => [
 
   position: relative;
   border-radius: clamp(0.875rem, 0.7rem + 0.7vw, 1.25rem);
+}
+
+/*
+ * The band cards' own colour. Each band names one of the theme's colour
+ * roles; the class maps that role's text and subtle tokens to two local
+ * properties. The name sits on the subtle tint in the role's text colour
+ * and the lit edge and the link take the text colour, so every pair is one
+ * src/theme/contrast.test.ts already checks against the surface or the
+ * subtle ground, in both modes.
+ */
+.band-accent-accent {
+  --band-text: var(--color-accent-text);
+  --band-subtle: var(--color-accent-subtle);
+}
+
+.band-accent-info {
+  --band-text: var(--color-info-text);
+  --band-subtle: var(--color-info-subtle);
+}
+
+.band-accent-success {
+  --band-text: var(--color-success-text);
+  --band-subtle: var(--color-success-subtle);
+}
+
+.panel-lit.band-card::before {
+  height: 3px;
+  background: var(--band-text);
+}
+
+.band-name {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--band-subtle);
+  color: var(--band-text);
+}
+
+.band-link {
+  color: var(--band-text);
 }
 
 /*
