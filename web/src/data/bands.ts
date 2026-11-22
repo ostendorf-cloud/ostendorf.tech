@@ -9,18 +9,20 @@ import herrenjedeckLogo from '../assets/bands/herrenjedeck-logo.webp'
  * hasDescription is false for a band with no description text yet, in
  * which case only the name and the Instagram link are rendered.
  *
- * accent names one of the theme's own colour roles (accent, info, success,
- * warning, danger). HomeView.vue maps it to a per band class that reads
- * that role's text and subtle tokens, so a band card has its own colour
- * in light and dark mode without a literal colour anywhere. The theme has
- * five roles for seven bands, so two roles repeat; neighbours differ.
+ * accent names one of three of the theme's own colour roles (accent, info,
+ * success). HomeView.vue maps it to a per band class that reads that role's
+ * text and subtle tokens, so a band card has its own colour in light and
+ * dark mode without a literal colour anywhere. Warning and danger are left
+ * out on purpose (owner decision): a decoration must not look like a
+ * message. The roles repeat in that order, so any three bands in a row
+ * differ, which is a full row of the carousel on a wide screen.
  *
  * logo is optional and rendered only when given. To add one, put the file
  * into src/assets/bands/, import it here and set { src, width, height }
  * with the file's real pixel size, then add bands.<slug>.logoAlt to both
  * locales. Get the band's permission before a logo goes on the site.
  */
-export type BandAccent = 'accent' | 'info' | 'success' | 'warning' | 'danger'
+export type BandAccent = 'accent' | 'info' | 'success'
 
 export interface BandLogo {
   src: string
@@ -64,28 +66,28 @@ export const bands: Band[] = [
     instagramHandle: '@fhaachenbigband',
     instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
     hasDescription: true,
-    accent: 'warning',
+    accent: 'accent',
   },
   {
     slug: 'bigBand',
     instagramHandle: '@fhaachenbigband',
     instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
     hasDescription: true,
-    accent: 'danger',
+    accent: 'info',
   },
   {
     slug: 'jazzCombo',
     instagramHandle: '@fhaachenbigband',
     instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
     hasDescription: true,
-    accent: 'accent',
+    accent: 'success',
   },
   {
     slug: 'herrenjedeck',
     instagramHandle: '@herrenjedeck',
     instagramUrl: 'https://www.instagram.com/herrenjedeck/',
     hasDescription: true,
-    accent: 'info',
+    accent: 'accent',
     // The band's own logo, with the band's permission (see NOTICE).
     logo: { src: herrenjedeckLogo, width: 480, height: 489 },
   },

@@ -145,7 +145,7 @@ describe('the vtech theme', () => {
  * lit edge is it on the surface at 3:1. Every role a band uses is checked
  * here in both modes, not only the five the lists above happen to hold.
  */
-const BAND_ROLES = ['accent', 'info', 'success', 'warning', 'danger']
+const BAND_ROLES = ['accent', 'info', 'success']
 const BAND_TEXT_PAIRS: Array<[string, string]> = BAND_ROLES.flatMap((role) => [
   [`${role}-text`, 'surface'],
   [`${role}-text`, `${role}-subtle`],

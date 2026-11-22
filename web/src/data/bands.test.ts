@@ -22,10 +22,20 @@ describe('bands data', () => {
     }
   })
 
-  it('gives neighbouring bands different accents', () => {
-    bands.slice(1).forEach((band, index) => {
-      expect(band.accent).not.toBe(bands[index].accent)
-    })
+  // Three roles for seven bands: the last card cannot differ from the
+  // first, but any three bands in a row, a full row on a wide screen, can.
+  it('gives any three consecutive bands three different accents', () => {
+    for (let start = 0; start + 3 <= bands.length; start++) {
+      const window = bands.slice(start, start + 3).map((band) => band.accent)
+      expect(new Set(window).size, `bands ${start} to ${start + 2}`).toBe(3)
+    }
+  })
+
+  it('uses only the accent, info and success roles, never warning or danger', () => {
+    for (const band of bands) {
+      expect(['accent', 'info', 'success']).toContain(band.accent)
+    }
+    expect(home).not.toMatch(/\.band-accent-(warning|danger)/)
   })
 
   it('maps every accent in use to a class that reads theme tokens only', () => {

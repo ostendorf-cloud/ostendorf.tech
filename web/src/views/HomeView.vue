@@ -538,16 +538,6 @@ const aboutFacts = computed<Fact[]>(() => [
   --band-subtle: var(--color-success-subtle);
 }
 
-.band-accent-warning {
-  --band-text: var(--color-warning-text);
-  --band-subtle: var(--color-warning-subtle);
-}
-
-.band-accent-danger {
-  --band-text: var(--color-danger-text);
-  --band-subtle: var(--color-danger-subtle);
-}
-
 .panel-lit.band-card::before {
   height: 3px;
   background: var(--band-text);
