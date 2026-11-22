@@ -24,20 +24,26 @@ spec:
   {{ fail "ingress.enabled and httpRoute.enabled cannot both be true: pick one external route and turn the other off." }}
   {{- end }}
   {{- if gt (.Values.replicaCount | int) 1 }}
-  {{ fail "replicaCount must stay at 1: internal/webapp/session.go keeps the anonymous session, and the CSRF token derived from it, in govue's in-process session.MemoryStore. A second replica can answer a visitor's GET on one pod and their contact form POST on another pod that never saw that session: requireSession then refuses that POST with 403, correctly from that pod's point of view but wrongly from the visitor's, since their session is real, just on the other pod. This breaks the contact form for real visitors; it is an availability problem, not a security hole. Raise replicaCount only after moving to a shared session store; see AGENTS.md." }}
+  {{ fail "replicaCount must stay at 1: govue's contact form keeps its rate limits, its global mail ceiling and its proof of work replay set in the memory of one process. Every replica has its own, so two replicas double every budget, the mail ceiling included, and a solved challenge can be used once per replica. Raise replicaCount only after those move to a shared store; see AGENTS.md." }}
   {{- end }}
+  {{/*
+  The Secret carries CHALLENGE_KEY and the SMTP credentials. Without them the
+  contact form answers 503, so an install without a Secret is a mistake:
+  the name is required even while every key below is left unset.
+  */}}
+  {{- $_ := include "ostendorf-tech.existingSecretName" . }}
   {{- if and .Values.ingress.enabled (not .Values.config.trustedProxies) }}
   {{ fail "config.trustedProxies must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md." }}
   {{- end }}
   {{- if and .Values.config.allowPlainHttp (hasPrefix "https://" (.Values.config.siteUrl | toString | trim | lower)) }}
-  {{ fail "config.allowPlainHttp must not be true when config.siteUrl is https: it drops the session cookie's Secure attribute and turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http." }}
+  {{ fail "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http." }}
   {{- end }}
   replicas: {{ .Values.replicaCount }}
   # Recreate, not the default RollingUpdate: a rolling update's maxSurge
-  # would otherwise briefly run two pods, which is exactly the "two pods, two
-  # sessions" situation the replicaCount guard above exists to prevent. This
-  # holds the single-pod invariant during a rollout too, not only at a fixed
-  # replicaCount.
+  # would otherwise briefly run two pods, each with its own rate limits, mail
+  # ceiling and proof of work replay set, which is exactly what the
+  # replicaCount guard above exists to prevent. This holds the single-pod
+  # invariant during a rollout too, not only at a fixed replicaCount.
   strategy:
     type: Recreate
   selector:
@@ -111,8 +117,12 @@ spec:
               value: {{ .Values.config.mailRateLimitBurst | quote }}
             - name: MAIL_RATE_LIMIT_PER
               value: {{ .Values.config.mailRateLimitPer | quote }}
-            - name: SMTP_ADDR
-              value: {{ .Values.config.smtpAddr | quote }}
+            {{- if .Values.config.smtpHost }}
+            - name: SMTP_HOST
+              value: {{ .Values.config.smtpHost | quote }}
+            - name: SMTP_PORT
+              value: {{ .Values.config.smtpPort | quote }}
+            {{- end }}
             - name: CONTACT_TO
               value: {{ .Values.config.contactTo | quote }}
             - name: CONTACT_FROM
@@ -139,11 +149,6 @@ spec:
             - name: UMAMI_WEBSITE_ID
               value: {{ .Values.config.umamiWebsiteId | quote }}
             {{- end }}
-            - name: CSRF_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.csrfKeyKey }}
             {{- if .Values.existingSecret.challengeKeyKey }}
             - name: CHALLENGE_KEY
               valueFrom:

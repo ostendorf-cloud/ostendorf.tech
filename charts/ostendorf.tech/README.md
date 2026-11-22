@@ -7,8 +7,8 @@ cluster.
 
 - Kubernetes 1.27 or newer.
 - A `Secret` already in the target namespace, created by your own secret manager operator,
-  carrying at least the CSRF signing key (see "Secrets" below). This chart never creates that
-  `Secret` itself.
+  carrying the contact form's challenge key and SMTP credentials (see "Secrets" below). This
+  chart never creates that `Secret` itself.
 - Only if `httpRoute.enabled` is set: the Gateway API CRDs and a running `Gateway` with a
   listener that allows this release's namespace. See "External routing" below; this chart
   ships neither.
@@ -25,13 +25,12 @@ helm install ostendorf-tech charts/ostendorf.tech \
 The chart has no usable default for `existingSecret.name`: no name could ever point at a
 `Secret` that actually exists on your cluster. Leaving it empty fails `helm install`,
 `helm upgrade` and `helm template` at render time, with a message naming `existingSecret.name`
-and why it is needed, rather than installing a `Deployment` that crash-loops on a missing
-`CSRF_KEY`.
+and why it is needed, rather than installing a site whose contact form answers 503.
 
-`config.allowPlainHttp` must stay `false` while `config.siteUrl` is an `https` URL. It drops the
-session cookie's `Secure` attribute and turns HSTS off too, which a site served over `https`
-must keep. `templates/deployment.yaml` rejects that combination at render time. Set it only for
-a plain `http` development run, with a plain `http` `config.siteUrl`.
+`config.allowPlainHttp` must stay `false` while `config.siteUrl` is an `https` URL. It turns
+HSTS off, which a site served over `https` must keep. `templates/deployment.yaml` rejects that
+combination at render time. Set it only for a plain `http` development run, with a plain `http`
+`config.siteUrl`.
 
 `config.trustedProxies` must be set once `ingress.enabled` is true. Left empty behind this
 chart's own `Ingress`, every request is attributed to the ingress controller's pod IP, which
@@ -63,18 +62,18 @@ by name.
 
 | Env var | `values.yaml` key | Default key in the Secret | Required |
 | --- | --- | --- | --- |
-| `CSRF_KEY` | `existingSecret.csrfKeyKey` | `CSRF_KEY` | Yes |
 | `CHALLENGE_KEY` | `existingSecret.challengeKeyKey` | unset (omitted) | No |
 | `CHALLENGE_KEY_PREVIOUS` | `existingSecret.challengeKeyPreviousKey` | unset (omitted) | No |
 | `SMTP_USERNAME` | `existingSecret.smtpUsernameKey` | unset (omitted) | No |
 | `SMTP_PASSWORD` | `existingSecret.smtpPasswordKey` | unset (omitted) | No |
 
-`CSRF_KEY` has no fallback: a `Secret` missing it fails the pod at the Kubernetes level
-(`CreateContainerConfigError`), and the server would refuse to start without one anyway.
-`CHALLENGE_KEY`, `CHALLENGE_KEY_PREVIOUS`, `SMTP_USERNAME` and `SMTP_PASSWORD` left unset omit
-the corresponding environment variable entirely, rather than referencing a key that may not
-exist in your `Secret`; the contact form answers "unavailable" while `CHALLENGE_KEY` or either
-SMTP credential is missing, and every other page keeps working.
+Every key left unset omits the corresponding environment variable entirely, rather than
+referencing a key that may not exist in your `Secret`. The contact form answers 503
+`not_configured` while `CHALLENGE_KEY` or `config.smtpHost` is missing, and every other page
+keeps working. `SMTP_USERNAME` and `SMTP_PASSWORD` go together: one without the other stops the
+website at startup. With `config.smtpHost` set and neither credential, govue sends without
+SMTP AUTH, which a submission server that requires it refuses. The website holds no CSRF key
+and no session any more: the contact form is govue's stateless one.
 
 This chart never handles the Meta access token the feed service needs at all any more: it
 lives in OpenBao, read by the feed service itself through the Kubernetes auth method, never
@@ -85,7 +84,7 @@ through a Kubernetes `Secret` or a value in this chart. See "Feed service" below
 Set `existingSecret.challengeKeyPreviousKey` to the key `CHALLENGE_KEY` previously pointed at,
 in the same render that moves `existingSecret.challengeKeyKey` to the new one. A proof of work
 challenge issued just before the rotation is still accepted for as long as both keys are
-present; the server only ever issues new challenges under the current key. Remove
+present; govue's proof of work signs new challenges with the first key only. Remove
 `challengeKeyPreviousKey` again once the challenge TTL (10 minutes) has safely passed.
 
 Every key is at least 32 random bytes, hex encoded, for example:
@@ -96,16 +95,13 @@ openssl rand -hex 32
 
 ## Replicas
 
-`replicaCount` stays at 1. `internal/webapp/session.go` keeps the anonymous session the CSRF
-protector relies on in govue's in-process `session.MemoryStore`. A second replica, or two pods
-briefly coexisting during an ordinary rolling update, can answer a visitor's GET on one pod and
-their contact form POST on another pod that never saw that session: `requireSession` then
-refuses that POST with 403, correctly from that pod's point of view but wrongly from the
-visitor's, since their session is real, just on the other pod. This breaks the contact form for
-real visitors; it is an availability problem, not a security hole. `templates/deployment.yaml`
-rejects a higher value at render time and runs the Deployment with `strategy.type: Recreate`, so
-a rollout never lets two pods coexist either. Raising `replicaCount` above 1 is possible only
-once the webapp moves to a shared session store instead of the in-memory one.
+`replicaCount` stays at 1. govue's contact form keeps its per client rate limits, its global
+mail ceiling and its proof of work replay set in the memory of one process. A second replica, or
+two pods briefly coexisting during an ordinary rolling update, has its own copy of each: every
+budget doubles, the mail ceiling included, and a solved challenge can be used once per pod.
+`templates/deployment.yaml` rejects a higher value at render time and runs the Deployment with
+`strategy.type: Recreate`, so a rollout never lets two pods coexist either. Raising
+`replicaCount` above 1 is possible only once those move to a shared store.
 
 `replicaCount: 0` is deliberately still allowed. Stopping the site entirely, for a maintenance
 window or to pause the deployment, is a legitimate and intentional use of `replicaCount` that
@@ -374,14 +370,15 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
 | `config.listenAddr` | Address the public listener binds (`LISTEN_ADDR`); must match `service.port` | `:8080` |
 | `config.logLevel` | `debug`, `info`, `warn` or `error` (`LOG_LEVEL`) | `info` |
-| `config.allowPlainHttp` | Drops the session cookie's `Secure` attribute and turns HSTS off, for a plain `http` development run. Refused at render time while `config.siteUrl` is `https` | `false` |
+| `config.allowPlainHttp` | Turns HSTS off, for a plain `http` development run. Refused at render time while `config.siteUrl` is `https` | `false` |
 | `config.rateLimitBurst` / `config.rateLimitPer` | Requests one client address may make before waiting, and the burst's refill period | `120` / `1m` |
-| `config.challengeRateLimitBurst` / `config.challengeRateLimitPer` | Same, for `GET /api/v1/challenge` | `10` / `20s` |
+| `config.challengeRateLimitBurst` / `config.challengeRateLimitPer` | Same, for `GET /api/v1/contact/challenge` | `10` / `20s` |
 | `config.contactRateLimitBurst` / `config.contactRateLimitPer` | Same, for `POST /api/v1/contact` | `5` / `10m` |
 | `config.mailRateLimitBurst` / `config.mailRateLimitPer` | Contact mails sent in total, across every client address, and the refill period | `50` / `1h` |
 | `config.contactTo` | Recipient address of every contact mail | `simon@ostendorf.tech` |
 | `config.contactFrom` | Envelope sender address of every contact mail | `ostendorf.tech <no-reply@ostendorf.cloud>` |
-| `config.smtpAddr` | SMTP submission server | `mail.ostendorf.cloud:587` |
+| `config.smtpHost` | SMTP submission server, a bare host name (`SMTP_HOST`). Empty leaves the contact form unconfigured | `mail.ostendorf.cloud` |
+| `config.smtpPort` | Its port (`SMTP_PORT`): 587 requires STARTTLS, 465 means TLS from the first byte | `587` |
 | `config.adminListenAddr` | govue's admin listener address (`ADMIN_ADDR`); must match `service.adminPort` | `:8081` |
 | `config.trustedProxies` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |
 | `config.feedRefreshInterval` | How often the website asks the feed service for the current post list | `5m` |

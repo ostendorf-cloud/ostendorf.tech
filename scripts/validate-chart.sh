@@ -150,15 +150,15 @@ if [ "$mode" = "lint" ]; then
 
   fail_messages=(
     "ingress.enabled and httpRoute.enabled cannot both be true: pick one external route and turn the other off."
-    "replicaCount must stay at 1: internal/webapp/session.go keeps the anonymous session, and the CSRF token derived from it, in govue's in-process session.MemoryStore. A second replica can answer a visitor's GET on one pod and their contact form POST on another pod that never saw that session: requireSession then refuses that POST with 403, correctly from that pod's point of view but wrongly from the visitor's, since their session is real, just on the other pod. This breaks the contact form for real visitors; it is an availability problem, not a security hole. Raise replicaCount only after moving to a shared session store; see AGENTS.md."
+    "replicaCount must stay at 1: govue's contact form keeps its rate limits, its global mail ceiling and its proof of work replay set in the memory of one process. Every replica has its own, so two replicas double every budget, the mail ceiling included, and a solved challenge can be used once per replica. Raise replicaCount only after those move to a shared store; see AGENTS.md."
     "config.trustedProxies must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md."
     "httpRoute.parentRefs.name is required when httpRoute.enabled is true"
     "httpRoute.parentRefs.namespace is required when httpRoute.enabled is true: the Gateway this HTTPRoute attaches to usually lives in a different namespace than this release"
-    "existingSecret.name is required: set it to the name of an existing Secret carrying CSRF_KEY, which the application needs to start and has no default."
+    "existingSecret.name is required: set it to the name of an existing Secret carrying CHALLENGE_KEY and the SMTP credentials, without which the contact form answers 503."
     "feed.config.openBaoAddr is required: set it to the OpenBao address the feed service authenticates against. There is no default, since none could ever point at an OpenBao installation that actually exists."
     "feed.config.openBaoRole is required: set it to the OpenBao Kubernetes auth role the feed service logs in as. There is no default, since none could ever name a role that actually exists in your OpenBao installation."
-    "config.allowPlainHttp must not be true when config.siteUrl is https: it drops the session cookie's Secure attribute and turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
-    "config.allowPlainHttp must not be true when config.siteUrl is https: it drops the session cookie's Secure attribute and turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
+    "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
+    "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
   )
 
   for i in "${!fail_names[@]}"; do

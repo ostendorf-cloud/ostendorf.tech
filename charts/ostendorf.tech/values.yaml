@@ -2,19 +2,15 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-# Must stay at 1 or drop to 0; never go above 1. internal/webapp/session.go
-# keeps the anonymous session the CSRF protector relies on in govue's
-# in-process session.MemoryStore. A second replica, or two pods briefly
-# coexisting during an ordinary rolling update, can answer a visitor's GET
-# on one pod and their contact form POST on another pod that never saw that
-# session: requireSession then refuses that POST with 403, correctly from
-# that pod's point of view but wrongly from the visitor's, since their
-# session is real, just on the other pod. This breaks the contact form for
-# real visitors; it is an availability problem, not a security hole.
-# templates/deployment.yaml rejects any value above 1 at render time and
-# runs the Deployment with strategy.type: Recreate, so a rollout never lets
-# two pods coexist either. Raise this above 1 only once the webapp moves to
-# a shared session store; see AGENTS.md.
+# Must stay at 1 or drop to 0; never go above 1. govue's contact form keeps
+# its per client rate limits, its global mail ceiling and its proof of work
+# replay set in the memory of one process. A second replica, or two pods
+# briefly coexisting during an ordinary rolling update, has its own copy of
+# each: every budget doubles, the mail ceiling included, and a solved
+# challenge can be used once per pod. templates/deployment.yaml rejects any
+# value above 1 at render time and runs the Deployment with
+# strategy.type: Recreate, so a rollout never lets two pods coexist either.
+# Raise this above 1 only once those move to a shared store; see AGENTS.md.
 #
 # 0 is deliberately still allowed (values.schema.json's own minimum is 0):
 # stopping the site entirely, for a maintenance window or to pause the
@@ -182,6 +178,9 @@ config:
   allowPlainHttp: false
   rateLimitBurst: 120
   rateLimitPer: "1m"
+  # The contact form's limits, passed to govue's contact handlers. The
+  # defaults are govue's own. All of them are per process, see
+  # replicaCount above.
   challengeRateLimitBurst: 10
   challengeRateLimitPer: "20s"
   contactRateLimitBurst: 5
@@ -195,7 +194,12 @@ config:
   # legitimately. See internal/webapp and internal/config.
   mailRateLimitBurst: 50
   mailRateLimitPer: "1h"
-  smtpAddr: "mail.ostendorf.cloud:587"
+  # The SMTP submission server, read by govue's mail.LoadConfig: a bare
+  # host name (SMTP_HOST) and a port (SMTP_PORT). 587 requires STARTTLS,
+  # 465 means TLS from the first byte. Empty smtpHost leaves both unset and
+  # the contact form answers 503. The credentials come from existingSecret.
+  smtpHost: "mail.ostendorf.cloud"
+  smtpPort: 587
   contactTo: "simon@ostendorf.tech"
   contactFrom: "ostendorf.tech <no-reply@ostendorf.cloud>"
   # How often the website asks the feed service for the current post list;
@@ -227,17 +231,15 @@ existingSecret:
   # empty here because no default could ever point at something that
   # actually exists on the cluster; templates/deployment.yaml rejects an
   # install or template render that leaves this empty, instead of shipping
-  # a Pod that crash-loops on a missing CSRF_KEY.
+  # a site whose contact form answers 503.
   name: ""
-  # Required key: CSRF_KEY has no fallback, so a missing key in the
-  # referenced Secret surfaces as a real Kubernetes error
-  # (CreateContainerConfigError) instead of a silently empty value, and
-  # the server refuses to start without one either way.
-  csrfKeyKey: "CSRF_KEY"
   # Optional keys: left empty, the corresponding environment variable is
   # omitted entirely rather than wired to a key that may not exist. The
-  # contact form answers "unavailable" for whichever of these is missing;
-  # every other page still works.
+  # contact form answers 503 not_configured without challengeKeyKey; every
+  # other page still works. smtpUsernameKey and smtpPasswordKey are set
+  # together or not at all, the website refuses to start otherwise.
+  # govue v0.6.0 reads SMTP_USERNAME as a plain variable, which a
+  # secretKeyRef fills just as well.
   challengeKeyKey: ""
   # Set only while rotating challengeKeyKey: the previous CHALLENGE_KEY,
   # kept around so a proof of work challenge issued just before the
