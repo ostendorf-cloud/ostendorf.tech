@@ -31,15 +31,21 @@ The global baseline already applies here and is not repeated below.
   validation to inherit. `internal/routes/testdata/{valid,invalid}` holds the fixtures
   both `routes_test.go` and `routeTable.test.ts` read, so a fixture either side adds is
   checked by both validators without touching the other test file.
-- `internal/pow` issues and verifies the contact form's proof of work challenge, ported
-  from old_simon-ostendorf.de's `internal/pow`: the algorithm is a contract with the
-  browser worker that solves it. The salt is `<nonce>?expires=<unix>&issued=<unix>&`,
-  ends with a fixed `&` that the parser requires, and the hash input is the salt followed
-  by the number in decimal. The worker treats the salt as an opaque string.
-- `internal/contact` validates a contact submission, builds the mail and sends it over
-  SMTP, ported from old_simon-ostendorf.de's `internal/contact` with one change: a field
-  error carries a stable code instead of a German message, so `internal/webapp` can
-  answer in German or English depending on the visitor's own locale.
+- The contact form is govue's: the Go handlers (`contact`, with `pow` and `mail`) and the
+  Vue form (`GovueContactForm` with its proof of work worker). The site has no contact,
+  proof of work or SMTP code of its own. `internal/webapp/contact.go` only builds govue's
+  `contact.Handler` with the site's own envelope (`CONTACT_FROM`, `CONTACT_TO`), subject
+  and body, the challenge keys (`CHALLENGE_KEY` first, `CHALLENGE_KEY_PREVIOUS` for a
+  rotation), the audience (the host of `SITE_URL`), the site's limiters
+  (`CHALLENGE_RATE_LIMIT_*`, `CONTACT_RATE_LIMIT_*`, `MAIL_RATE_LIMIT_*`) and the trusted
+  origin of `SITE_URL`, and mounts `GET /api/v1/contact/challenge` and
+  `POST /api/v1/contact` behind the general rate limit. `internal/config` reads SMTP
+  through govue's `mail.LoadConfig` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+  `SMTP_PASSWORD` or `SMTP_PASSWORD_FILE`) and only when `SMTP_HOST` is set. Without a key
+  or without `SMTP_HOST` both routes answer 503 `not_configured`. The mail body is German
+  and holds the name, the address and the message; the consent state never leaves the
+  browser. `internal/webapp/contact_test.go` proves the wiring through the real handler
+  chain with a fake `mail.Sender`.
 - `internal/instagram` is the domain logic behind the home page's Impressionen section:
   a `Client` against Meta's Graph API, a `Feed` cache of the posts and their picture
   bytes, a `Syncer` that keeps `Feed` current, and a `TokenStore` that reads and writes
@@ -105,11 +111,13 @@ The global baseline already applies here and is not repeated below.
   payload changes, which means a govue upgrade that touches the analytics privacy
   checklist.
 - `internal/webapp` builds two HTTP handlers from govue's packages. `Handler` is the
-  public one: the security and access log middleware, the client IP resolver, the rate
-  limiter, a session manager and the CSRF protector, in front of pages, assets and the
-  API routes. `AdminHandler` is the second, smaller one govue's admin listener serves:
-  health, readiness and metrics, reached only from inside the cluster, never through the
-  chart's own Ingress. `pages.go` is the catch-all document handler:
+  public one: the security and access log middleware, the client IP resolver and the rate
+  limiter, in front of pages, assets, the API routes and govue's contact handlers. There
+  is no session manager and no CSRF protector: every other route answers GET only and
+  changes nothing, and the contact handlers check the origin themselves. `AdminHandler`
+  is the second, smaller one govue's admin listener serves: health, readiness and
+  metrics, reached only from inside the cluster, never through the chart's own Ingress.
+  `pages.go` is the catch-all document handler:
   the locale redirect at `/`, trailing slash canonicalisation, and serving the matching
   prerendered file or a locale's own 404 page. Every route except the home page is a
   legal page and is served at govue's exact `/<code>/<page>` with no trailing slash
@@ -131,27 +139,25 @@ The global baseline already applies here and is not repeated below.
   `TestPrerenderedOutputMatchesRouteTable` checks: it walks the real output `task
   prerender` wrote and compares it against `internal/routes`, catching both a route with
   no prerendered file and a prerendered file that answers no route. `task test:routes`
-  runs it, with its own CI job. `contact.go` and `session.go` are the contact form's two
-  endpoints and the anonymous, cookie-backed session they share with the CSRF
-  protector. A session is minted in exactly one place: `GET /api/v1/challenge`, which
-  already returns the resulting CSRF token in the same response body the frontend reads.
-  No page route mints or reads a session any more. `POST /api/v1/contact` requires that
-  session through `requireSession` instead, refusing a request with none outright.
-  `session.go` keeps that session in govue's in-process `session.MemoryStore`, so the
-  Deployment stays at one replica: a second replica, or two pods briefly coexisting
-  during an ordinary rolling update, can answer a visitor's GET on one pod and their
-  contact form POST on another pod that never saw that session. `requireSession` then
-  refuses that POST with 403 — correctly from that pod's point of view, wrongly from the
-  visitor's, since their session is real, just on the other pod. This is an availability
-  problem for real visitors, not a security hole. `charts/ostendorf.tech` enforces the
-  single replica at render time and runs the Deployment with `strategy.type: Recreate`,
-  so a rollout never lets two pods coexist either. Lifts once `internal/webapp` moves to
-  a shared session store instead of the in-memory one.
+  runs it, with its own CI job. `contact.go` mounts govue's stateless contact form (see
+  its own bullet above): no cookie, no session, no CSRF token. govue keeps the contact
+  form's per client limits, its global mail ceiling and its proof of work replay set in
+  the memory of one process, so the Deployment stays at one replica: a second replica,
+  or two pods briefly coexisting during an ordinary rolling update, has its own copy of
+  each, which doubles every budget, the mail ceiling included, and lets a solved
+  challenge be used once per pod. `charts/ostendorf.tech` enforces the single replica at
+  render time and runs the Deployment with `strategy.type: Recreate`, so a rollout never
+  lets two pods coexist either. Lifts once those move to a shared store (govue's
+  `contact.Config` limiters and `pow.Config.Seen` take one).
 - `web/` is the Vue SPA, consuming govue's Vue package as a pnpm git dependency. `web/src`
-  holds the app; `web/src/lib/contactChallenge.ts` and `web/src/workers/pow.worker.ts`
-  are the contact form's proof of work client, a Web Worker kept cookie-free and
-  third-party-free; `web/scripts/prerender.ts` is the static site generation step `task
-  prerender` runs. `web/src/lib/routeTable.ts` is the one place the frontend reads
+  holds the app. The contact section in `web/src/views/HomeView.vue` renders govue's
+  `GovueContactForm` with a cookie free client (`createClient({ credentials: 'omit' })`),
+  the site's own consent text (`home.contact.consent`), the form heading and the privacy
+  link of the page's language; its fields, errors and success text come from govue's
+  catalogue, and its proof of work Worker is govue's, emitted by Vite as a same-origin
+  file under `/assets/` that `worker-src 'self'` allows. `web/src/views/contactSection.test.ts`
+  proves the section in both languages. `web/scripts/prerender.ts` is the static site
+  generation step `task prerender` runs. `web/src/lib/routeTable.ts` is the one place the frontend reads
   `internal/routes/routes.json` from; `web/scripts/prerender.ts`, `web/src/router/index.ts`
   (the Vue Router table) and `web/src/lib/seo.ts` (the `PageRoute` list and its slugs) all
   import it instead of restating the page list themselves.

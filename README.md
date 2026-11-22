@@ -12,8 +12,9 @@ over.
 
 The home page's hero, Leistungen, Impressionen, Bands, Über mich and Kontakt sections, and the
 imprint, privacy and AGB pages, are implemented in German (the source of truth) and
-English. The Kontakt section's contact form sends mail over SMTP, protected by a
-proof of work challenge, a per-session CSRF token and a per-address rate limit. See
+English. The Kontakt section's contact form is govue's stateless one: it sends mail over
+SMTP, protected by an origin check, a proof of work challenge, a per-address rate limit and
+a global mail ceiling, with no cookie and no session. See
 `AGENTS.md` for what is deliberately left out of this milestone.
 
 ## Install
@@ -40,8 +41,8 @@ trailing newline, and it is an error to set both or to point `_FILE` at a file t
 resolves to nothing. There is no secret manager client in this binary: an OpenBao
 agent, External Secrets, a Kubernetes secret mount or a plain `.env` file are all
 interchangeable, as long as one of them lands the value in the right place before the
-process starts. `CSRF_KEY` is the only variable with no usable default; every other one
-does, so `bin/website` otherwise runs with none of them set.
+process starts. Every variable has a usable default or may stay unset, so `bin/website`
+runs with none of them set; the contact form then answers 503 `not_configured`.
 It serves the site at `/de/...` and `/en/...`, redirects `/` to the visitor's preferred
 locale, and serves `/robots.txt` and `/sitemap.xml` built from the same route table the
 prerenderer uses. `/healthz`, `/readyz` and `/metrics` answer on a second, administrative
@@ -56,15 +57,15 @@ listener (`ADMIN_ADDR`), never on this public one; see the Configuration table b
 | `SITE_URL` | The site's own canonical origin, used for SEO tags and the sitemap | `https://ostendorf.tech` | no |
 | `LOG_LEVEL` | `debug`, `info`, `warn` or `error` | `info` | no |
 | `TRUSTED_PROXIES` | Comma separated CIDRs or addresses trusted to set `X-Forwarded-For` | none | no |
-| `ALLOW_PLAIN_HTTP` | Drops the session cookie's `Secure` attribute, for a plain HTTP dev run | `false` | no |
-| `RATE_LIMIT_BURST` | Requests one client address may make before waiting | `120` | no |
+| `ALLOW_PLAIN_HTTP` | Drops the `Strict-Transport-Security` header, for a plain HTTP dev run | `false` | no |
+| `RATE_LIMIT_BURST` | Requests one client address may make before waiting, on every route | `120` | no |
 | `RATE_LIMIT_PER` | The burst's refill period | `1m` | no |
-| `CSRF_KEY` (+ `_FILE`) | Hex encoded, at least 32 bytes. Signs the contact form's CSRF token | none | **yes** |
 | `CHALLENGE_KEY` (+ `_FILE`) | Hex encoded, at least 32 bytes. Signs the proof of work challenge | none | no\* |
 | `CHALLENGE_KEY_PREVIOUS` (+ `_FILE`) | Hex encoded, at least 32 bytes. The key `CHALLENGE_KEY` was just rotated out of; see "Rotating the challenge key" below | none | no |
-| `SMTP_ADDR` | SMTP submission server the contact form sends through | `mail.ostendorf.cloud:587` | no |
-| `SMTP_USERNAME` (+ `_FILE`) | SMTP username | none | no\* |
-| `SMTP_PASSWORD` (+ `_FILE`) | SMTP password | none | no\* |
+| `SMTP_HOST` | SMTP submission server the contact form sends through, a bare host name | none | no\* |
+| `SMTP_PORT` | Its port: `587` requires STARTTLS, `465` means TLS from the first byte | `587` | no |
+| `SMTP_USERNAME` | SMTP username, set together with `SMTP_PASSWORD`. No `_FILE` twin in govue v0.6.0 | none | no |
+| `SMTP_PASSWORD` (+ `_FILE`) | SMTP password | none | no |
 | `CONTACT_TO` | Recipient address of every contact mail | `simon@ostendorf.tech` | no |
 | `CONTACT_FROM` | Envelope sender address of every contact mail | `ostendorf.tech <no-reply@ostendorf.cloud>` | no |
 | `CHALLENGE_RATE_LIMIT_BURST` | Challenge requests one client address may make before waiting | `10` | no |
@@ -80,9 +81,16 @@ listener (`ADMIN_ADDR`), never on this public one; see the Configuration table b
 | `MAIL_RATE_LIMIT_BURST` | Contact mails this service sends in total, across every client address, before waiting | `50` | no |
 | `MAIL_RATE_LIMIT_PER` | That burst's refill period | `1h` | no |
 
-\* Without `CHALLENGE_KEY`, or without both `SMTP_USERNAME` and `SMTP_PASSWORD`, the
-contact form answers "unavailable" instead of failing to start; every other page keeps
-working. `CSRF_KEY` has no such fallback: the server refuses to start without it.
+\* Without `CHALLENGE_KEY` or without `SMTP_HOST`, both contact form routes answer 503
+`not_configured` instead of the server failing to start; every other page keeps working.
+The SMTP variables are read by govue's `mail.LoadConfig`. A username without a password, or
+the other way round, stops the start. With `SMTP_HOST` and neither credential, the form
+sends without SMTP AUTH.
+
+The contact form is govue's stateless one (`contact.Handler`): `GET /api/v1/contact/challenge`
+and `POST /api/v1/contact`. It sets no cookie, keeps no session and takes no CSRF token. It
+checks the origin itself, trusting the origin of `SITE_URL`, and keeps its limits and its
+proof of work replay set in the memory of the one process.
 
 \*\* `UMAMI_URL` and `UMAMI_WEBSITE_ID` are set together or not at all; exactly one of
 them is refused at startup rather than silently counting nothing.
@@ -118,16 +126,17 @@ chart entry, reached over `FEED_SERVICE_URL` alone.
 account itself, across every address at once, which the per-client limit alone cannot do: a
 client address is an IPv6 /64, and a single routed /48 is 65,536 of them. The default, 50 an
 hour, is well above anything one event technology sole trader's contact form is ever expected to
-receive legitimately. Exceeding it answers the same "too many requests" message the per-client
-limit gives, and is logged at warning level, since it means either an attack or a genuine surge
-worth the operator's attention, unlike an ordinary per-client throttle.
+receive legitimately. Exceeding it answers 503 `mail_limit` with a `Retry-After`, and govue logs
+`global mail ceiling reached` at warning level at most once a minute, since it means either an
+attack or a genuine surge worth the operator's attention, unlike an ordinary per-client
+throttle, which answers 429.
 
 ### Rotating the challenge key
 
 Set `CHALLENGE_KEY_PREVIOUS` to the key `CHALLENGE_KEY` previously held, in the same change that
 moves `CHALLENGE_KEY` to the new one. A challenge issued just before the rotation, and still
-sitting unsolved in a visitor's browser, verifies against either key; only `CHALLENGE_KEY` is
-ever used to issue a new one. Remove `CHALLENGE_KEY_PREVIOUS` again once the challenge TTL (10
+sitting unsolved in a visitor's browser, verifies against either key; govue's `pow` signs new
+challenges with `CHALLENGE_KEY` only. Remove `CHALLENGE_KEY_PREVIOUS` again once the challenge TTL (10
 minutes) has safely passed. Leaving it unset, as before, means rotating `CHALLENGE_KEY` invalidates
 every challenge already issued the moment the new key takes effect.
 
@@ -146,12 +155,13 @@ controller's own address range.
 ## Container
 
 ```sh
-cp .env.example .env   # fill in CSRF_KEY at least; see .env.example
+cp .env.example .env   # see .env.example; no variable is required
 docker compose up --build
 ```
 
-`CSRF_KEY` alone starts the site. The contact form needs `CHALLENGE_KEY`, `SMTP_USERNAME` and
-`SMTP_PASSWORD` too, and answers "unavailable" without them. Compose runs the website only, no
+An empty `.env` starts the site. The contact form needs `CHALLENGE_KEY` and `SMTP_HOST`, and
+`SMTP_USERNAME` and `SMTP_PASSWORD` for a server with SMTP AUTH, and answers 503 without the
+first two. Compose runs the website only, no
 feed service, so the Impressionen section stays off unless `FEED_SERVICE_URL` points at a feed
 service started some other way.
 
@@ -167,7 +177,7 @@ cut a port out of an address, so `LISTEN_ADDR` itself is not read from `.env` he
 published.
 
 `scripts/smoke-test-image.sh <image-ref>` starts an already built image the same way,
-with a throwaway `CSRF_KEY`, and asserts its admin listener (`ADMIN_ADDR`, `:8081`)
+with no secret, and asserts its admin listener (`ADMIN_ADDR`, `:8081`)
 answers `/healthz`, `/readyz` and `/metrics`, its public listener serves the home page in
 each locale with its prerendered content intact, `/robots.txt` and `/sitemap.xml`, and
 that the public listener itself no longer answers `/metrics`. The `docker-build` job in
