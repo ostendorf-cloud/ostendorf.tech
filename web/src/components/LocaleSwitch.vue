@@ -33,6 +33,8 @@ const target = computed(() => {
 <template>
   <router-link
     :to="target"
+    :lang="otherLocale"
+    :hreflang="otherLocale"
     class="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2 text-base min-[480px]:px-4 font-medium text-accent-text transition-colors hover:bg-accent-subtle"
   >
     {{ t('common.switchLocale') }}

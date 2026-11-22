@@ -1,7 +1,27 @@
 import { describe, expect, it } from 'vitest'
 
 import { routeTable } from './routeTable'
-import { canonical, descriptionKeys, NOT_FOUND, path, titleKeys } from './seo'
+import {
+  canonical,
+  descriptionKeys,
+  isIndexable,
+  NOT_FOUND,
+  path,
+  robotsContent,
+  titleKeys,
+} from './seo'
+
+describe('robotsContent and isIndexable', () => {
+  it('keeps the 404 page out of the index', () => {
+    expect(robotsContent(NOT_FOUND)).toBe('noindex')
+    expect(isIndexable(NOT_FOUND)).toBe(false)
+  })
+
+  it.each(routeTable)('lets routes.json entry $name be indexed', (entry) => {
+    expect(robotsContent(entry.name)).toBe('index, follow')
+    expect(isIndexable(entry.name)).toBe(true)
+  })
+})
 
 // titleKeys and descriptionKeys are kept separate from routes.json
 // deliberately (see seo.ts), which only stays safe as long as this test

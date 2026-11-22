@@ -17,16 +17,26 @@ services:
       # protection with it. Never set this on anything reachable from
       # outside the machine it runs on.
       ALLOW_PLAIN_HTTP: "true"
+      # LISTEN_PORT in .env is the one value that sets both the address the
+      # container listens on and the host port published below, so the two
+      # cannot drift apart. Compose interpolation only knows ${VAR:-default},
+      # ${VAR-default}, ${VAR:?error}, ${VAR:+alternative} and their
+      # variants: it cannot cut the port out of an address like ":8123", so
+      # this file takes the port alone, not LISTEN_ADDR. A LISTEN_ADDR in
+      # .env is not forwarded and has no effect through this stack.
+      # internal/envsync checks that the two stay in step.
+      LISTEN_ADDR: ":${LISTEN_PORT:-8080}"
       CSRF_KEY: "${CSRF_KEY:?Set CSRF_KEY, e.g. via: openssl rand -hex 32}"
-      CHALLENGE_KEY: "${CHALLENGE_KEY}"
-      SMTP_ADDR: "${SMTP_ADDR}"
-      SMTP_USERNAME: "${SMTP_USERNAME}"
-      SMTP_PASSWORD: "${SMTP_PASSWORD}"
-      CONTACT_TO: "${CONTACT_TO}"
-      CONTACT_FROM: "${CONTACT_FROM}"
+      CHALLENGE_KEY: "${CHALLENGE_KEY:-}"
+      SMTP_ADDR: "${SMTP_ADDR:-}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      CONTACT_TO: "${CONTACT_TO:-}"
+      CONTACT_FROM: "${CONTACT_FROM:-}"
       # Page view counting is off unless both are set in .env or the shell.
       # Empty values count as unset.
       UMAMI_URL: "${UMAMI_URL:-}"
       UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
     ports:
-      - "127.0.0.1:8080:8080"
+      # Loopback only. The admin listener (ADMIN_ADDR, 8081) is not published.
+      - "127.0.0.1:${LISTEN_PORT:-8080}:${LISTEN_PORT:-8080}"
