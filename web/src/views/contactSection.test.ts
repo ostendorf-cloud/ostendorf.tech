@@ -4,7 +4,7 @@
  * tests cover the form itself: its fields, the proof of work, the request
  * body and the errors.
  */
-import { render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory } from 'vue-router'
 
@@ -83,5 +83,28 @@ describe.each(['de', 'en'] as const)('the contact section in %s', (locale) => {
     expect(form?.textContent).toContain(
       locale === 'de' ? 'So gehen wir mit Ihren Angaben um:' : 'How your details are handled:',
     )
+  })
+
+  it('fetches the challenge with a client that sends no credentials', async () => {
+    const { container } = await renderHome(locale)
+    const name = container.querySelector<HTMLInputElement>('#contact input[name="name"]')
+    expect(name).not.toBeNull()
+    if (name) {
+      await fireEvent.focusIn(name)
+    }
+
+    // govue's createClient calls fetch with a URL string.
+    const calls = () =>
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.map(([input, init]) => [input as string, init] as const)
+    await waitFor(() => {
+      expect(calls().some(([url]) => url.includes('/contact/challenge'))).toBe(true)
+    })
+    for (const [url, init] of calls()) {
+      if (url.includes('/contact')) {
+        expect(init?.credentials, url).toBe('omit')
+      }
+    }
   })
 })
