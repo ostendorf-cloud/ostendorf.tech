@@ -161,9 +161,27 @@ docker compose up --build
 
 An empty `.env` starts the site. The contact form needs `CHALLENGE_KEY` and `SMTP_HOST`, and
 `SMTP_USERNAME` and `SMTP_PASSWORD` for a server with SMTP AUTH, and answers 503 without the
-first two. Compose runs the website only, no
+first two. A plain `docker compose up` runs the website only, no
 feed service, so the Impressionen section stays off unless `FEED_SERVICE_URL` points at a feed
 service started some other way.
+
+To see the Impressionen section locally, start the development only fake feed as well:
+
+```sh
+# in .env
+FEED_SERVICE_URL=http://fakefeed:9081
+```
+
+```sh
+docker compose --profile feed up --build
+```
+
+The `fakefeed` service (`cmd/fakefeed`) serves generated sample posts and pictures on the
+same routes as the real feed service, never real Instagram content. It publishes no host
+port: the website reaches it on the compose network. The real feed service needs OpenBao
+and a Meta token and cannot run locally. `POST_COUNT` in `.env` sets how many sample posts
+there are, 20 by default. The fake is its own `fakefeed` target in the `Dockerfile`; no
+production target depends on it and no workflow builds or publishes it.
 
 Builds the multi-stage `Dockerfile` (frontend, prerender, static Go binary, then a
 minimal non-root runtime stage with no shell) and serves the site at
