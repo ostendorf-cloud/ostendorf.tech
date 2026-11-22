@@ -27,17 +27,19 @@ tests:
           path: spec.strategy.type
           value: Recreate
 
-  - it: wires the required secret-backed CSRF key with no fallback
+  - it: carries no CSRF key and no SMTP_ADDR any more
     template: templates/deployment.yaml
     asserts:
-      - contains:
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: CSRF_KEY
-            valueFrom:
-              secretKeyRef:
-                name: ostendorf-tech-secrets
-                key: CSRF_KEY
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMTP_ADDR
+          any: true
 
   - it: wires the plain env vars with their documented defaults
     template: templates/deployment.yaml
@@ -57,11 +59,6 @@ tests:
           content:
             name: SITE_URL
             value: "https://ostendorf.tech"
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: SMTP_ADDR
-            value: "mail.ostendorf.cloud:587"
       - contains:
           path: spec.template.spec.containers[0].env
           content:

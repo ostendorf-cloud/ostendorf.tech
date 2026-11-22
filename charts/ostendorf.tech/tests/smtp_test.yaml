@@ -1,0 +1,43 @@
+suite: SMTP submission server
+templates:
+  - templates/deployment.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+tests:
+  - it: passes a changed host and port to govue's mail.LoadConfig
+    set:
+      config:
+        smtpHost: smtp.example.test
+        smtpPort: 465
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMTP_HOST
+            value: "smtp.example.test"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMTP_PORT
+            value: "465"
+
+  - it: leaves SMTP_HOST and SMTP_PORT unset by default, so the form answers 503
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMTP_HOST
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMTP_PORT
+          any: true
+
+  - it: refuses a host with a port, which govue's mail config refuses at startup
+    set:
+      config:
+        smtpHost: "mail.ostendorf.cloud:587"
+    asserts:
+      - failedTemplate: {}

@@ -23,7 +23,9 @@ function leafPaths(value: unknown, prefix = ''): string[] {
 describe('locale files', () => {
   // The legal subtree is left out on purpose: the English legal pages carry
   // two keys the German ones do not (the convenience translation notice and
-  // the link to the German original), and that text is owned separately.
+  // the link to the German original), the German ones one key the English
+  // ones do not (which version is binding), and that text is owned
+  // separately.
   const withoutLegal = (paths: string[]) => paths.filter((path) => !path.startsWith('legal.'))
 
   it('carry the same keys in German and English', () => {

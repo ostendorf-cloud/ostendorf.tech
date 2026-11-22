@@ -127,24 +127,9 @@
         "instagram": { "label": "Instagram", "value": "simonostendorf.vtech" },
         "facebook": { "label": "Facebook", "value": "simonostendorf.vtech" }
       },
-      "form": {
-        "title": "Nachricht senden",
-        "name": "Name",
-        "email": "E-Mail",
-        "message": "Nachricht",
-        "honeypot": "Website",
-        "consent": {
-          "prefix": "Ich bin damit einverstanden, dass die angegebenen Daten gemäß der",
-          "linkLabel": "Datenschutzerklärung",
-          "suffix": "zur Bearbeitung meiner Anfrage gespeichert werden dürfen."
-        },
-        "submit": "Absenden",
-        "submitting": "Wird gesendet …",
-        "hint": "Pflichtfeld. Ein kurzer Rechentest in Ihrem Browser schützt vor Spam, ohne Drittanbieter.",
-        "noscript": "Der Spamschutz dieses Formulars braucht JavaScript. Ohne JavaScript erreichen Sie mich per E-Mail an simon\\@ostendorf.tech.",
-        "fallbackError": "Die Nachricht konnte nicht gesendet werden. Bitte schreiben Sie mir an simon\\@ostendorf.tech.",
-        "success": "Vielen Dank für Ihre Nachricht! Ich melde mich so schnell wie möglich bei Ihnen."
-      }
+      "formTitle": "Nachricht senden",
+      "consent": "Ich bin damit einverstanden, dass die angegebenen Daten gemäß der Datenschutzerklärung zur Bearbeitung meiner Anfrage gespeichert werden dürfen.",
+      "noscript": "Der Spamschutz dieses Formulars braucht JavaScript. Ohne JavaScript erreichen Sie mich per E-Mail an simon\\@ostendorf.tech."
     }
   },
   "bands": {
@@ -195,6 +180,7 @@
   },
   "legal": {
     "eyebrow": "Rechtliches",
+    "bindingNoticeDe": "Rechtlich verbindlich ist die deutsche Fassung.",
     "imprint": {
       "title": "Impressum",
       "metaDescription": "Impressum von Simon Ostendorf Veranstaltungstechnik."

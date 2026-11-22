@@ -18,14 +18,17 @@ import (
 
 	"github.com/ostendorf-cloud/govue/analytics"
 	"github.com/ostendorf-cloud/govue/clientip"
+	"github.com/ostendorf-cloud/govue/contact"
 	"github.com/ostendorf-cloud/govue/envconf"
 	"github.com/ostendorf-cloud/govue/logging"
+	govuemail "github.com/ostendorf-cloud/govue/mail"
+	"github.com/ostendorf-cloud/govue/pow"
 )
 
 // minKeyBytes is the shortest decoded key this package accepts for a signing
-// secret: a key shorter than this is a deployment mistake, not a value worth
-// running with, the same floor govue's own example applies to its keys.
-const minKeyBytes = 32
+// secret: govue's pow.MinKeyLen, so a key config.Load accepts is one
+// pow.New accepts too.
+const minKeyBytes = pow.MinKeyLen
 
 // Defaults applied to a field left unset in the environment.
 const (
@@ -39,7 +42,6 @@ const (
 	DefaultRateLimitBurst  = 120
 	DefaultRateLimitPer    = time.Minute
 
-	DefaultSMTPAddr  = "mail.ostendorf.cloud:587"
 	DefaultContactTo = "simon@ostendorf.tech"
 	// DefaultContactFrom is flagged in the report this milestone ends with:
 	// it may belong on ostendorf.tech itself rather than ostendorf.cloud,
@@ -47,17 +49,15 @@ const (
 	DefaultContactFrom = "ostendorf.tech <no-reply@ostendorf.cloud>"
 
 	// DefaultChallengeRateLimitBurst and DefaultChallengeRateLimitPer bound
-	// GET /api/v1/challenge per client address. The browser fetches one
-	// automatically whenever a visitor focuses the contact form, so the
-	// burst is generous; see old_simon-ostendorf.de's cmd/website/main.go
-	// for the values this ports.
-	DefaultChallengeRateLimitBurst = 10
-	DefaultChallengeRateLimitPer   = 20 * time.Second
+	// GET /api/v1/contact/challenge per client address: govue's own
+	// contact.DefaultChallengeBurst and DefaultChallengePer.
+	DefaultChallengeRateLimitBurst = contact.DefaultChallengeBurst
+	DefaultChallengeRateLimitPer   = contact.DefaultChallengePer
 	// DefaultContactRateLimitBurst and DefaultContactRateLimitPer bound
-	// POST /api/v1/contact per client address, tighter than the challenge
-	// limit because every one of these actually tries to send a mail.
-	DefaultContactRateLimitBurst = 5
-	DefaultContactRateLimitPer   = 10 * time.Minute
+	// POST /api/v1/contact per client address: govue's own
+	// contact.DefaultClientBurst and DefaultClientPer.
+	DefaultContactRateLimitBurst = contact.DefaultClientBurst
+	DefaultContactRateLimitPer   = contact.DefaultClientPer
 
 	// DefaultFeedRefreshInterval is how often the website asks the feed
 	// service for the Impressionen section's posts. The feed service
@@ -72,15 +72,11 @@ const (
 
 	// DefaultMailRateLimitBurst and DefaultMailRateLimitPer bound every
 	// contact mail this service sends in total, independent of who is
-	// asking; see internal/webapp for why the per-client limit above
-	// cannot stand in for this one. 50 an hour is well above anything a
-	// single event technology sole trader's contact form is ever expected
-	// to receive legitimately (a handful a day, generously multiplied for
-	// a busy week or a marketing push), while still being orders of
-	// magnitude below what an attacker spreading requests across many
-	// client addresses could otherwise drive the mail account to.
-	DefaultMailRateLimitBurst = 50
-	DefaultMailRateLimitPer   = time.Hour
+	// asking: govue's own contact.DefaultMailBurst and DefaultMailPer. The
+	// per-client limit above cannot stand in for this one, because one
+	// routed IPv6 /48 is 65,536 independent per-client buckets.
+	DefaultMailRateLimitBurst = contact.DefaultMailBurst
+	DefaultMailRateLimitPer   = contact.DefaultMailPer
 )
 
 // Feed refresh bounds, the range FEED_REFRESH_INTERVAL is checked
@@ -111,48 +107,40 @@ type Config struct {
 	RateLimitBurst int
 	RateLimitPer   time.Duration
 
-	// AllowPlainHTTP drops the session cookie's Secure attribute, for a
-	// plain HTTP development run (docker compose, or bin/website after task build). Never set on
-	// anything reachable from outside the machine it runs on.
+	// AllowPlainHTTP drops the Strict-Transport-Security header, for a
+	// plain HTTP development run (docker compose, or bin/website after task
+	// build). Never set on anything reachable from outside the machine it
+	// runs on.
 	AllowPlainHTTP bool
 
-	// CSRFKey signs the contact form's per-session CSRF token. Required:
-	// the contact form is the only mutating route this service has, and an
-	// application that started without a way to protect it would otherwise
-	// have to disable that protection outright, which is not a tradeoff
-	// this config makes silently.
-	CSRFKey []byte
-
-	// SMTPAddr, SMTPUsername and SMTPPassword reach the mail submission
-	// server the contact form sends through. Username and password are
-	// optional at the config level: a deployment without them yet still
-	// serves every other page, and the contact form answers unavailable
-	// instead of failing to start; see internal/webapp.
-	SMTPAddr     string
-	SMTPUsername string
-	SMTPPassword string
+	// SMTP is the mail submission server the contact form sends through,
+	// read by govue's mail.LoadConfig (SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
+	// SMTP_PASSWORD or SMTP_PASSWORD_FILE). Nil when SMTP_HOST is unset: the
+	// site still serves every page, and the contact form answers 503
+	// not_configured instead of the service refusing to start.
+	SMTP *govuemail.Config
 
 	// ContactTo and ContactFrom are the fixed addresses of every contact
 	// mail: the recipient (always Simon) and the envelope sender.
 	ContactTo   *mail.Address
 	ContactFrom *mail.Address
 
-	// ChallengeKey signs the proof of work challenge the contact form's
-	// Web Worker solves. Optional at the config level, like the SMTP
-	// credentials: without it the contact form answers unavailable rather
-	// than the service refusing to start.
+	// ChallengeKey signs the proof of work challenge govue's contact form
+	// solves in a Web Worker. Optional at the config level, like SMTP:
+	// without it the contact form answers 503 not_configured rather than
+	// the service refusing to start.
 	ChallengeKey []byte
 
 	// ChallengeKeyPrevious verifies a challenge issued under a key that
-	// was just rotated out, while ChallengeKey carries the new one. Every
-	// challenge still has to be issued under ChallengeKey; this only
-	// widens what Verify accepts, for the challengeTTL window where a
+	// was just rotated out, while ChallengeKey carries the new one. govue's
+	// pow signs with the first key and verifies with every key, so this
+	// only widens what Verify accepts, for the challenge TTL window where a
 	// challenge handed out just before the rotation is still in flight.
 	// Left unset, rotating CHALLENGE_KEY invalidates every challenge
 	// issued under the old key the moment the new one takes effect.
 	ChallengeKeyPrevious []byte
 
-	// ChallengeRateLimitBurst/Per bound GET /api/v1/challenge; see
+	// ChallengeRateLimitBurst/Per bound GET /api/v1/contact/challenge; see
 	// DefaultChallengeRateLimitBurst.
 	ChallengeRateLimitBurst int
 	ChallengeRateLimitPer   time.Duration
@@ -206,7 +194,6 @@ func Load(getenv func(string) string) (Config, error) {
 		RateLimitBurst:          loader.Int("RATE_LIMIT_BURST", DefaultRateLimitBurst, 1, 100_000),
 		RateLimitPer:            loader.Duration("RATE_LIMIT_PER", DefaultRateLimitPer, time.Second, time.Hour),
 		AllowPlainHTTP:          loader.Bool("ALLOW_PLAIN_HTTP", false),
-		SMTPAddr:                loader.String("SMTP_ADDR", DefaultSMTPAddr),
 		ChallengeRateLimitBurst: loader.Int("CHALLENGE_RATE_LIMIT_BURST", DefaultChallengeRateLimitBurst, 1, 100_000),
 		ChallengeRateLimitPer:   loader.Duration("CHALLENGE_RATE_LIMIT_PER", DefaultChallengeRateLimitPer, time.Second, time.Hour),
 		ContactRateLimitBurst:   loader.Int("CONTACT_RATE_LIMIT_BURST", DefaultContactRateLimitBurst, 1, 100_000),
@@ -238,8 +225,22 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.ContactFrom, err = mail.ParseAddress(loader.String("CONTACT_FROM", DefaultContactFrom))
 	fail(wrap("CONTACT_FROM", err))
 
-	cfg.SMTPUsername = loader.SecretOrFile("SMTP_USERNAME")
-	cfg.SMTPPassword = loader.SecretOrFile("SMTP_PASSWORD")
+	// SMTP_HOST unset is the contact form's mail switched off, not a
+	// mistake: govue's mail.LoadConfig requires it, so it only runs when
+	// the host is set. Its own messages name the variable at fault, so no
+	// wrap here.
+	if strings.TrimSpace(resolved(govuemail.EnvHost)) != "" {
+		smtp, err := govuemail.LoadConfig(getenv)
+		fail(err)
+		if err == nil {
+			// The EHLO name is the site's own host name rather than govue's
+			// "localhost" default, the name this site always announced.
+			if cfg.SiteURL != nil {
+				smtp.HeloName = cfg.SiteURL.Hostname()
+			}
+			cfg.SMTP = &smtp
+		}
+	}
 
 	challengeKey, err := decodeKey(loader.SecretOrFile("CHALLENGE_KEY"))
 	fail(wrap("CHALLENGE_KEY", err))
@@ -249,18 +250,12 @@ func Load(getenv func(string) string) (Config, error) {
 	fail(wrap("CHALLENGE_KEY_PREVIOUS", err))
 	cfg.ChallengeKeyPrevious = challengeKeyPrevious
 	if len(cfg.ChallengeKeyPrevious) > 0 && len(cfg.ChallengeKey) == 0 {
-		// handleChallenge always issues a fresh challenge under
-		// challengeKeys[0], the current key; webapp.go's New puts
-		// ChallengeKey there when it is set, and falls back to
-		// ChallengeKeyPrevious otherwise. A deployment that set only the
-		// previous key would then have a retired key issuing challenges
-		// again, exactly the thing rotation is meant to retire.
+		// govue's pow signs every fresh challenge with its first key. A
+		// deployment that set only the previous key would have a retired
+		// key issuing challenges again, exactly the thing rotation is meant
+		// to retire.
 		fail(wrap("CHALLENGE_KEY_PREVIOUS", errors.New("must not be set without CHALLENGE_KEY, which would then be the one issuing")))
 	}
-
-	csrfKey, err := decodeKey(loader.RequiredSecretOrFile("CSRF_KEY"))
-	fail(wrap("CSRF_KEY", err))
-	cfg.CSRFKey = csrfKey
 
 	// Read raw rather than through loader.URL: that helper treats an empty
 	// value as a missing required one, and an empty FEED_SERVICE_URL is
@@ -325,9 +320,8 @@ func resolvedGetenv(getenv func(string) string) func(string) string {
 }
 
 // decodeKey decodes raw as hex and checks its length. An empty raw means the
-// key was simply not configured, not a problem by itself: whether that is
-// acceptable is the caller's decision, CSRFKey requiring one and
-// ChallengeKey not. The caller names the variable through wrap, so the
+// key was simply not configured, not a problem by itself: the contact form
+// then answers 503 not_configured. The caller names the variable through wrap, so the
 // message here never repeats it.
 func decodeKey(raw string) ([]byte, error) {
 	if raw == "" {

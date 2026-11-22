@@ -20,6 +20,8 @@ const germanHref = computed(() => router.resolve({ name: 'terms', params: { loca
     :language-switch="false"
   >
     <div v-if="route.params.locale === 'de'" class="flex flex-col gap-4 text-text">
+      <p class="text-text-muted">{{ t('legal.bindingNoticeDe') }}</p>
+
       <h2 class="text-xl font-semibold">§ 1 Geltungsbereich</h2>
       <p>
         Diese Allgemeinen Geschäftsbedingungen gelten für alle Verträge zwischen Simon Ostendorf

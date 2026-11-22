@@ -8,10 +8,8 @@
 # Run by the docker-build job in .github/workflows/checks.yaml right
 # after it builds and loads the image, so this never needs a registry.
 #
-# CSRF_KEY is generated here with openssl, exactly the way
-# docker-compose.yaml's own comment documents; internal/config refuses
-# to start the application without one, and this value is thrown away
-# with the container.
+# The container starts with no secret at all: without CHALLENGE_KEY and
+# SMTP_HOST the contact form answers 503 and every page still serves.
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
@@ -38,8 +36,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-csrf_key="$(openssl rand -hex 32)"
-
 # ALLOW_PLAIN_HTTP matches docker-compose.yaml's own local run: this
 # script talks to the container directly over plain HTTP, with nothing
 # terminating TLS in front of it, unlike the chart's own default.
@@ -48,7 +44,6 @@ docker run \
   --name "$container" \
   --publish "127.0.0.1:8080:8080" \
   --publish "127.0.0.1:8081:8081" \
-  --env "CSRF_KEY=${csrf_key}" \
   --env "ALLOW_PLAIN_HTTP=true" \
   "$image" >/dev/null
 

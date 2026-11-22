@@ -112,8 +112,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/feed ./cmd/feed
 # make outbound TLS connections (OpenBao's API and the Graph API),
 # verified against the OS trust store. tzdata is unused by this binary:
 # cmd/feed and the packages it imports have no need for time zones at
-# all, let alone the "time/tzdata" import cmd/website's own runtime stage
-# uses below. "scratch" was considered and rejected for the
+# all, the same as cmd/website below. "scratch" was considered and rejected for the
 # ca-certificates gap alone. The ":nonroot" tag already runs as uid/gid
 # 65532, not root.
 #
@@ -144,13 +143,12 @@ ENTRYPOINT ["/usr/local/bin/feed"]
 # Runtime stage for cmd/website: same distroless base and the same
 # ca-certificates/no-shell reasoning as cmd/feed's own runtime stage
 # above. ca-certificates is what this image needs it for here: the
-# contact form's SMTP sender verifies the mail server's certificate
-# (internal/contact/smtp.go) against the OS trust store at connect time.
-# Unlike cmd/feed, this binary does care about a time zone, but tzdata is
-# still not needed from the image itself: internal/contact/message.go
-# imports "time/tzdata" to embed Europe/Berlin into the binary directly,
-# so the base image's own bundled tzdata ends up just as unused here as
-# it is for cmd/feed, for a different reason.
+# contact form's SMTP sender (govue's mail package) verifies the mail
+# server's certificate against the OS trust store at connect time. tzdata
+# is unused here too: no code in this binary loads a time zone, and govue
+# writes a contact mail's Date header in UTC. The base image bundles
+# tzdata anyway; this file installs nothing for it, so there is nothing
+# to remove.
 #
 # This is also why a bare "docker build ." or "docker compose build", with
 # no "--target", builds this stage: it is deliberately the last one in the

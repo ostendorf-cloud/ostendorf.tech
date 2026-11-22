@@ -64,14 +64,14 @@ Create the name of the service account to use.
 {{- end -}}
 
 {{/*
-Name of the existing Secret carrying CSRF_KEY and the other secret-backed
-values. values.schema.json allows this to stay empty, because no default
-Secret name could ever point at something that actually exists on the
-cluster; this check turns that empty default into a clear render-time
-failure instead of a Pod that crash-loops on a missing CSRF_KEY.
+Name of the existing Secret carrying CHALLENGE_KEY and the SMTP credentials
+of the contact form. values.schema.json allows this to stay empty, because
+no default Secret name could ever point at something that actually exists
+on the cluster; this check turns that empty default into a clear
+render-time failure instead of a site whose contact form answers 503.
 */}}
 {{- define "ostendorf-tech.existingSecretName" -}}
-{{- required "existingSecret.name is required: set it to the name of an existing Secret carrying CSRF_KEY, which the application needs to start and has no default." .Values.existingSecret.name -}}
+{{- required "existingSecret.name is required: set it to the name of an existing Secret carrying CHALLENGE_KEY and the SMTP credentials, without which the contact form answers 503." .Values.existingSecret.name -}}
 {{- end -}}
 
 {{/*
