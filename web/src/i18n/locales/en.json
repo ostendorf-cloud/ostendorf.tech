@@ -118,24 +118,9 @@
         "instagram": { "label": "Instagram", "value": "simonostendorf.vtech" },
         "facebook": { "label": "Facebook", "value": "simonostendorf.vtech" }
       },
-      "form": {
-        "title": "Send a message",
-        "name": "Name",
-        "email": "Email",
-        "message": "Message",
-        "honeypot": "Website",
-        "consent": {
-          "prefix": "I agree that the data I provide may be stored under the",
-          "linkLabel": "privacy policy",
-          "suffix": "to process my request."
-        },
-        "submit": "Send",
-        "submitting": "Sending …",
-        "hint": "Required field. A short computation in your browser protects against spam, with no third parties.",
-        "noscript": "This form's spam protection needs JavaScript. Without JavaScript, reach me by email at simon\\@ostendorf.tech.",
-        "fallbackError": "The message could not be sent. Please write to me at simon\\@ostendorf.tech.",
-        "success": "Thank you for your message! I will get back to you as soon as possible."
-      }
+      "formTitle": "Send a message",
+      "consent": "I agree that the data I provide may be stored under the privacy policy to process my request.",
+      "noscript": "This form's spam protection needs JavaScript. Without JavaScript, reach me by email at simon\\@ostendorf.tech."
     }
   },
   "bands": {

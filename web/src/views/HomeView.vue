@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { GovueCard, GovuePage } from '@ostendorf-cloud/govue'
+import {
+  createClient,
+  GovueCard,
+  GovueContactForm,
+  GovuePage,
+  legalPath,
+} from '@ostendorf-cloud/govue'
 
 import CardCarousel from '../components/CardCarousel.vue'
 import ContactChannels from '../components/ContactChannels.vue'
-import ContactForm from '../components/ContactForm.vue'
 import CountingFacts from '../components/CountingFacts.vue'
 import HeroStage from '../components/HeroStage.vue'
 import InstagramFeed from '../components/InstagramFeed.vue'
@@ -13,6 +18,7 @@ import LogoMark from '../components/LogoMark.vue'
 import ServiceIcon from '../components/ServiceIcon.vue'
 import { bands } from '../data/bands'
 import { serviceIcons } from '../data/services'
+import { isLocale } from '../i18n'
 import { experienceYearsFloor } from '../lib/experienceYears'
 import type { Fact } from '../lib/facts'
 import {
@@ -26,7 +32,15 @@ import {
 // Destructuring tm is vue-i18n's own documented usage; unbound-method's
 // warning about it does not apply, tm never reads `this`.
 // eslint-disable-next-line @typescript-eslint/unbound-method
-const { t, tm, rt } = useI18n()
+const { t, tm, rt, locale } = useI18n()
+
+// govue's contact form is stateless: the client sends no cookie
+// (credentials omit) and no CSRF token, as govue's GovueContactForm asks of
+// its caller.
+const contactClient = createClient({ credentials: 'omit' })
+const privacyHref = computed(() =>
+  legalPath('privacy', isLocale(locale.value) ? locale.value : 'de'),
+)
 
 // Annotated so the v-for below sees a real array type and a numeric
 // index, which tm's own return type does not provably give it.
@@ -243,7 +257,22 @@ const aboutFacts = computed<Fact[]>(() => [
 
       <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <ContactChannels />
-        <ContactForm />
+        <div class="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 sm:p-6">
+          <!-- govue ships the form, its labels and its errors. The consent
+               text and the heading are the site's own. -->
+          <GovueContactForm
+            :client="contactClient"
+            :privacy-href="privacyHref"
+            require-consent
+            :consent-label="t('home.contact.consent')"
+            :heading-level="3"
+          >
+            <template #title>{{ t('home.contact.formTitle') }}</template>
+          </GovueContactForm>
+          <noscript>
+            <p class="text-sm text-text-muted">{{ t('home.contact.noscript') }}</p>
+          </noscript>
+        </div>
       </div>
     </section>
   </GovuePage>
