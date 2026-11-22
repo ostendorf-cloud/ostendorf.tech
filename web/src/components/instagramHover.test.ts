@@ -30,6 +30,10 @@ function rule(css: string, selector: string): string {
 const css = styleBlock(source('src/components/InstagramFeed.vue'))
 const theme = source('src/theme/vtech.css')
 
+/** The one `@media (hover: hover)` block, and what is inside it. */
+const hoverMedia = /@media \(hover: hover\)\s*\{[\s\S]*?\n\}\n/
+const hoverRules = hoverMedia.exec(css)?.[0] ?? ''
+
 describe('the tile hover', () => {
   it('rounds the tile at 14 px with a 1 px border', () => {
     const tile = rule(css, '.insta-tile')
@@ -39,17 +43,22 @@ describe('the tile hover', () => {
 
   it('scales the picture to 1.06 over 600 ms with the theme easing', () => {
     expect(rule(css, '.insta-tile img')).toMatch(/transition:\s*transform 600ms var\(--ease-out\)/)
-    expect(css).toMatch(
-      /\.insta-tile:hover img,\s*\.insta-tile:focus-visible img\s*\{[^}]*transform:\s*scale\(1\.06\)/,
-    )
+    expect(rule(css, '.insta-tile:focus-visible img')).toMatch(/transform:\s*scale\(1\.06\)/)
+    expect(hoverRules).toMatch(/\.insta-tile:hover img\s*\{[^}]*transform:\s*scale\(1\.06\)/)
   })
 
   it('fades the overlay in over 250 ms, on hover and on keyboard focus', () => {
     expect(rule(css, '.insta-overlay')).toMatch(/transition:\s*opacity 250ms/)
     expect(rule(css, '.insta-overlay')).toMatch(/opacity:\s*0;/)
-    expect(css).toMatch(
-      /\.insta-tile:hover \.insta-overlay,\s*\.insta-tile:focus-visible \.insta-overlay\s*\{[^}]*opacity:\s*1/,
-    )
+    expect(rule(css, '.insta-tile:focus-visible .insta-overlay')).toMatch(/opacity:\s*1/)
+    expect(hoverRules).toMatch(/\.insta-tile:hover \.insta-overlay\s*\{[^}]*opacity:\s*1/)
+  })
+
+  it('applies hover only where a pointer can hover, and focus everywhere', () => {
+    // A tap on a touch screen must not leave the tile stuck hovered.
+    expect(hoverRules).not.toBe('')
+    const outside = css.replace(hoverMedia, '')
+    expect(outside).not.toMatch(/\.insta-tile:hover[^{]*\{[^}]*(scale|opacity:\s*1)/)
   })
 
   it('sizes the glyph at 34 px', () => {

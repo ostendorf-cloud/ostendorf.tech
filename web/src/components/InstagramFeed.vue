@@ -168,14 +168,24 @@ onMounted(async () => {
   height: 34px;
 }
 
-.insta-tile:hover img,
 .insta-tile:focus-visible img {
   transform: scale(1.06);
 }
 
-.insta-tile:hover .insta-overlay,
 .insta-tile:focus-visible .insta-overlay {
   opacity: 1;
+}
+
+/* Hover only where the pointer can really hover: on a touch screen a tap
+   would otherwise leave the tile stuck in its hovered state. */
+@media (hover: hover) {
+  .insta-tile:hover img {
+    transform: scale(1.06);
+  }
+
+  .insta-tile:hover .insta-overlay {
+    opacity: 1;
+  }
 }
 
 /* No scale and no fade: the overlay simply appears. */
@@ -189,5 +199,7 @@ onMounted(async () => {
   .insta-tile:focus-visible img {
     transform: none;
   }
+  /* (the hover rules above sit in a media query of their own, so this
+     reduced motion rule, which comes later with equal specificity, wins) */
 }
 </style>
