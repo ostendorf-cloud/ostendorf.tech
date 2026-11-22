@@ -6,7 +6,9 @@
     "switchLocale": "English",
     "carousel": {
       "slide": "{n} von {total}",
-      "region": "{label}, seitlich scrollbar"
+      "region": "{label}, seitlich scrollbar",
+      "pause": "Automatisches Scrollen pausieren",
+      "play": "Automatisches Scrollen starten"
     },
     "theme": {
       "switch": "Farbmodus: {current}. Wechseln zu: {next}.",
