@@ -151,6 +151,69 @@ describe('the vtech theme', () => {
 })
 
 /*
+ * The header. Its ground is --header-bg, the page background at a declared
+ * alpha, and what scrolls under it shows through the blur. White and black
+ * are the two worst cases in each mode (a white page, or the dark hero under
+ * a light header), so the text roles the header paints, the links, the
+ * language switch's accent text and the muted text, are measured over both.
+ */
+const HEADER_TEXT_ROLES = ['text', 'text-muted', 'accent-text']
+const headerAlpha = (() => {
+  const match = /--header-bg:\s*color-mix\(in srgb, var\(--color-bg\) (\d+)%, transparent\)/.exec(
+    css,
+  )
+  if (!match) {
+    throw new Error('contrast: vtech.css declares no --header-bg over --color-bg')
+  }
+  return Number(match[1]) / 100
+})()
+
+describe('the header ground', () => {
+  for (const [mode, palette] of [
+    ['light', light],
+    ['dark', dark],
+  ] as const) {
+    for (const [name, behind] of [
+      ['white', 255],
+      ['black', 0],
+    ] as const) {
+      it(`carries every header text role at 4.5:1 over ${name} in ${mode} mode`, () => {
+        const ground = heroGround(palette.bg, headerAlpha, behind)
+        const failed = HEADER_TEXT_ROLES.flatMap((role) => {
+          const value = ratio(palette[role], ground)
+          return value < TEXT_MINIMUM ? [`${role} is ${round(value)}:1 over ${name}`] : []
+        })
+        expect(failed).toEqual([])
+      })
+    }
+  }
+
+  it('is at least 86% opaque', () => {
+    expect(headerAlpha).toBeGreaterThanOrEqual(0.86)
+  })
+})
+
+/*
+ * Two pairs that are below 3:1 on purpose. accent-strong is the purple end
+ * of the gradient button's border: 2.95:1 on surface-hover and 2.87:1 on
+ * accent-subtle in dark mode. Neither is a ground that border sits on: the
+ * button keeps the surface fill on hover (styles.css, .btn-gradient), and no
+ * gradient button sits on an accent-subtle tint. The button's label, not its
+ * border, identifies it, and the border holds on the surface, below.
+ */
+describe('the gradient border exceptions', () => {
+  it('are the measured ratios, so a change to either token shows up here', () => {
+    expect(ratio(dark['accent-strong'], dark['surface-hover'])).toBeLessThan(3)
+    expect(ratio(dark['accent-strong'], dark['accent-subtle'])).toBeLessThan(3)
+  })
+
+  it('hold on the surface, the only ground the button is painted on', () => {
+    expect(ratio(dark['accent-strong'], dark.surface)).toBeGreaterThanOrEqual(3)
+    expect(ratio(light['accent-strong'], light.surface)).toBeGreaterThanOrEqual(3)
+  })
+})
+
+/*
  * The old site's palette (its style.css :root) in dark mode. These are the
  * owner's colours; the test fails if a later edit drifts away from them
  * without saying so.

@@ -4,6 +4,14 @@ import { ref } from 'vue'
 export const IMPRESSIONS_ID = 'impressions'
 
 /**
+ * The widths, from Tailwind's sm (40rem) up to just below lg (64rem), where
+ * the header shows its navigation as one row that has no room for a fifth
+ * link in German (about 909 px needed). The Impressionen entry is left out of
+ * the row there; below sm it is in govue's menu, from lg in the row.
+ */
+export const IMPRESSIONS_HIDDEN_QUERY = '(min-width: 40rem) and (max-width: 63.9375rem)'
+
+/**
  * Whether the Impressionen section is on the page right now.
  *
  * The section renders itself in the browser once the feed has posts, so the

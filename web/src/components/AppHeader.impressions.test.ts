@@ -1,11 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/vue'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { createAppI18n } from '../i18n'
 import type { Locale } from '../i18n'
-import { impressionsOnPage } from '../lib/pageSections'
+import { IMPRESSIONS_HIDDEN_QUERY, impressionsOnPage } from '../lib/pageSections'
 import AppHeader from './AppHeader.vue'
 import InstagramFeed from './InstagramFeed.vue'
 
@@ -33,8 +33,31 @@ function navLabels(): string[] {
   return Array.from(links, (a) => (a.textContent ?? '').trim())
 }
 
+/** A viewport of the given width, as far as the header's one media query goes:
+ *  true while the width is in the 640 to 1023 px range. Returns a function
+ *  that resizes it and tells the listeners. */
+function stubViewport(width: number): (next: number) => void {
+  let current = width
+  const listeners = new Set<() => void>()
+  const inRange = (): boolean => current >= 640 && current <= 1023
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    get matches() {
+      return query === IMPRESSIONS_HIDDEN_QUERY && inRange()
+    },
+    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+  }))
+  return (next) => {
+    current = next
+    listeners.forEach((listener) => {
+      listener()
+    })
+  }
+}
+
 afterEach(() => {
   impressionsOnPage.value = false
+  vi.unstubAllGlobals()
 })
 
 describe('the Impressionen entry in the header', () => {
@@ -82,6 +105,55 @@ describe('the Impressionen entry in the header', () => {
       '/en#impressions',
     )
     expect(container.querySelector('#impressions')).not.toBeNull()
+  })
+
+  const withEntry = ['Leistungen', 'Impressionen', 'Bands', 'Über mich', 'Kontakt']
+  const withoutEntry = ['Leistungen', 'Bands', 'Über mich', 'Kontakt']
+
+  for (const width of [400, 1024, 1440]) {
+    it(`is in the list at ${width} px: govue's menu below 640, the row from 1024`, async () => {
+      stubViewport(width)
+      await renderPage('de', () => Promise.resolve({ posts }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: 'Impressionen' })).toBeInTheDocument()
+      })
+      expect(navLabels()).toEqual(withEntry)
+    })
+  }
+
+  for (const width of [640, 768, 900, 1023]) {
+    it(`is not in the row at ${width} px, though the section is on the page`, async () => {
+      stubViewport(width)
+      const { container } = await renderPage('de', () => Promise.resolve({ posts }))
+
+      await waitFor(() => {
+        expect(container.querySelector('#impressions')).not.toBeNull()
+      })
+      expect(navLabels()).toEqual(withoutEntry)
+    })
+  }
+
+  it('follows a resize across the range', async () => {
+    const resize = stubViewport(1280)
+    await renderPage('de', () => Promise.resolve({ posts }))
+    await waitFor(() => {
+      expect(navLabels()).toEqual(withEntry)
+    })
+
+    resize(800)
+    await waitFor(() => {
+      expect(navLabels()).toEqual(withoutEntry)
+    })
+
+    resize(1100)
+    await waitFor(() => {
+      expect(navLabels()).toEqual(withEntry)
+    })
+  })
+
+  it('hides the entry only between the sm and lg breakpoints', () => {
+    expect(IMPRESSIONS_HIDDEN_QUERY).toBe('(min-width: 40rem) and (max-width: 63.9375rem)')
   })
 
   it('goes away with the section', async () => {

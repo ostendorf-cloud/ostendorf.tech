@@ -183,6 +183,12 @@
    */
   --brand-gradient-from: var(--color-accent);
   --brand-gradient-to: var(--color-accent-text);
+  /* The header's translucent ground: the page background at 86%. The text on
+     it sits over whatever scrolls under the blur, white and black being the
+     two worst cases, and 0.86 is above the 0.85 floor where accent-text
+     still holds 4.5:1 over both; src/theme/contrast.test.ts measures it. */
+  --header-bg: color-mix(in srgb, var(--color-bg) 86%, transparent);
+
   /* The logo's own two stops, the favicon's values. A logo is not a text or
      icon role and is exempt from the contrast rules, and it must not change
      with the mode or with the palette, so these are plain colours, the same

@@ -313,7 +313,10 @@ implemented. Left out, tracked as later milestones:
   because it cannot know whether the section will be there, and `InstagramFeed.vue` sets
   `impressionsOnPage` (`web/src/lib/pageSections.ts`) once its section is rendered, which
   makes `AppHeader.vue` add the entry between Leistungen and Bands. The entry shifts the
-  links after it sideways when it arrives; the header's height does not change.
+  links after it sideways when it arrives; the header's height does not change. It is
+  left out of the row between 640 and 1023 px (`IMPRESSIONS_HIDDEN_QUERY`, the `sm` to
+  below `lg` range), where the one row has no room for a fifth German link; it is in
+  govue's menu below 640 px and in the row from 1024 px.
 
 ## Deviations
 

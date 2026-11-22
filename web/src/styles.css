@@ -42,11 +42,10 @@
  * theme's --brand-gradient, never a copy of its colours. Forced colours
  * drops the background layers, so the border falls back to a system one.
  *
- * The header's Kontakt link is the old site's nav-cta and takes the same
- * look from the same rules: GovueNav renders a plain anchor with no class
- * hook of its own, so it is selected by where it points.
+ * Hover keeps the surface fill and lifts the button: the purple end of the
+ * border has 3.2:1 on the surface but only 2.95:1 on the hover surface.
  */
-:is(.btn-gradient, .app-header nav a[href$='#contact']) {
+.btn-gradient {
   border: 1.5px solid transparent;
   border-radius: 999px;
   background:
@@ -58,42 +57,41 @@
     transform 200ms var(--ease-out);
 }
 
-:is(.btn-gradient, .app-header nav a[href$='#contact']):is(:hover, :focus-visible) {
-  background:
-    linear-gradient(var(--color-surface-hover), var(--color-surface-hover)) padding-box,
-    var(--brand-gradient) border-box;
+.btn-gradient:is(:hover, :focus-visible) {
   transform: translateY(-2px);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(.btn-gradient, .app-header nav a[href$='#contact']) {
+  .btn-gradient {
     transition: none;
   }
 
-  :is(.btn-gradient, .app-header nav a[href$='#contact']):is(:hover, :focus-visible) {
+  .btn-gradient:is(:hover, :focus-visible) {
     transform: none;
   }
 }
 
 @media (forced-colors: active) {
-  :is(.btn-gradient, .app-header nav a[href$='#contact']) {
+  .btn-gradient {
     border-color: ButtonText;
   }
 }
 
 /*
- * The header as on the old site: translucent over what scrolls under it,
- * with a blur and a border. A browser without backdrop-filter keeps the
- * opaque ground govue gives it, since a see-through bar over text is
+ * The header as on the old site: translucent with a blur. This overrides
+ * the bg-surface that GovueHeader sets on its root, because govue has no
+ * header background token to set instead: a token for the header's ground
+ * is the missing govue feature, and this one rule goes when it exists.
+ * --header-bg is the theme's token for it. A browser without backdrop-filter
+ * keeps govue's opaque ground, since a see-through bar over text is
  * unreadable. The old site also made the bar transparent over the hero
- * until the page scrolled; that needs the header to float over the hero,
- * and this one is a sticky row the hero starts below, whose measured height
- * (--header-height) the anchors and the hero's own height depend on, so it
- * stays a bar.
+ * until the page scrolled; this one is a sticky row the hero starts below,
+ * whose measured height (--header-height) drives the anchors and the hero's
+ * own height, so it stays a bar.
  */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .app-header {
-    background-color: color-mix(in srgb, var(--color-bg) 82%, transparent);
+    background-color: var(--header-bg);
     -webkit-backdrop-filter: blur(14px) saturate(1.2);
     backdrop-filter: blur(14px) saturate(1.2);
   }

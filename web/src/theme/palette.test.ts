@@ -25,25 +25,34 @@ describe('the gradient button', () => {
   const styles = source('src/styles.css')
 
   it('is defined once, from the brand gradient and the surface tokens', () => {
-    expect(styles.match(/^:is\(\.btn-gradient, [^)]*\]\)\s*\{/gm)).toHaveLength(1)
-    expect(styles).toMatch(/^:is\(\.btn-gradient, [^{]*\{[^}]*var\(--brand-gradient\) border-box/m)
-    expect(styles).toMatch(/^:is\(\.btn-gradient, [^{]*\{[^}]*var\(--color-surface\)/m)
+    expect(styles.match(/^\.btn-gradient\s*\{/gm)).toHaveLength(1)
+    expect(styles).toMatch(/^\.btn-gradient\s*\{[^}]*var\(--brand-gradient\) border-box/m)
+    expect(styles).toMatch(/^\.btn-gradient\s*\{[^}]*var\(--color-surface\)/m)
   })
 
   it('does not lift or animate for reduced motion', () => {
     expect(styles).toMatch(
-      /prefers-reduced-motion: reduce\)\s*\{\s*:is\(\.btn-gradient, [^{]*\{\s*transition: none;[\s\S]*?transform: none;/,
+      /prefers-reduced-motion: reduce\)\s*\{\s*\.btn-gradient\s*\{\s*transition: none;[\s\S]*?transform: none;/,
     )
   })
 
-  it('also dresses the header link to the contact section, as the old nav-cta', () => {
-    expect(styles).toContain(".app-header nav a[href$='#contact']")
+  // The purple end of the border is 3.2:1 on the surface and 2.95:1 on the
+  // hover surface (see contrast.test.ts), so hover must not repaint the fill.
+  it('keeps the surface fill on hover, only lifting', () => {
+    expect(styles).not.toMatch(/\.btn-gradient[^{]*hover[^{]*\{[^}]*surface-hover/)
+    expect(styles).toMatch(/\.btn-gradient:is\(:hover, :focus-visible\)\s*\{\s*transform:/)
   })
 
-  it('makes the header translucent with a blur only where backdrop-filter exists', () => {
+  it('restyles no govue link through its href: govue offers no hook for it', () => {
+    expect(styles).not.toMatch(/a\[href/)
+  })
+
+  it('makes the header translucent from one token and one selector, with the govue gap named', () => {
     expect(styles).toMatch(
-      /@supports \(backdrop-filter: blur\(1px\)\)[^{]*\{\s*\.app-header\s*\{[^}]*color-mix\(in srgb, var\(--color-bg\) 82%, transparent\)[^}]*backdrop-filter: blur\(14px\)/,
+      /@supports \(backdrop-filter: blur\(1px\)\)[^{]*\{\s*\.app-header\s*\{[^}]*background-color: var\(--header-bg\)[^}]*backdrop-filter: blur\(14px\)/,
     )
+    expect(styles.match(/\.app-header\b/g)).toHaveLength(1)
+    expect(styles).toMatch(/govue has no\s+\*?\s*header background token/)
   })
 
   it('is what the primary buttons of the home page use', () => {
