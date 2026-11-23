@@ -248,10 +248,12 @@ podman compose --profile realfeed up --build
 - Compose also forwards `OPENBAO_SECRET_KEY_ACCESS_TOKEN`, `OPENBAO_SECRET_KEY_REFRESHED_AT`,
   `SYNC_INTERVAL`, `TOKEN_REFRESH_AGE`, `API_VERSION`, `POST_COUNT`, `POSTS_PER_REQUEST` and
   `LOG_LEVEL`. Empty means the service's own default.
-- `POST_COUNT` caps the posts one sync collects, default 200, `0` for every post of the
-  account. `POSTS_PER_REQUEST` is how many posts one request to Meta asks for, default 50,
-  `1` to `100`. Each post costs its picture in memory, in the feed service and again in the
-  website: see "Posts and memory" in `charts/ostendorf.tech/README.md`.
+- `POST_COUNT` caps the number of posts, 0 means the maximum of 10000. The default is 200.
+  `POSTS_PER_REQUEST` is how many posts one request to Meta asks for, default 50, `1` to
+  `100`. Each post costs its picture in memory, in the feed service and again in the
+  website: see "Posts and memory" in `charts/ostendorf.tech/README.md`, which also covers
+  the chart's `GOMEMLIMIT`.
+- The feed service follows no redirect from Meta or from a picture host.
 - `OPENBAO_TOKEN_FILE` is not forwarded: a bind mount of a file that may be absent cannot be
   optional in compose.
 - The token never goes into `docker-compose.yaml`. It is only read from `.env` or the shell.
