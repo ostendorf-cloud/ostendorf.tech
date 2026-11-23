@@ -12,12 +12,12 @@ import { prefersReducedMotion } from '../lib/motion'
  * It is a plain scroll container with CSS scroll snap, so a swipe, the
  * arrow keys, a trackpad and the Tab key all work without this script, and
  * every card stays reachable when it does not run. The two buttons are an
- * addition: each scrolls by one page, the width of the visible row. They
+ * addition: each scrolls by one card, its width plus the gap. They
  * use aria-disabled instead of disabled at the ends, so a keyboard user's
- * focus is not thrown out of the control when the last page is reached.
+ * focus is not thrown out of the control when the last card is reached.
  *
- * The row also advances by itself, one page every AUTO_SCROLL_INTERVAL_MS,
- * and wraps to the start after the last page. It holds still while the
+ * The row also advances by itself, one card every AUTO_SCROLL_INTERVAL_MS,
+ * and wraps to the start at the end. It holds still while the
  * pointer is over the carousel, while focus is inside it (the pause button
  * excepted), while a finger or a pressed pointer is on the track, while the
  * page is hidden and while the carousel is scrolled out of view. A wheel
@@ -70,28 +70,36 @@ function update(): void {
   atEnd.value = el.scrollLeft + el.clientWidth >= el.scrollWidth - EDGE_TOLERANCE
 }
 
-/** One page: the visible width plus the gap, so the next card lands
- *  exactly on a snap point. */
-function pageSize(el: HTMLElement): number {
+/** One step: the width of one card plus the gap, so the next card lands
+ *  exactly on a snap point. 0 while the cards have no layout. */
+function stepSize(el: HTMLElement): number {
+  const card = el.firstElementChild
+  if (!(card instanceof HTMLElement)) {
+    return 0
+  }
   const gap = Number.parseFloat(getComputedStyle(el).columnGap)
-  return el.clientWidth + (Number.isFinite(gap) ? gap : 0)
+  return card.offsetWidth + (Number.isFinite(gap) ? gap : 0)
 }
 
-function scrollPage(direction: -1 | 1): void {
+function scrollStep(direction: -1 | 1): void {
   const el = track.value
   if (!el) {
+    return
+  }
+  const step = stepSize(el)
+  if (step <= 0) {
     return
   }
   if (direction === -1 ? atStart.value : atEnd.value) {
     return
   }
   el.scrollBy({
-    left: direction * pageSize(el),
+    left: direction * step,
     behavior: prefersReducedMotion() ? 'auto' : 'smooth',
   })
 }
 
-/** The time between two automatic page turns. */
+/** The time between two automatic steps. */
 const AUTO_SCROLL_INTERVAL_MS = 6000
 
 /** The visitor stopped the movement with the pause button. */
@@ -143,8 +151,8 @@ function startTimer(): void {
   }
 }
 
-/** One automatic step: the page the next arrow scrolls by, or, on the last
- *  page, back to the start. A row with nothing to scroll stays put. */
+/** One automatic step: the card the next arrow scrolls by, or, at the
+ *  end, back to the start. A row with nothing to scroll stays put. */
 function advance(): void {
   const el = track.value
   if (!el || (atStart.value && atEnd.value)) {
@@ -157,11 +165,11 @@ function advance(): void {
     el.scrollBy({ left: -el.scrollLeft, behavior: 'smooth' })
     return
   }
-  scrollPage(1)
+  scrollStep(1)
 }
 
 function onArrow(direction: -1 | 1): void {
-  scrollPage(direction)
+  scrollStep(direction)
   startTimer()
 }
 
