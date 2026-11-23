@@ -88,7 +88,7 @@ type Syncer struct {
 	Client *Client
 	// Tokens is asked for the token every cycle; required.
 	Tokens TokenSource
-	// Count caps the posts of one cycle; zero means no cap.
+	// Count caps the posts of one cycle; zero means MaxPosts.
 	Count int
 	// PerRequest is how many posts one call to Meta asks for, 1 to
 	// MaxPostsPerRequest; zero means DefaultPostsPerRequest.

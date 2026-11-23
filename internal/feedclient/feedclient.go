@@ -55,8 +55,8 @@ const (
 	// every entry can pull a MaxImageBytes image. A second, independent
 	// limit against a feed service response that does not honour its own
 	// ceiling, the same reasoning MaxImageBytes above already states for
-	// image size. A feed service run with POST_COUNT=0, no cap, on an
-	// account with more posts than this shows the newest maxPosts here.
+	// image size. The feed service reads POST_COUNT=0 as the same maximum,
+	// internal/instagram.MaxPosts.
 	maxPosts = 10000
 )
 

@@ -41,7 +41,7 @@ const (
 	defaultListenAddr = ":9081"
 	// defaultPostCount is the size of the sample account: enough posts for several
 	// "load more" clicks, few enough to draw in a moment at startup. The real feed
-	// service reads POST_COUNT as a cap on a real account, with 0 for no cap; here
+	// service reads POST_COUNT as a cap on a real account, with 0 for its maximum; here
 	// it is the number of samples, and 0 or empty means the whole sample account.
 	// maxPostCount keeps the startup drawing short.
 	defaultPostCount = 40

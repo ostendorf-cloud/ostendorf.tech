@@ -49,10 +49,14 @@ const (
 	// pause spreads a cycle of many pages over time, so a full fetch stays
 	// well inside Meta's rate limits.
 	DefaultPagePause = 500 * time.Millisecond
-	// maxPages bounds one cycle even with no cap on the posts: 1000 pages of
-	// 100 posts is far beyond any real account, so reaching it means a
-	// misbehaving answer, not a large account.
-	maxPages = 1000
+	// MaxPosts is the most posts one Media call collects. A cap of 0 means
+	// this maximum, so a cycle is always bounded.
+	MaxPosts = 10000
+	// defaultMaxPages bounds the pages of one cycle. Every page that does
+	// not end the cycle adds at least one post, so MaxPosts posts need at
+	// most MaxPosts pages, even at one post per request: the cap ends every
+	// valid cycle before this bound.
+	defaultMaxPages = MaxPosts
 )
 
 // Error kinds of a media cycle. The returned error wraps one of them, so a
@@ -68,8 +72,11 @@ var (
 	ErrInvalidCursor = errors.New("invalid paging cursor")
 	// ErrCursorLoop is a cursor that came back a second time in one cycle.
 	ErrCursorLoop = errors.New("paging cursor repeated")
-	// ErrTooManyPages is a cycle that reached maxPages.
+	// ErrTooManyPages is a cycle that reached the page bound.
 	ErrTooManyPages = errors.New("too many pages")
+	// ErrRedirect is a 3xx answer. Redirects are not followed, for the
+	// Graph API and for pictures alike.
+	ErrRedirect = errors.New("redirect not followed")
 )
 
 // validCursor is what a paging cursor from Meta may look like before it is
@@ -127,6 +134,19 @@ type Client struct {
 	// PagePause is the wait between two pages of one Media call; zero
 	// means none. NewClient sets DefaultPagePause.
 	PagePause time.Duration
+
+	// maxPages bounds the pages of one Media call; zero means
+	// defaultMaxPages. Tests lower it to reach the bound.
+	maxPages int
+}
+
+// do sends req without following a redirect, whatever HTTP's own
+// CheckRedirect says: a request goes only to the URL it was built for, so
+// the host checks before it stay true. A 3xx comes back as the response.
+func (c *Client) do(req *http.Request) (*http.Response, error) {
+	hc := *c.HTTP
+	hc.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return hc.Do(req)
 }
 
 // NewClient returns a client for the real API with a 15 second timeout.
@@ -176,7 +196,7 @@ func (c *Client) getJSON(ctx context.Context, endpoint string, params url.Values
 	if err != nil {
 		return scrub(err)
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return scrub(err)
 	}
@@ -186,6 +206,8 @@ func (c *Client) getJSON(ctx context.Context, endpoint string, params url.Values
 		return scrub(err)
 	}
 	switch {
+	case resp.StatusCode >= 300 && resp.StatusCode < 400:
+		return fmt.Errorf("%w: status %d", ErrRedirect, resp.StatusCode)
 	case resp.StatusCode == http.StatusTooManyRequests:
 		return fmt.Errorf("%w: %w", ErrRateLimited, describe(resp.StatusCode, body))
 	case resp.StatusCode >= 400 && resp.StatusCode < 500:
@@ -236,8 +258,8 @@ type MediaResult struct {
 // Media returns the posts of the token's account, newest first. It asks for
 // perRequest posts per call (1 to MaxPostsPerRequest) and follows the
 // paging cursor until Meta announces no further page or maxPosts posts are
-// collected; maxPosts 0 means no cap. The pages are fetched one after the
-// other with PagePause between them.
+// collected; maxPosts 0, or anything above MaxPosts, means MaxPosts. The
+// pages are fetched one after the other with PagePause between them.
 //
 // Every page is requested from this client's own endpoint, with the cursor
 // from paging.cursors.after as the after parameter. The URL in paging.next
@@ -257,6 +279,13 @@ func (c *Client) Media(ctx context.Context, token string, perRequest, maxPosts i
 	if maxPosts < 0 {
 		return res, errors.New("instagram media: the post cap must not be negative")
 	}
+	if maxPosts == 0 || maxPosts > MaxPosts {
+		maxPosts = MaxPosts
+	}
+	maxPages := c.maxPages
+	if maxPages <= 0 {
+		maxPages = defaultMaxPages
+	}
 	seen := map[string]bool{}
 	after := ""
 	for {
@@ -266,10 +295,7 @@ func (c *Client) Media(ctx context.Context, token string, perRequest, maxPosts i
 		if res.Pages > 0 && !pause(ctx, c.PagePause) {
 			return res, fmt.Errorf("instagram media: %w", ctx.Err())
 		}
-		limit := perRequest
-		if maxPosts > 0 {
-			limit = min(limit, maxPosts-len(res.Media))
-		}
+		limit := min(perRequest, maxPosts-len(res.Media))
 		params := url.Values{}
 		params.Set("fields", "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp")
 		params.Set("limit", strconv.Itoa(limit))
@@ -286,7 +312,7 @@ func (c *Client) Media(ctx context.Context, token string, perRequest, maxPosts i
 			page.Data = page.Data[:limit]
 		}
 		res.Media = append(res.Media, page.Data...)
-		if maxPosts > 0 && len(res.Media) >= maxPosts {
+		if len(res.Media) >= maxPosts {
 			return res, nil
 		}
 		if !page.hasNext() || len(page.Data) == 0 {
@@ -368,11 +394,14 @@ func (c *Client) Image(ctx context.Context, rawURL string) ([]byte, string, erro
 	if err != nil {
 		return nil, "", scrub(err)
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, "", fmt.Errorf("instagram image from %s: %w", u.Host, scrub(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		return nil, "", fmt.Errorf("instagram image from %s: %w: status %d", u.Host, ErrRedirect, resp.StatusCode)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", fmt.Errorf("instagram image from %s: unexpected status %d", u.Host, resp.StatusCode)
 	}

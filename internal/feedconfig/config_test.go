@@ -133,9 +133,11 @@ func TestLoadOverrides(t *testing.T) {
 	}
 }
 
-// TestLoadPostCountZeroMeansNoCap proves POST_COUNT=0 is accepted as "no
-// cap" rather than refused, and POSTS_PER_REQUEST=1 as the lower bound.
-func TestLoadPostCountZeroMeansNoCap(t *testing.T) {
+// TestLoadPostCountZeroIsAccepted proves POST_COUNT=0, the maximum of
+// 10000 posts, is accepted rather than refused, and POSTS_PER_REQUEST=1
+// with it: 10000 posts at one per request stay within the client's page
+// bound, see internal/instagram's TestMediaZeroMeansTheMaximumAtOnePostPerRequest.
+func TestLoadPostCountZeroIsAccepted(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := Load(env(requiredValues(map[string]string{"POST_COUNT": "0", "POSTS_PER_REQUEST": "1"})))

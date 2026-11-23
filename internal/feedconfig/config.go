@@ -60,7 +60,8 @@ const (
 	// rather than repeating it, so the two can never drift.
 	DefaultAPIVersion = instagram.DefaultVersion
 	// DefaultPostCount caps how many posts one sync collects across all
-	// pages; 0 means no cap. Every post held costs the bytes of its picture,
+	// pages; 0 means the maximum of 10000 (instagram.MaxPosts). Every post
+	// held costs the bytes of its picture,
 	// see the chart's README for the memory this takes.
 	DefaultPostCount = 200
 	// DefaultPostsPerRequest is how many posts one call to Meta asks for.
@@ -77,10 +78,10 @@ const (
 	maxSyncInterval    = 24 * time.Hour
 	minTokenRefreshAge = 24 * time.Hour
 	maxTokenRefreshAge = 50 * 24 * time.Hour
-	// POST_COUNT is 0 (no cap) or at most maxPostCount, the same bound
+	// POST_COUNT is 0 (the maximum) or at most maxPostCount, the same bound
 	// internal/feedclient applies to the list the website reads.
 	minPostCount       = 0
-	maxPostCount       = 10000
+	maxPostCount       = instagram.MaxPosts
 	minPostsPerRequest = 1
 	maxPostsPerRequest = instagram.MaxPostsPerRequest
 )
@@ -125,7 +126,7 @@ type Config struct {
 	// internal/instagram.DefaultVersion.
 	APIVersion string
 	// PostCount caps the posts one sync collects across all pages; 0 means
-	// no cap.
+	// the maximum of 10000.
 	PostCount int
 	// PostsPerRequest is how many posts one call to Meta asks for, 1 to
 	// instagram.MaxPostsPerRequest.
