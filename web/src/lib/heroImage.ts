@@ -28,9 +28,13 @@ import hero2400Webp from '../assets/hero-2400.webp'
 import heroJpeg from '../assets/hero-1280.jpg'
 import portrait460Avif from '../assets/portrait-460.avif'
 import portrait920Avif from '../assets/portrait-920.avif'
+import portrait1200Avif from '../assets/portrait-1200.avif'
 import portrait460Webp from '../assets/portrait-460.webp'
 import portrait920Webp from '../assets/portrait-920.webp'
-import portraitJpeg from '../assets/portrait-460.jpg'
+import portrait1200Webp from '../assets/portrait-1200.webp'
+import portrait460Jpeg from '../assets/portrait-460.jpg'
+import portrait920Jpeg from '../assets/portrait-920.jpg'
+import portrait1200Jpeg from '../assets/portrait-1200.jpg'
 
 function srcset(variants: Array<[url: string, width: number]>): string {
   return variants.map(([url, width]) => `${url} ${width}w`).join(', ')
@@ -75,14 +79,35 @@ export const PORTRAIT_BOX = { width: 1200, height: 1500 } as const
 /** The portrait is capped at 460 CSS pixels by the Über mich layout. */
 export const PORTRAIT_SIZES = '(min-width: 920px) 460px, min(100vw - 2rem, 460px)'
 
-export const portraitAvif = srcset([
-  [portrait460Avif, 460],
-  [portrait920Avif, 920],
-])
+/** Each portrait variant with its pixel width, square like the original.
+ *  The widest one is the original's own 1200 pixels and is never exceeded,
+ *  so no variant is upscaled. A test reads every file's header against
+ *  these widths. */
+export const PORTRAIT_VARIANTS = {
+  avif: [
+    [portrait460Avif, 460],
+    [portrait920Avif, 920],
+    [portrait1200Avif, 1200],
+  ],
+  webp: [
+    [portrait460Webp, 460],
+    [portrait920Webp, 920],
+    [portrait1200Webp, 1200],
+  ],
+  jpeg: [
+    [portrait460Jpeg, 460],
+    [portrait920Jpeg, 920],
+    [portrait1200Jpeg, 1200],
+  ],
+} as const satisfies Record<string, Array<[url: string, width: number]>>
 
-export const portraitWebp = srcset([
-  [portrait460Webp, 460],
-  [portrait920Webp, 920],
-])
+export const portraitAvif = srcset([...PORTRAIT_VARIANTS.avif])
 
-export const portraitFallback = portraitJpeg
+export const portraitWebp = srcset([...PORTRAIT_VARIANTS.webp])
+
+/** The fallback <img> carries its own srcset, so a browser that reads
+ *  neither AVIF nor WebP still gets the sharp one. */
+export const portraitFallbackSet = srcset([...PORTRAIT_VARIANTS.jpeg])
+
+/** The original JPEG, for a browser that reads no srcset at all. */
+export const portraitFallback = portrait1200Jpeg

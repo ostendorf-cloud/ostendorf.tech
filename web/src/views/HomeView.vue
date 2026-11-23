@@ -30,6 +30,7 @@ import {
   PORTRAIT_SIZES,
   portraitAvif,
   portraitFallback,
+  portraitFallbackSet,
   portraitWebp,
 } from '../lib/heroImage'
 
@@ -238,6 +239,8 @@ const aboutFacts = computed<Fact[]>(() => [
             <source type="image/webp" :srcset="portraitWebp" :sizes="PORTRAIT_SIZES" />
             <img
               :src="portraitFallback"
+              :srcset="portraitFallbackSet"
+              :sizes="PORTRAIT_SIZES"
               :width="PORTRAIT_BOX.width"
               :height="PORTRAIT_BOX.height"
               :alt="t('home.about.portraitAlt')"
