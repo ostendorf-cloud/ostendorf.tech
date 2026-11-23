@@ -146,41 +146,35 @@ const aboutFacts = computed<Fact[]>(() => [
         <p class="text-lg text-text-muted">{{ t('home.services.lead') }}</p>
       </header>
 
-      <div class="panel-grid grid md:grid-cols-2">
-        <GovueCard class="panel-lit">
-          <h3 class="mb-4 text-lg font-semibold text-text">
-            {{ t('home.services.panelTechnology') }}
-          </h3>
-          <ul class="flex flex-col gap-1" role="list">
-            <li v-for="(item, index) in serviceItems" :key="rt(item.title)" class="service">
-              <span class="service-icon">
-                <ServiceIcon :name="serviceIcons[index]" />
-              </span>
-              <span class="flex min-w-0 flex-col gap-0.5">
-                <span class="font-medium text-text">{{ rt(item.title) }}</span>
-                <span class="text-sm text-text-muted">{{ rt(item.text) }}</span>
-              </span>
-            </li>
-          </ul>
-        </GovueCard>
+      <h3 class="services-group text-lg font-semibold text-text">
+        {{ t('home.services.panelTechnology') }}
+      </h3>
+      <ul class="service-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3" role="list">
+        <li v-for="(item, index) in serviceItems" :key="rt(item.title)" class="flex">
+          <GovueCard class="service-card w-full">
+            <span class="service-icon">
+              <ServiceIcon :name="serviceIcons[index]" />
+            </span>
+            <h4 class="service-title text-lg font-semibold text-text">{{ rt(item.title) }}</h4>
+            <p class="service-text text-base text-text-muted">{{ rt(item.text) }}</p>
+          </GovueCard>
+        </li>
+      </ul>
 
-        <GovueCard class="panel-lit">
-          <h3 class="mb-4 text-lg font-semibold text-text">{{ t('home.services.panelAreas') }}</h3>
-          <ul class="flex flex-wrap gap-2" role="list">
-            <li
-              v-for="area in tm('home.services.areas')"
-              :key="rt(area)"
-              class="rounded-sm bg-bg-subtle px-2 py-1 text-sm text-text"
-            >
-              {{ rt(area) }}
-            </li>
-          </ul>
-          <p class="mt-auto pt-5 text-sm">
-            <a href="mailto:simon@ostendorf.tech" class="text-accent-text hover:underline">
-              {{ t('home.services.more') }}
-            </a>
-          </p>
-        </GovueCard>
+      <div class="areas-block">
+        <h3 class="areas-heading text-lg font-semibold text-text">
+          {{ t('home.services.panelAreas') }}
+        </h3>
+        <ul class="areas-list grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3" role="list">
+          <li v-for="area in tm('home.services.areas')" :key="rt(area)" class="area text-base">
+            {{ rt(area) }}
+          </li>
+        </ul>
+        <p class="areas-more text-base">
+          <a href="mailto:simon@ostendorf.tech" class="areas-link text-accent-text">
+            {{ t('home.services.more') }}
+          </a>
+        </p>
       </div>
     </section>
 
@@ -582,8 +576,65 @@ const aboutFacts = computed<Fact[]>(() => [
   margin-bottom: clamp(1.75rem, 1.2rem + 2.2vw, 3rem);
 }
 
-.panel-grid {
-  gap: clamp(1.25rem, 0.85rem + 1.6vw, 2.25rem);
+.service-grid {
+  gap: clamp(1rem, 0.7rem + 1.2vw, 1.5rem);
+}
+
+.services-group {
+  margin-bottom: clamp(1rem, 0.8rem + 0.8vw, 1.5rem);
+}
+
+.areas-block {
+  margin-top: clamp(2.5rem, 1.6rem + 3.6vw, 4rem);
+}
+
+/* The areas are plain text on the page ground: a small accent dot, a
+   generous row gap and columns that never run past about 30 characters. */
+.areas-heading {
+  margin-bottom: clamp(1rem, 0.8rem + 0.8vw, 1.5rem);
+}
+
+.areas-list {
+  column-gap: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+  row-gap: 0.875rem;
+}
+
+.area {
+  position: relative;
+  padding-left: 1.25rem;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.area::before {
+  content: '';
+  position: absolute;
+  top: 0.6em;
+  left: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--color-accent);
+}
+
+.areas-more {
+  margin-top: 1.5rem;
+}
+
+.areas-link {
+  border-radius: 0.25rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  transition: color var(--default-transition-duration) var(--ease-out);
+}
+
+.areas-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.areas-link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
 }
 
 /* A thin lit edge along the top of every panel, as on the old site: the
@@ -656,18 +707,38 @@ const aboutFacts = computed<Fact[]>(() => [
   background: var(--brand-gradient);
 }
 
-.service {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-inline: -0.5rem;
-  padding: 0.5rem;
-  border-radius: 0.75rem;
-  transition: background-color var(--default-transition-duration) var(--ease-out);
+/* One flat card per service. No lit edge: hover changes colour only. The
+   padding is the same at every width, only the floor drops on a phone. */
+.service-card {
+  --service-padding: clamp(1.25rem, 1rem + 0.9vw, 1.5rem);
+
+  border-radius: var(--radius-lg);
+  transition:
+    background-color var(--default-transition-duration) var(--ease-out),
+    border-color var(--default-transition-duration) var(--ease-out);
 }
 
-.service:hover {
+.service-card:hover,
+.service-card:focus-within {
+  border-color: var(--color-border-strong);
   background-color: var(--color-surface-hover);
+}
+
+.service-card :deep(> div) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: var(--service-padding);
+}
+
+.service-title {
+  margin-top: 1rem;
+}
+
+.service-text {
+  margin-top: 0.5rem;
+  max-width: 36ch;
+  text-wrap: pretty;
 }
 
 .service-icon {
@@ -676,13 +747,8 @@ const aboutFacts = computed<Fact[]>(() => [
   place-items: center;
   width: 3rem;
   height: 3rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.875rem;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--color-accent) 16%, transparent),
-    color-mix(in srgb, var(--color-accent-text) 22%, transparent)
-  );
+  border-radius: 0.75rem;
+  background: var(--color-accent-subtle);
   color: var(--color-accent-text);
 }
 
@@ -715,7 +781,8 @@ const aboutFacts = computed<Fact[]>(() => [
     animation: none;
   }
 
-  .service {
+  .service-card,
+  .areas-link {
     transition: none;
   }
 }

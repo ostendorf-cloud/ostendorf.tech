@@ -16,8 +16,8 @@ defineProps<{ name: ServiceIconName }>()
 <template>
   <svg
     viewBox="0 0 24 24"
-    width="26"
-    height="26"
+    width="24"
+    height="24"
     fill="none"
     stroke="currentColor"
     stroke-width="1.7"
