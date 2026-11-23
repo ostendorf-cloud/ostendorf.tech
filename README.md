@@ -166,24 +166,24 @@ first two. A plain `docker compose up` runs the website only, no
 feed service, so the Impressionen section stays off unless `FEED_SERVICE_URL` points at a feed
 service started some other way.
 
-To see the Impressionen section locally, start the development only fake feed as well:
+To see the Impressionen section locally, start one feed service next to the website. It is
+one choice: a profile and the matching `FEED_SERVICE_URL` in `.env`. Start only one of the
+two. Neither publishes a host port.
 
-```sh
-# in .env
-FEED_SERVICE_URL=http://fakefeed:9081
-```
+| Feed | `.env` | Command |
+| --- | --- | --- |
+| Fake, generated sample posts | `FEED_SERVICE_URL=http://fakefeed:9081` | `docker compose --profile feed up --build` |
+| Real, against your OpenBao | `FEED_SERVICE_URL=http://realfeed:9081` | `docker compose --profile realfeed up --build` |
 
-```sh
-docker compose --profile feed up --build
-```
+With Podman, write `podman compose` instead of `docker compose`. See "Real feed service with
+compose" below for the real one.
 
 The `fakefeed` service (`cmd/fakefeed`) serves generated sample posts and pictures on the
 same routes as the real feed service, never real Instagram content. It publishes no host
 port: the website reaches it on the compose network. `POST_COUNT` in `.env` sets how many
 sample posts there are, 20 by default. The fake is its own `fakefeed` target in the
 `Dockerfile`; no production target depends on it and no workflow builds or publishes it.
-Compose forwards no OpenBao variable: the fake needs no OpenBao. See "Running the real feed
-service locally" below for the real one.
+The fake needs no OpenBao.
 
 Builds the multi-stage `Dockerfile` (frontend, prerender, static Go binary, then a
 minimal non-root runtime stage with no shell) and serves the site at
@@ -222,6 +222,36 @@ not and cannot prove that this service ever reaches `/readyz` 200, or that OpenB
 Kubernetes auth actually admits its role; both need a real cluster. The `docker-build-feed`
 job in `.github/workflows/checks.yaml` runs it the same way `docker-build` runs the
 website's own script.
+
+### Real feed service with compose
+
+The `realfeed` service builds the `feed` target and runs `cmd/feed` with the token method
+against an OpenBao you run yourself. Put these into `.env` (git ignored, never commit it):
+
+```sh
+FEED_SERVICE_URL=http://realfeed:9081
+OPENBAO_ADDR=http://host.containers.internal:8200
+OPENBAO_TOKEN=<a token allowed to read and write the secret below>
+OPENBAO_SECRET_PATH=<KV v2 data path of the secret>
+```
+
+```sh
+podman compose --profile realfeed up --build
+```
+
+- `OPENBAO_AUTH_METHOD` defaults to `token` in this stack.
+- An OpenBao on the host is not `127.0.0.1` inside a container. Use
+  `http://host.containers.internal:8200` with Podman and `http://host.docker.internal:8200`
+  with Docker.
+- Compose also forwards `OPENBAO_SECRET_KEY_ACCESS_TOKEN`, `OPENBAO_SECRET_KEY_REFRESHED_AT`,
+  `SYNC_INTERVAL`, `TOKEN_REFRESH_AGE`, `API_VERSION`, `POST_COUNT` and `LOG_LEVEL`. Empty
+  means the service's own default.
+- `OPENBAO_TOKEN_FILE` is not forwarded: a bind mount of a file that may be absent cannot be
+  optional in compose.
+- The token never goes into `docker-compose.yaml`. It is only read from `.env` or the shell.
+- The service never renews the token. Once it expires or is revoked, OpenBao answers 403 and
+  `/readyz` stays 503. Put a new token into `.env` and restart: `podman compose --profile
+  realfeed up -d --force-recreate realfeed`.
 
 ### Running the real feed service locally
 
