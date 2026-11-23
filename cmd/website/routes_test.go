@@ -220,8 +220,9 @@ func TestPrerenderedThemeBootScriptIsByteIdenticalAcrossPages(t *testing.T) {
 			t.Errorf("%s has no <script id=\"theme-boot\"> tag", p)
 			return nil
 		}
-		openTag := string(data)[strings.Index(string(data), `<script id="theme-boot"`):]
-		openTag = openTag[:strings.Index(openTag, ">")+1]
+		_, fromTag, _ := strings.Cut(string(data), `<script id="theme-boot"`)
+		openTag, _, _ := strings.Cut(`<script id="theme-boot"`+fromTag, ">")
+		openTag += ">"
 		for _, want := range []string{
 			` data-storage-key="govue-theme"`,
 			` data-theme-color-light="#`,
