@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useId } from 'vue'
+import { onMounted, ref, useId } from 'vue'
 
 /**
  * The fader mark alone, ported from the {{define "logo"}} block of
@@ -22,13 +22,25 @@ withDefaults(
     /** Edge length in pixels. The header and the footer take the default;
      *  the hero asks for a much larger one. */
     size?: number
-    /** Lets the four knobs slide in their tracks, each at its own tempo,
-     *  the way the old site's own hero and Über mich logos did. Off by
-     *  default, so the header and the footer stay calm. */
+    /** Lets the four knobs slide in their tracks, each at its own tempo and
+     *  without end, the way the old site's own hero and Über mich logos
+     *  did. Off by default, so the header and the footer stay calm. The
+     *  slide starts once the script has run, because only then can the
+     *  visitor stop it; the prerendered mark is at rest. */
     animated?: boolean
+    /** Freezes the knobs where they are: the visitor's own pause button
+     *  (WCAG 2.2.2), the same state that freezes the hero's beams. */
+    paused?: boolean
   }>(),
-  { size: 32, animated: false },
+  { size: 32, animated: false, paused: false },
 )
+
+// Set in onMounted, so the server render and the first client render agree
+// and the knobs never move where no pause button exists.
+const live = ref(false)
+onMounted(() => {
+  live.value = true
+})
 
 const gradientId = `logo-mark-gradient-${useId()}`
 const maskId = `logo-mark-cut-${useId()}`
@@ -39,7 +51,7 @@ const maskId = `logo-mark-cut-${useId()}`
     viewBox="0 0 79.8 80.6"
     :width="size"
     :height="size"
-    :class="{ 'logo-mark-animated': animated }"
+    :class="{ 'logo-mark-animated': animated && live, 'is-paused': paused }"
     aria-hidden="true"
     focusable="false"
   >
@@ -94,37 +106,52 @@ const maskId = `logo-mark-cut-${useId()}`
  * tracks it bridges, which is what the old site's own travel values were
  * chosen for.
  *
- * The slide plays once and then rests, and never runs longer than five
- * seconds: moving content that starts by itself and goes on longer than
- * that needs a pause control (WCAG 2.2.2), and a pause button on a logo
- * would be worse than a logo that comes to rest. A looping version is
- * what this replaced.
+ * The slide goes on for as long as the page is open, as on the old site.
+ * Moving content that starts by itself and goes on longer than five
+ * seconds needs a way to stop it (WCAG 2.2.2): that is the hero's pause
+ * button, which sets .is-paused through the paused prop. The class is only
+ * there once the script has run, the same moment the button appears.
  */
 .logo-mark-animated .logo-knob {
-  animation: logo-fader 4s ease-in-out 1;
+  animation: logo-fader 4s ease-in-out infinite;
+}
+
+.logo-mark-animated.is-paused .logo-knob {
+  animation-play-state: paused;
 }
 
 /*
- * Only the travel differs per knob. The old rules also carried a duration
- * and a delay each, but the shared rule above sets the animation shorthand
- * with higher specificity, so those never applied and all four knobs have
- * always slid together over 4 seconds. They are gone rather than made
- * live, so the animation looks as it always did.
+ * Each knob has its own travel, tempo and phase, as on the old site. The
+ * duration and delay sit under .logo-mark-animated so they win over the
+ * shorthand above; set on a bare .knob-N they would be overridden and
+ * never apply, which is how the knobs once came to slide in lockstep.
  */
-.knob-1 {
+.logo-mark-animated .knob-1 {
   --travel: 5px;
+
+  animation-duration: 4.2s;
+  animation-delay: -0.6s;
 }
 
-.knob-2 {
+.logo-mark-animated .knob-2 {
   --travel: -6px;
+
+  animation-duration: 5.1s;
+  animation-delay: -2.4s;
 }
 
-.knob-3 {
+.logo-mark-animated .knob-3 {
   --travel: 6px;
+
+  animation-duration: 3.7s;
+  animation-delay: -1.3s;
 }
 
-.knob-4 {
+.logo-mark-animated .knob-4 {
   --travel: -5px;
+
+  animation-duration: 4.6s;
+  animation-delay: -3.1s;
 }
 
 @keyframes logo-fader {

@@ -78,26 +78,31 @@ describe('hero scroll cue', () => {
 })
 
 describe('logo animation', () => {
-  it('never loops', () => {
-    expect(logo).not.toMatch(/infinite/)
-    expect(home).not.toMatch(/infinite/)
-  })
-
-  it('ends within five seconds of starting, so it needs no pause control', () => {
+  it('loops, as on the old site', () => {
     const animated = declaration(rule(logo, '.logo-mark-animated .logo-knob'), 'animation')
-    const base = /logo-fader\s+([\d.]+)s\s+\S+\s+(\d+)$/.exec(animated)
-    expect(base, animated).not.toBeNull()
-    expect(Number(base?.[2])).toBe(1)
-    expect(Number(base?.[1]) * Number(base?.[2])).toBeLessThanOrEqual(5)
+    expect(animated).toMatch(/^logo-fader\s+[\d.]+s\s+\S+\s+infinite$/)
   })
 
-  // The shared rule sets the animation shorthand with higher specificity
-  // than a .knob-N rule, so a duration or delay on a knob rule would never
-  // apply and would only mislead. The animation that runs is the shared one.
-  it('keeps no dead per knob timing that the shared rule would override', () => {
-    for (const knob of ['.knob-1', '.knob-2', '.knob-3', '.knob-4']) {
-      expect(rule(logo, knob)).not.toMatch(/animation/)
-    }
+  // Endless motion is only allowed because the visitor can stop it.
+  it('freezes under the pause state the hero button sets', () => {
+    expect(
+      declaration(rule(logo, '.logo-mark-animated.is-paused .logo-knob'), 'animation-play-state'),
+    ).toBe('paused')
+    expect(source('src/views/HomeView.vue')).toMatch(
+      /<LogoMark[^>]*\banimated\s+:paused="motionPaused"/,
+    )
+  })
+
+  // The shorthand on the shared rule resets duration and delay, so a knob's
+  // own timing has to be at least as specific to apply. A bare .knob-N rule
+  // would be overridden and all four knobs would slide in lockstep.
+  it('gives every knob its own tempo and phase, in rules that win over the shorthand', () => {
+    const tempos = ['.knob-1', '.knob-2', '.knob-3', '.knob-4'].map((knob) => {
+      const block = rule(logo, `.logo-mark-animated ${knob}`)
+      return [declaration(block, 'animation-duration'), declaration(block, 'animation-delay')]
+    })
+    expect(new Set(tempos.map(([duration]) => duration)).size).toBe(4)
+    expect(new Set(tempos.map(([, delay]) => delay)).size).toBe(4)
   })
 
   it('stays still for reduced motion', () => {
