@@ -55,6 +55,8 @@ const TEXT_PAIRS: Array<[fg: string, bg: string]> = [
   ['success-text', 'bg'],
   ['danger-text', 'bg'],
   ['danger-text', 'surface'],
+  // The raised ground the page takes in the alt sections (styles.css).
+  ['text-faint', 'bg-subtle'],
 ]
 
 const NON_TEXT_PAIRS: Array<[fg: string, bg: string]> = [
@@ -68,6 +70,9 @@ const NON_TEXT_PAIRS: Array<[fg: string, bg: string]> = [
   ['focus', 'bg'],
   ['focus', 'surface'],
   ['focus', 'surface-hover'],
+  ['border-strong', 'bg-subtle'],
+  ['accent', 'bg-subtle'],
+  ['focus', 'bg-subtle'],
 ]
 
 type Palette = Record<string, string>

@@ -80,6 +80,25 @@ describe('the gradient button', () => {
   })
 })
 
+describe('the section ground', () => {
+  const styles = source('src/styles.css')
+
+  it('turns the body to the raised ground, smoothly, and not at all for reduced motion', () => {
+    expect(styles).toMatch(
+      /:root\[data-section-bg='alt'\] body\s*\{\s*background-color: var\(--color-bg-subtle\)/,
+    )
+    expect(styles).toMatch(/^body\s*\{\s*transition: background-color/m)
+    expect(styles).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*body\s*\{\s*transition: none/)
+  })
+
+  it('is asked for by Über mich and Impressionen only', () => {
+    expect(source('src/views/HomeView.vue').match(/data-section-tone="alt"/g)).toHaveLength(1)
+    expect(
+      source('src/components/InstagramFeed.vue').match(/data-section-tone="alt"/g),
+    ).toHaveLength(1)
+  })
+})
+
 describe('components', () => {
   it('carry no hex colour of their own, except the logo mark', () => {
     const offenders = sfcs(join(process.cwd(), 'src'))

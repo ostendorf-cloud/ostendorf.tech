@@ -163,6 +163,29 @@
 }
 
 /*
+ * The page ground follows the section in view, as on the old site: the
+ * sections marked data-section-tone="alt" (Impressionen, Über mich) lie on
+ * the raised ground, the others on the page's own. src/lib/sectionBackground.ts
+ * sets data-section-bg on the root. Only the colour changes, so nothing moves.
+ * The hero paints its own scrim and does not read the body, and the prerendered
+ * page and a visitor without script stay on the page ground. Every text role
+ * is proven on bg-subtle in src/theme/contrast.test.ts.
+ */
+body {
+  transition: background-color 500ms var(--ease-out);
+}
+
+:root[data-section-bg='alt'] body {
+  background-color: var(--color-bg-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+}
+
+/*
  * The sticky header is as tall as its rows make it: one row from 480px up,
  * more below that. AppHeader measures it and writes the real height to
  * --header-height on the root element (src/lib/headerHeight.ts), and every
