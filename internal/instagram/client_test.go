@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/secrettest"
 )
 
 // TestHostAllowed covers hostAllowed's actual decision logic against the
@@ -97,10 +99,10 @@ func TestMediaAndRefreshTokenScrubTheAccessTokenOnTransportFailure(t *testing.T)
 	client := NewClient("v23.0")
 	client.HTTP = &http.Client{Transport: failingTransport{}}
 
-	if _, err := client.Media(t.Context(), secretToken, 10); err == nil {
+	if _, err := client.Media(t.Context(), secretToken, 10, 0); err == nil {
 		t.Fatal("Media() error = nil, want an error from the failing transport")
-	} else if strings.Contains(err.Error(), secretToken) {
-		t.Errorf("Media() error contains the access token: %q", err.Error())
+	} else {
+		secrettest.AssertHidden(t, err, secretToken)
 	}
 
 	if _, err := client.RefreshToken(t.Context(), secretToken); err == nil {

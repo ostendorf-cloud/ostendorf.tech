@@ -71,11 +71,12 @@ func New(cfg feedconfig.Config, logger *slog.Logger) *App {
 		Now:            time.Now,
 	}
 	syncer := &instagram.Syncer{
-		Client: client,
-		Tokens: store,
-		Count:  cfg.PostCount,
-		Feed:   f,
-		Logger: logger,
+		Client:     client,
+		Tokens:     store,
+		Count:      cfg.PostCount,
+		PerRequest: cfg.PostsPerRequest,
+		Feed:       f,
+		Logger:     logger,
 	}
 
 	a := &App{logger: logger, feed: f, syncer: syncer, interval: cfg.SyncInterval, health: health.New()}

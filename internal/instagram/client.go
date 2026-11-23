@@ -17,6 +17,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -32,11 +33,51 @@ const (
 	DefaultVersion = "v23.0"
 
 	maxAPIBytes = 1 << 20
-	// DefaultMaxImageBytes is far above the 1080 px JPEGs Instagram serves
-	// (a few hundred KiB) and keeps 20 of them inside a 128 MiB pod, the
-	// limit charts/ostendorf.tech/values.yaml sets.
+	// DefaultMaxImageBytes bounds one picture. It is far above the 1080 px
+	// JPEGs Instagram serves (a few hundred KiB); what a full cache costs is
+	// the number of posts times the real size of their pictures, see the
+	// chart's README.
 	DefaultMaxImageBytes = 4 << 20
+
+	// DefaultPostsPerRequest is how many posts one call to the media edge
+	// asks for.
+	DefaultPostsPerRequest = 50
+	// MaxPostsPerRequest is the most Meta's limit parameter accepts.
+	MaxPostsPerRequest = 100
+	// DefaultPagePause is the pause between two pages of one cycle. The
+	// pages are fetched one after the other, never in parallel, and the
+	// pause spreads a cycle of many pages over time, so a full fetch stays
+	// well inside Meta's rate limits.
+	DefaultPagePause = 500 * time.Millisecond
+	// maxPages bounds one cycle even with no cap on the posts: 1000 pages of
+	// 100 posts is far beyond any real account, so reaching it means a
+	// misbehaving answer, not a large account.
+	maxPages = 1000
 )
+
+// Error kinds of a media cycle. The returned error wraps one of them, so a
+// caller can tell them apart with errors.Is; none of them carries the access
+// token or the paging cursor.
+var (
+	// ErrRateLimited is a 429 from Meta.
+	ErrRateLimited = errors.New("rate limited by Meta")
+	// ErrRefused is any other 4xx from Meta.
+	ErrRefused = errors.New("request refused by Meta")
+	// ErrInvalidCursor is a next page whose cursor is missing or fails
+	// validCursor.
+	ErrInvalidCursor = errors.New("invalid paging cursor")
+	// ErrCursorLoop is a cursor that came back a second time in one cycle.
+	ErrCursorLoop = errors.New("paging cursor repeated")
+	// ErrTooManyPages is a cycle that reached maxPages.
+	ErrTooManyPages = errors.New("too many pages")
+)
+
+// validCursor is what a paging cursor from Meta may look like before it is
+// sent back: base64 like characters and a bounded length. The cursor only
+// ever travels as the after query parameter on this client's own BaseURL,
+// encoded by url.Values, so the check bounds what an answer can make this
+// client send, not where it is sent.
+var validCursor = regexp.MustCompile(`^[A-Za-z0-9_=+/-]{1,512}$`)
 
 // allowedImageTypes are the formats served back to browsers.
 var allowedImageTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true}
@@ -83,6 +124,9 @@ type Client struct {
 	// domain suffixes checked by hostAllowed. Overridable primarily so
 	// tests can point it at a fake host instead of real Meta domains.
 	AllowedImageHosts []string
+	// PagePause is the wait between two pages of one Media call; zero
+	// means none. NewClient sets DefaultPagePause.
+	PagePause time.Duration
 }
 
 // NewClient returns a client for the real API with a 15 second timeout.
@@ -93,6 +137,7 @@ func NewClient(version string) *Client {
 		HTTP:              &http.Client{Timeout: 15 * time.Second},
 		MaxImageBytes:     DefaultMaxImageBytes,
 		AllowedImageHosts: DefaultAllowedImageHosts,
+		PagePause:         DefaultPagePause,
 	}
 }
 
@@ -140,7 +185,12 @@ func (c *Client) getJSON(ctx context.Context, endpoint string, params url.Values
 	if err != nil {
 		return scrub(err)
 	}
-	if resp.StatusCode != http.StatusOK {
+	switch {
+	case resp.StatusCode == http.StatusTooManyRequests:
+		return fmt.Errorf("%w: %w", ErrRateLimited, describe(resp.StatusCode, body))
+	case resp.StatusCode >= 400 && resp.StatusCode < 500:
+		return fmt.Errorf("%w: %w", ErrRefused, describe(resp.StatusCode, body))
+	case resp.StatusCode != http.StatusOK:
 		return describe(resp.StatusCode, body)
 	}
 	if err := json.Unmarshal(body, out); err != nil {
@@ -156,22 +206,118 @@ func (c *Client) endpoint(path string) string {
 	return c.BaseURL + "/" + c.Version + "/" + path
 }
 
-// Media returns the newest posts of the token's account, newest first.
-func (c *Client) Media(ctx context.Context, token string, limit int) ([]Media, error) {
-	params := url.Values{}
-	params.Set("fields", "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp")
-	params.Set("limit", strconv.Itoa(limit))
-	params.Set("access_token", token)
-	var resp struct {
-		Data []Media `json:"data"`
+// mediaPage is one answer of the media edge. Paging.Next is kept as raw
+// JSON on purpose: only its presence is read, as the signal that another
+// page exists, and its value, a full URL Meta built, is never parsed,
+// logged or requested.
+type mediaPage struct {
+	Data   []Media `json:"data"`
+	Paging struct {
+		Cursors struct {
+			After string `json:"after"`
+		} `json:"cursors"`
+		Next json.RawMessage `json:"next"`
+	} `json:"paging"`
+}
+
+// hasNext reports whether the answer announces a further page.
+func (p *mediaPage) hasNext() bool {
+	next := strings.TrimSpace(string(p.Paging.Next))
+	return next != "" && next != "null" && next != `""`
+}
+
+// MediaResult is what one Media call collected: the posts, newest first,
+// and how many pages it took.
+type MediaResult struct {
+	Media []Media
+	Pages int
+}
+
+// Media returns the posts of the token's account, newest first. It asks for
+// perRequest posts per call (1 to MaxPostsPerRequest) and follows the
+// paging cursor until Meta announces no further page or maxPosts posts are
+// collected; maxPosts 0 means no cap. The pages are fetched one after the
+// other with PagePause between them.
+//
+// Every page is requested from this client's own endpoint, with the cursor
+// from paging.cursors.after as the after parameter. The URL in paging.next
+// is never followed, so an answer cannot send the client, or the access
+// token, to another host. The cursor is checked against validCursor, and a
+// cursor seen twice in one call ends it with ErrCursorLoop. Neither the
+// token nor the cursor appears in a returned error.
+//
+// On an error the result holds what the pages before it collected, so the
+// caller can tell how far the cycle got; internal/instagram.Syncer still
+// keeps the last good feed until a cycle completes.
+func (c *Client) Media(ctx context.Context, token string, perRequest, maxPosts int) (MediaResult, error) {
+	var res MediaResult
+	if perRequest < 1 || perRequest > MaxPostsPerRequest {
+		return res, fmt.Errorf("instagram media: posts per request must be between 1 and %d", MaxPostsPerRequest)
 	}
-	if err := c.getJSON(ctx, c.endpoint("me/media"), params, &resp); err != nil {
-		return nil, fmt.Errorf("instagram media: %w", err)
+	if maxPosts < 0 {
+		return res, errors.New("instagram media: the post cap must not be negative")
 	}
-	if len(resp.Data) > limit {
-		resp.Data = resp.Data[:limit]
+	seen := map[string]bool{}
+	after := ""
+	for {
+		if res.Pages >= maxPages {
+			return res, fmt.Errorf("instagram media: %w (%d)", ErrTooManyPages, maxPages)
+		}
+		if res.Pages > 0 && !pause(ctx, c.PagePause) {
+			return res, fmt.Errorf("instagram media: %w", ctx.Err())
+		}
+		limit := perRequest
+		if maxPosts > 0 {
+			limit = min(limit, maxPosts-len(res.Media))
+		}
+		params := url.Values{}
+		params.Set("fields", "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp")
+		params.Set("limit", strconv.Itoa(limit))
+		if after != "" {
+			params.Set("after", after)
+		}
+		params.Set("access_token", token)
+		var page mediaPage
+		if err := c.getJSON(ctx, c.endpoint("me/media"), params, &page); err != nil {
+			return res, fmt.Errorf("instagram media page %d: %w", res.Pages+1, err)
+		}
+		res.Pages++
+		if len(page.Data) > limit {
+			page.Data = page.Data[:limit]
+		}
+		res.Media = append(res.Media, page.Data...)
+		if maxPosts > 0 && len(res.Media) >= maxPosts {
+			return res, nil
+		}
+		if !page.hasNext() || len(page.Data) == 0 {
+			return res, nil
+		}
+		next := page.Paging.Cursors.After
+		if !validCursor.MatchString(next) {
+			return res, fmt.Errorf("instagram media page %d: %w", res.Pages, ErrInvalidCursor)
+		}
+		if seen[next] {
+			return res, fmt.Errorf("instagram media page %d: %w", res.Pages, ErrCursorLoop)
+		}
+		seen[next] = true
+		after = next
 	}
-	return resp.Data, nil
+}
+
+// pause waits d, or not at all for d <= 0. It reports false when ctx ended
+// first.
+func pause(ctx context.Context, d time.Duration) bool {
+	if d <= 0 {
+		return ctx.Err() == nil
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
 }
 
 // RefreshToken exchanges a long lived token for a new one valid 60 days.

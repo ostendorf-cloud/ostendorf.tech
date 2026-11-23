@@ -127,6 +127,7 @@ func newSyncer(meta *fakeMeta, logs io.Writer) *Syncer {
 	client.HTTP = &http.Client{Transport: hostTransport{meta}}
 	client.MaxImageBytes = 1000
 	client.AllowedImageHosts = []string{"cdn.test"}
+	client.PagePause = 0
 	return &Syncer{
 		Client: client, Tokens: &fakeTokenSource{token: "tok-1"},
 		Count: 20, Feed: &Feed{},
@@ -275,7 +276,7 @@ func TestUnversionedClient(t *testing.T) {
 	meta := newFakeMeta()
 	s := newSyncer(meta, io.Discard)
 	s.Client.Version = ""
-	if _, err := s.Client.Media(t.Context(), "tok-1", 5); err != nil {
+	if _, err := s.Client.Media(t.Context(), "tok-1", 5, 0); err != nil {
 		t.Fatal(err)
 	}
 	if meta.lastMediaPath != "/me/media" || meta.lastLimit != "5" {
