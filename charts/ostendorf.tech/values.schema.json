@@ -74,6 +74,11 @@
       }
     },
     "resources": { "type": "object" },
+    "goMemLimit": {
+      "type": "string",
+      "pattern": "^([0-9]+(B|KiB|MiB|GiB|TiB)?)?$",
+      "description": "GOMEMLIMIT of the website container, below resources.limits.memory. A whole number with an optional B, KiB, MiB, GiB or TiB suffix. Empty renders none."
+    },
     "startupProbe": { "type": "object" },
     "livenessProbe": { "type": "object" },
     "readinessProbe": { "type": "object" },
@@ -204,6 +209,11 @@
           }
         },
         "resources": { "type": "object" },
+        "goMemLimit": {
+          "type": "string",
+          "pattern": "^([0-9]+(B|KiB|MiB|GiB|TiB)?)?$",
+          "description": "GOMEMLIMIT of the feed container, below feed.resources.limits.memory. A whole number with an optional B, KiB, MiB, GiB or TiB suffix. Empty renders none."
+        },
         "startupProbe": { "type": "object" },
         "livenessProbe": { "type": "object" },
         "readinessProbe": { "type": "object" },
@@ -251,7 +261,7 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 10000,
-              "description": "Cap on the posts one sync collects across all pages. 0 means no cap."
+              "description": "Caps the number of posts one sync collects across all pages. 0 means the maximum of 10000."
             },
             "postsPerRequest": {
               "type": "integer",

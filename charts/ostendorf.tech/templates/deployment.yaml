@@ -38,6 +38,7 @@ spec:
   {{- if and .Values.config.allowPlainHttp (hasPrefix "https://" (.Values.config.siteUrl | toString | trim | lower)) }}
   {{ fail "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http." }}
   {{- end }}
+  {{- include "ostendorf-tech.checkGoMemLimit" (list "goMemLimit" .Values.goMemLimit "resources.limits.memory" (dig "limits" "memory" "" (.Values.resources | default dict))) }}
   replicas: {{ .Values.replicaCount }}
   # Recreate, not the default RollingUpdate: a rolling update's maxSurge
   # would otherwise briefly run two pods, each with its own rate limits, mail
@@ -87,6 +88,10 @@ spec:
               containerPort: {{ .Values.service.adminPort }}
               protocol: TCP
           env:
+            {{- with .Values.goMemLimit }}
+            - name: GOMEMLIMIT
+              value: {{ . | quote }}
+            {{- end }}
             - name: LISTEN_ADDR
               value: {{ .Values.config.listenAddr | quote }}
             - name: ADMIN_ADDR

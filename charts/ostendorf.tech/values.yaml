@@ -138,6 +138,15 @@ resources:
     # limit stays in place as a safety net against a genuine leak.
     memory: 192Mi
 
+# GOMEMLIMIT of the website container: the heap size at which Go collects
+# harder. Without it the heap may grow to about twice the live heap before a
+# collection, which can pass resources.limits.memory during a sync. About 90
+# percent of that limit leaves room for the rest of the process. It must stay
+# below the limit (checked at render time) and is a whole number with an
+# optional B, KiB, MiB, GiB or TiB suffix. Change it with the limit. Empty
+# renders no GOMEMLIMIT.
+goMemLimit: "172MiB"
+
 startupProbe:
   # Disabled by default: startup only loads the embedded frontend and
   # validates the configuration, neither of which is expected to be slow
@@ -450,6 +459,10 @@ feed:
       # safety net against a genuine leak.
       memory: 160Mi
 
+  # GOMEMLIMIT of the feed container, about 90 percent of
+  # feed.resources.limits.memory; same rules as the website's own goMemLimit.
+  goMemLimit: "144MiB"
+
   startupProbe:
     # Disabled by default: startup only logs in to OpenBao and runs one sync
     # cycle, neither of which is expected to be slow enough to need one.
@@ -524,10 +537,10 @@ feed:
     syncInterval: "1h"
     tokenRefreshAge: "7d"
     apiVersion: "v23.0"
-    # Cap on the posts one sync collects across all pages, 0 for no cap
-    # (every post of the account), at most 10000. Every post costs its
-    # picture in this pod and again in the website: see the resources
-    # above and "Feed service" in the README.
+    # Caps the number of posts one sync collects across all pages; 0 means
+    # the maximum of 10000. Every post costs its picture in this pod and
+    # again in the website: see the resources above and "Posts and memory"
+    # in the README.
     postCount: 200
     # Posts one request to Meta asks for, 1 to 100 (Meta's maximum). The
     # feed service follows Meta's paging cursor, one page after the other
