@@ -39,9 +39,18 @@ async function renderCarousel(locale: Locale = 'de') {
   return view
 }
 
+/** One card is 200 px wide, the gap 20 px: a step is 220 px. */
+const CARD = 200
+const GAP = 20
+const STEP = CARD + GAP
+
 /** Gives the track the metrics a browser would: a 600 px window onto 1800
- *  px of cards, scrolled to `left`. */
+ *  px of cards of 200 px with a 20 px gap, scrolled to `left`. */
 function layOut(track: HTMLElement, left: number): void {
+  track.style.columnGap = `${GAP}px`
+  for (const slide of track.querySelectorAll<HTMLElement>('.carousel-slide')) {
+    Object.defineProperty(slide, 'offsetWidth', { value: CARD, configurable: true })
+  }
   Object.defineProperty(track, 'clientWidth', { value: 600, configurable: true })
   Object.defineProperty(track, 'scrollWidth', { value: 1800, configurable: true })
   Object.defineProperty(track, 'scrollLeft', { value: left, configurable: true })
@@ -134,20 +143,34 @@ describe('CardCarousel semantics', () => {
 })
 
 describe('CardCarousel arrows', () => {
-  it('scrolls forward by one page, the visible width plus the gap', async () => {
+  it('scrolls forward by one card, its width plus the gap, not a page', async () => {
     const { container } = await renderCarousel()
     const track = trackOf(container)
     layOut(track, 0)
-    track.style.columnGap = '20px'
     await fireEvent.scroll(track)
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Nächste Bands' }))
 
     expect(scrollBy).toHaveBeenCalledTimes(1)
-    expect(scrollBy).toHaveBeenCalledWith({ left: 620, behavior: 'smooth' })
+    expect(scrollBy).toHaveBeenCalledWith({ left: STEP, behavior: 'smooth' })
   })
 
-  it('scrolls back by one page', async () => {
+  it('does nothing while the cards have no layout', async () => {
+    const { container } = await renderCarousel()
+    const track = trackOf(container)
+    layOut(track, 0)
+    for (const slide of track.querySelectorAll<HTMLElement>('.carousel-slide')) {
+      Object.defineProperty(slide, 'offsetWidth', { value: 0, configurable: true })
+    }
+    track.style.columnGap = ''
+    await fireEvent.scroll(track)
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Nächste Bands' }))
+
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  it('scrolls back by one card', async () => {
     const { container } = await renderCarousel()
     const track = trackOf(container)
     layOut(track, 620)
@@ -155,7 +178,7 @@ describe('CardCarousel arrows', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Vorherige Bands' }))
 
-    expect(scrollBy).toHaveBeenCalledWith({ left: -600, behavior: 'smooth' })
+    expect(scrollBy).toHaveBeenCalledWith({ left: -STEP, behavior: 'smooth' })
   })
 
   it('disables the previous arrow at the start and enables the next', async () => {
@@ -225,7 +248,7 @@ describe('CardCarousel arrows', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Nächste Bands' }))
 
-    expect(scrollBy).toHaveBeenCalledWith({ left: 600, behavior: 'auto' })
+    expect(scrollBy).toHaveBeenCalledWith({ left: STEP, behavior: 'auto' })
   })
 })
 
@@ -312,7 +335,7 @@ describe('CardCarousel automatic scrolling', () => {
     }))
   }
 
-  it('advances by one page after 6 seconds, not before', async () => {
+  it('advances by one card after 6 seconds, not before', async () => {
     await ready()
 
     vi.advanceTimersByTime(5999)
@@ -320,7 +343,7 @@ describe('CardCarousel automatic scrolling', () => {
     vi.advanceTimersByTime(1)
 
     expect(scrollBy).toHaveBeenCalledTimes(1)
-    expect(scrollBy).toHaveBeenCalledWith({ left: 600, behavior: 'smooth' })
+    expect(scrollBy).toHaveBeenCalledWith({ left: STEP, behavior: 'smooth' })
   })
 
   it('wraps back to the start at the end', async () => {
