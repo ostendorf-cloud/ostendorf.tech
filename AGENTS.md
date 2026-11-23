@@ -289,9 +289,28 @@ magick hero.jpg -resize 1280x -strip -quality 50 web/src/assets/hero-1280.avif
 magick hero.jpg -resize 1280x -strip -quality 72 -define webp:method=6 web/src/assets/hero-1280.webp
 ```
 
-repeated for 640, 960, 1280, 1600, 1920 and 2400, and for the portrait at 460 and 920.
-The JPEG fallback each one carries is the 1280 (hero) and 460 (portrait) width at
-`-quality 78 -sampling-factor 4:2:0 -interlace JPEG`.
+repeated for 640, 960, 1280, 1600, 1920 and 2400. The hero's JPEG fallback is the 1280
+width at `-quality 78 -sampling-factor 4:2:0 -interlace JPEG`.
+
+The portrait is the exception: it is shown large and close, so it keeps higher quality
+and the original's own width. Its source is `portrait.jpg` of the old site
+(`https://www.simon-ostendorf.de/static/img/portrait.jpg`, 1200x1200, 133 KB, the
+owner's own photograph). It is not committed: put it at `web/src/assets/portrait-source.jpg`,
+where `.gitignore` keeps it out. Every variant is made from that file and none is scaled
+up. The commands, run in `web/src/assets/`, for W in 460, 920 and 1200:
+
+```sh
+magick portrait-source.jpg -resize Wx -strip -quality 80 portrait-W.avif
+magick portrait-source.jpg -resize Wx -strip -quality 90 -define webp:method=6 portrait-W.webp
+magick portrait-source.jpg -resize Wx -strip -quality 85 -sampling-factor 4:2:0 \
+  -interlace JPEG portrait-W.jpg
+```
+
+The JPEG commands run for 460 and 920 only: `portrait-1200.jpg` is the source file
+copied unchanged, so the widest fallback loses nothing. Each file stays under 150 KB.
+`web/src/lib/heroImage.ts` lists all nine with their widths, and
+`web/src/lib/portraitImage.test.ts` reads every file's header and fails when a declared
+width differs from the file's pixels.
 
 `web/public/favicon.svg` is the one hand kept source of the icon: the earlier site's 32 by
 32 fader mark on a dark rounded square. `web/public/favicon-32x32.png`,
