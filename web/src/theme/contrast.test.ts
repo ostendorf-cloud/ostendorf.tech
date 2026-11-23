@@ -417,20 +417,21 @@ describe('the hero scrim', () => {
   // - Navy body text (eyebrow, tagline) over the pale scrim over that pixel
   //   must carry 4.5:1: 4.38:1 at 0.50 fails with this grade, 0.52 holds
   //   (4.67:1). The gentler grade is what moved the alpha from 0.5.
-  // - The headline gradient cannot reach 3:1 against that ground by itself:
-  //   a mid luminance gradient over a mid luminance ground is 1.2 to 1.9:1.
-  //   It holds only with the pale halo (--hero-title-glow-light) lifting the
-  //   ground right behind the glyphs. Three chained drop shadows of the
-  //   page ground cover at least about 70% at a glyph's edge (a blurred
-  //   edge is 50% per shadow, 75% for two); that model, not a rendering, is
-  //   what is pinned below, and a browser look is the open check.
+  // - NOT GUARANTEED: the large headline's 3:1 against the worst pixel. A
+  //   clear cyan to purple gradient over this ground measures 1.4 to 1.5:1
+  //   over the darkest 1% of the photograph (scrim 0.52), and no such pair
+  //   gets near 3:1 there. The owner decided, because dark is the default
+  //   mode and the light hero is a secondary view, to keep the clean
+  //   gradient and only a very subtle pale edge (--hero-title-glow-light),
+  //   rather than darken the colours or add glow back. So this file pins the
+  //   gradient stops and the glow value, and deliberately no headline ratio.
+  //   Over the usual picture, brighter than its darkest 1%, it reads better.
   describe('in light mode', () => {
     const number = (name: string) =>
       Number(new RegExp(`--${name}:\\s*([0-9.]+)\\s*;`).exec(bareCss)?.[1])
     const value = (name: string) => new RegExp(`--${name}:\\s*([^;]+);`).exec(bareCss)?.[1].trim()
     const alphaLight = number('hero-scrim-alpha-light')
     const DARKEST_PERCENT_OF_PHOTO = [13, 4, 52]
-    const HALO_COVERAGE_AT_GLYPH_EDGE = 0.7
 
     function over(top: string, alpha: number, behind: number[]): string {
       const scrim = Number.parseInt(top.slice(1), 16)
@@ -438,11 +439,6 @@ describe('the hero scrim', () => {
         Math.round(alpha * c + (1 - alpha) * behind[i]),
       )
       return `#${channels.map((c) => c.toString(16).padStart(2, '0')).join('')}`
-    }
-
-    const rgb = (hex: string) => {
-      const n = Number.parseInt(hex.slice(1), 16)
-      return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
     }
 
     it('pins the thinner light scrim and the gentler photo grade', () => {
@@ -460,22 +456,26 @@ describe('the hero scrim', () => {
       expect(ratio(light.text, ground)).toBeLessThan(TEXT_MINIMUM)
     })
 
-    it('carries both headline gradient stops at 3:1 over the glow over the darkest 1%', () => {
-      const scrim = over(light.bg, alphaLight, DARKEST_PERCENT_OF_PHOTO)
-      const ground = over(light.bg, HALO_COVERAGE_AT_GLYPH_EDGE, rgb(scrim))
-      for (const stop of ['hero-title-from-light', 'hero-title-to-light']) {
-        const colour = value(stop) ?? ''
-        expect(colour, stop).toMatch(/^#[0-9a-f]{6}$/i)
-        expect(round(ratio(colour, ground)), stop).toBeGreaterThanOrEqual(NON_TEXT_MINIMUM)
-      }
+    it('pins the clean headline gradient and its one very subtle edge', () => {
+      expect(value('hero-title-from-light')).toBe('#0077a0')
+      expect(value('hero-title-to-light')).toBe('#7b3cf5')
+      // One shadow, small and at most 40% opaque: the glow is not a contrast
+      // measure any more, see the comment above.
+      expect(value('hero-title-glow-light')).toMatch(
+        /^drop-shadow\(\s*0 0 0\.05em color-mix\(in srgb, var\(--color-bg\) 40%, transparent\)\s*\)$/,
+      )
+    })
+
+    it('brightens the beams in light mode only, by a modest step', () => {
+      const beamLight = number('hero-beam-opacity-light')
+      expect(beamLight).toBe(0.95)
+      expect(beamLight).toBeGreaterThan(number('hero-beam-opacity'))
+      expect(beamLight).toBeLessThanOrEqual(1)
     })
 
     it('interpolates the headline gradient in oklch where the browser can', () => {
       expect(css).toMatch(
         /@supports \(background: linear-gradient\(in oklch, red, blue\)\)\s*\{\s*:root\[data-theme='vtech'\]\s*\{\s*--hero-title-gradient-light:\s*linear-gradient\(\s*90deg in oklch,/,
-      )
-      expect(value('hero-title-glow-light')).toMatch(
-        /^drop-shadow\(.*\)\s*drop-shadow\(.*\)\s*drop-shadow\(/s,
       )
     })
 
@@ -485,6 +485,7 @@ describe('the hero scrim', () => {
         'hero-photo-filter',
         'hero-title-gradient',
         'hero-title-glow',
+        'hero-beam-opacity',
       ]) {
         const selectors = [
           ...bareCss.matchAll(
@@ -508,6 +509,7 @@ describe('the hero scrim', () => {
     expect(value('hero-beam-blend')).toBe('screen')
     expect(value('hero-title-gradient')).toBe('var(--brand-gradient-text)')
     expect(value('hero-title-glow')).toBe('none')
+    expect(value('hero-beam-opacity')).toBe('0.75')
   })
 
   // There is deliberately no assertion here pinning the alpha to its

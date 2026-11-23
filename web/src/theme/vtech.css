@@ -162,13 +162,16 @@
    *   gradient, the logo's cyan family into the brand purple, clear hues
    *   instead of the theme's teal into violet. The gradient is
    *   interpolated in oklch, where available, so the middle stays a clean
-   *   blue instead of turning grey. The stops are as light as 3:1 allows
-   *   once the glow below sits behind the glyphs.
-   * - --hero-title-glow: a pale halo, in the page ground, around the glyphs.
-   *   It lifts the ground right behind the headline, which a scrim over a
-   *   dark part of the photograph cannot. It is a filter, not a text shadow,
-   *   because a shadow shows through a glyph that is filled by a clipped
-   *   background. Dark mode has no glow.
+   *   blue instead of turning grey. The stops are clear hues, not darkened
+   *   until they pass 3:1.
+   * - --hero-title-glow: one very subtle pale edge, in the page ground,
+   *   around the glyphs. It is a filter, not a text shadow, because a shadow
+   *   shows through a glyph that is filled by a clipped background. It is
+   *   deliberately weak: the large headline's 3:1 against the darkest part
+   *   of the photograph is not guaranteed in the light hero, by the owner's
+   *   decision, since dark is the default mode. Dark mode has no glow.
+   * - --hero-beam-opacity-light: the stage beams a bit brighter, 0.95
+   *   instead of 0.75. They screen over the photo, so this only adds light.
    */
   --hero-photo-filter-light: brightness(1.05) saturate(1.45);
   --hero-title-from-light: #0077a0;
@@ -178,13 +181,17 @@
     var(--hero-title-from-light),
     var(--hero-title-to-light)
   );
-  --hero-title-glow-light: drop-shadow(0 0 0.04em var(--color-bg))
-    drop-shadow(0 0 0.1em var(--color-bg)) drop-shadow(0 0 0.24em var(--color-bg));
+  --hero-title-glow-light: drop-shadow(
+    0 0 0.05em color-mix(in srgb, var(--color-bg) 40%, transparent)
+  );
+  --hero-beam-opacity-light: 0.95;
 
-  /* Dark mode's values for the two hero headline tokens: the theme's own
-     gradient and no glow, exactly as before they existed. */
+  /* Dark mode's values for the hero headline and beam tokens: the theme's
+     own gradient, no glow and the beams' own opacity, exactly as before the
+     tokens existed. */
   --hero-title-gradient: var(--brand-gradient-text);
   --hero-title-glow: none;
+  --hero-beam-opacity: 0.75;
 
   /*
    * The hero's two paint layers, as numbers rather than as an accident of
@@ -277,6 +284,7 @@
   --hero-photo-filter: var(--hero-photo-filter-light);
   --hero-title-gradient: var(--hero-title-gradient-light);
   --hero-title-glow: var(--hero-title-glow-light);
+  --hero-beam-opacity: var(--hero-beam-opacity-light);
 }
 
 @media (prefers-color-scheme: light) {
@@ -285,5 +293,6 @@
     --hero-photo-filter: var(--hero-photo-filter-light);
     --hero-title-gradient: var(--hero-title-gradient-light);
     --hero-title-glow: var(--hero-title-glow-light);
+    --hero-beam-opacity: var(--hero-beam-opacity-light);
   }
 }
