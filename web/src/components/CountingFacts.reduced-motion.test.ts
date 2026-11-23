@@ -14,6 +14,7 @@ class FakeIntersectionObserver implements IntersectionObserver {
   static instances: FakeIntersectionObserver[] = []
   readonly root = null
   readonly rootMargin = ''
+  readonly scrollMargin = ''
   readonly thresholds: ReadonlyArray<number> = []
   private readonly callback: IntersectionObserverCallback
 
