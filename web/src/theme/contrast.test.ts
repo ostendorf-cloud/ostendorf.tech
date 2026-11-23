@@ -377,6 +377,9 @@ function heroFailures(palette: Palette, refs: Record<string, string>, ground: st
 
 const hero = heroTokens(css)
 
+/** The theme without its comments, which name tokens in prose. */
+const bareCss = css.replaceAll(/\/\*[\s\S]*?\*\//g, '')
+
 /** The hero's own stylesheet, where the scheme it paints in is pinned.
  *  Resolved the same way the theme above is, and for the same reason. */
 const homeView = readFileSync(join(process.cwd(), 'src/views/HomeView.vue'), 'utf-8')
@@ -407,61 +410,104 @@ describe('the hero scrim', () => {
   // by a DARK pixel, not a white one). The floor is therefore relaxed for
   // the light hero, to a measured one:
   //
-  // - Measured on web/src/assets/hero-1280.jpg, after the hero's own photo
-  //   grade (brightness(1.55) saturate(1.45)): the darkest 1% of pixels
-  //   (1st percentile luminance 0.0077) are about rgb(23, 7, 70). The
-  //   brightest 1% (luminance 0.873) is irrelevant to dark text: a light
-  //   pixel only raises the ground.
+  // - Measured on web/src/assets/hero-1280.jpg, after the LIGHT photo grade
+  //   (brightness(1.05) saturate(1.45), CSS formulas applied to a 128x96
+  //   sample): the darkest 1% of pixels is about rgb(13, 4, 52). Brighter
+  //   pixels only raise the ground under dark text.
   // - Navy body text (eyebrow, tagline) over the pale scrim over that pixel
-  //   must carry 4.5:1. 0.45 gives 3.9:1 and fails, 0.48 is the break even
-  //   point over the middle of the picture, 0.5 holds with margin over the
-  //   whole picture.
-  // - Not held, and not held on main either: the headline gradient's teal
-  //   end. Teal is darker than the scrim ground, so a darker ground only
-  //   lowers it: 2.0:1 over the same pixel at the old 0.74, about 1.1:1 at
-  //   0.5. It would need a scrim near 0.9. It is reported in the pull
-  //   request rather than pinned here.
+  //   must carry 4.5:1: 4.38:1 at 0.50 fails with this grade, 0.52 holds
+  //   (4.67:1). The gentler grade is what moved the alpha from 0.5.
+  // - The headline gradient cannot reach 3:1 against that ground by itself:
+  //   a mid luminance gradient over a mid luminance ground is 1.2 to 1.9:1.
+  //   It holds only with the pale halo (--hero-title-glow-light) lifting the
+  //   ground right behind the glyphs. Three chained drop shadows of the
+  //   page ground cover at least about 70% at a glyph's edge (a blurred
+  //   edge is 50% per shadow, 75% for two); that model, not a rendering, is
+  //   what is pinned below, and a browser look is the open check.
   describe('in light mode', () => {
-    const alphaLight = Number(/--hero-scrim-alpha-light:\s*([0-9.]+)\s*;/.exec(css)?.[1])
-    const DARKEST_PERCENT_OF_PHOTO = [23, 7, 70]
+    const number = (name: string) =>
+      Number(new RegExp(`--${name}:\\s*([0-9.]+)\\s*;`).exec(bareCss)?.[1])
+    const value = (name: string) => new RegExp(`--${name}:\\s*([^;]+);`).exec(bareCss)?.[1].trim()
+    const alphaLight = number('hero-scrim-alpha-light')
+    const DARKEST_PERCENT_OF_PHOTO = [13, 4, 52]
+    const HALO_COVERAGE_AT_GLYPH_EDGE = 0.7
 
-    function groundOver(alpha: number, behind: number[]): string {
-      const scrim = Number.parseInt(light.bg.slice(1), 16)
+    function over(top: string, alpha: number, behind: number[]): string {
+      const scrim = Number.parseInt(top.slice(1), 16)
       const channels = [(scrim >> 16) & 0xff, (scrim >> 8) & 0xff, scrim & 0xff].map((c, i) =>
         Math.round(alpha * c + (1 - alpha) * behind[i]),
       )
       return `#${channels.map((c) => c.toString(16).padStart(2, '0')).join('')}`
     }
 
-    it('pins the thinner light scrim', () => {
-      expect(alphaLight).toBe(0.5)
+    const rgb = (hex: string) => {
+      const n = Number.parseInt(hex.slice(1), 16)
+      return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
+    }
+
+    it('pins the thinner light scrim and the gentler photo grade', () => {
+      expect(alphaLight).toBe(0.52)
+      expect(value('hero-photo-filter-light')).toBe('brightness(1.05) saturate(1.45)')
     })
 
     it('carries the navy body text over the darkest 1% of the photograph at 4.5:1', () => {
-      const ground = groundOver(alphaLight, DARKEST_PERCENT_OF_PHOTO)
+      const ground = over(light.bg, alphaLight, DARKEST_PERCENT_OF_PHOTO)
       expect(round(ratio(light.text, ground))).toBeGreaterThanOrEqual(TEXT_MINIMUM)
     })
 
-    it('would not hold at the 0.45 that was first asked for', () => {
-      const ground = groundOver(0.45, DARKEST_PERCENT_OF_PHOTO)
+    it('would not hold at 0.50 with this grade', () => {
+      const ground = over(light.bg, 0.5, DARKEST_PERCENT_OF_PHOTO)
       expect(ratio(light.text, ground)).toBeLessThan(TEXT_MINIMUM)
     })
 
+    it('carries both headline gradient stops at 3:1 over the glow over the darkest 1%', () => {
+      const scrim = over(light.bg, alphaLight, DARKEST_PERCENT_OF_PHOTO)
+      const ground = over(light.bg, HALO_COVERAGE_AT_GLYPH_EDGE, rgb(scrim))
+      for (const stop of ['hero-title-from-light', 'hero-title-to-light']) {
+        const colour = value(stop) ?? ''
+        expect(colour, stop).toMatch(/^#[0-9a-f]{6}$/i)
+        expect(round(ratio(colour, ground)), stop).toBeGreaterThanOrEqual(NON_TEXT_MINIMUM)
+      }
+    })
+
+    it('interpolates the headline gradient in oklch where the browser can', () => {
+      expect(css).toMatch(
+        /@supports \(background: linear-gradient\(in oklch, red, blue\)\)\s*\{\s*:root\[data-theme='vtech'\]\s*\{\s*--hero-title-gradient-light:\s*linear-gradient\(\s*90deg in oklch,/,
+      )
+      expect(value('hero-title-glow-light')).toMatch(
+        /^drop-shadow\(.*\)\s*drop-shadow\(.*\)\s*drop-shadow\(/s,
+      )
+    })
+
     it('reaches the hero through rules that only light mode matches', () => {
-      const selectors = [
-        ...css.matchAll(/([^{}]*)\{\s*--hero-scrim-alpha:\s*var\(--hero-scrim-alpha-light\)/g),
-      ].map((match) => match[1].replaceAll(/\/\*[\s\S]*?\*\//g, '').trim())
-      expect(selectors).toEqual([":root[data-mode='light'] .hero", ':root:not([data-mode]) .hero'])
+      for (const token of [
+        'hero-scrim-alpha',
+        'hero-photo-filter',
+        'hero-title-gradient',
+        'hero-title-glow',
+      ]) {
+        const selectors = [
+          ...bareCss.matchAll(
+            new RegExp(`([^{}]*)\\{[^{}]*--${token}:\\s*var\\(--${token}-light\\)`, 'g'),
+          ),
+        ].map((match) => match[1].replaceAll(/\/\*[\s\S]*?\*\//g, '').trim())
+        expect(selectors, token).toEqual([
+          ":root[data-mode='light'] .hero",
+          ':root:not([data-mode]) .hero',
+        ])
+      }
     })
   })
 
-  // Dark mode is exactly what main shipped.
+  // Dark mode is exactly what main shipped, headline included.
   it('leaves the dark hero values as they were', () => {
-    const value = (name: string) => new RegExp(`--${name}:\\s*([^;]+);`).exec(css)?.[1].trim()
+    const value = (name: string) => new RegExp(`--${name}:\\s*([^;]+);`).exec(bareCss)?.[1].trim()
     expect(value('hero-scrim-color')).toBe('var(--color-bg)')
     expect(value('hero-scrim-alpha')).toBe('0.74')
     expect(value('hero-photo-filter')).toBe('brightness(1.55) saturate(1.45)')
     expect(value('hero-beam-blend')).toBe('screen')
+    expect(value('hero-title-gradient')).toBe('var(--brand-gradient-text)')
+    expect(value('hero-title-glow')).toBe('none')
   })
 
   // There is deliberately no assertion here pinning the alpha to its

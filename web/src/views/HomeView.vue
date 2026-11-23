@@ -412,6 +412,8 @@ const aboutFacts = computed<Fact[]>(() => [
   line-height: 1.02;
   hyphens: auto;
   overflow-wrap: break-word;
+  /* A pale halo in light mode, none in dark; see --hero-title-glow. */
+  filter: var(--hero-title-glow);
 }
 
 /* The gradient needs the text clipped out of it; a browser that cannot do
@@ -423,7 +425,7 @@ const aboutFacts = computed<Fact[]>(() => [
        letter spacing, need room. The margin takes the room back. */
     padding: 0 0.08em 0.14em;
     margin: 0.75rem -0.08em -0.14em;
-    background: var(--brand-gradient-text);
+    background: var(--hero-title-gradient);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -436,6 +438,7 @@ const aboutFacts = computed<Fact[]>(() => [
 @media (forced-colors: active) {
   .hero-title {
     background: none;
+    filter: none;
     -webkit-text-fill-color: currentcolor;
     color: canvastext;
   }
