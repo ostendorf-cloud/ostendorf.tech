@@ -75,10 +75,14 @@ func (c *Cache) Set(posts []*CachedPost) {
 // last good cache in place and logs rather than clearing it, the same
 // "last good feed stays" rule internal/instagram.Syncer.Run applies, so a
 // feed service outage costs freshness, never the section's availability.
-// While the cache is still empty, the retry is capped at five minutes
-// rather than waiting a full interval, the same bound Run uses there too,
-// so a cold start or a still-unreachable feed service is not amplified
-// into a tighter loop than that cap, whatever the configured interval is.
+// After a failed cycle Run does not wait a whole interval: it retries
+// after RetryDelay (DefaultRetryDelay, five seconds, when zero), doubling
+// the delay on every further failure up to MaxRetryDelay or the interval,
+// whichever is smaller, so a feed service that starts a moment after the
+// website is picked up within seconds, while one that stays down is not
+// hammered. One success resets the delay and returns Run to the interval.
+// Each failed attempt logs one line, so the log grows with the delay, not
+// with the clock.
 //
 // A cold start therefore never blocks the website: New builds an empty
 // Cache synchronously, Start (internal/webapp) launches Run in the
@@ -88,21 +92,46 @@ type Syncer struct {
 	Client *Client
 	Cache  *Cache
 	Logger *slog.Logger
+	// RetryDelay is the wait after the first failed cycle. Zero means
+	// DefaultRetryDelay.
+	RetryDelay time.Duration
+
+	// wait replaces sleep in tests, so they need no real time. It reports
+	// false when the context ended.
+	wait func(ctx context.Context, d time.Duration) bool
 }
 
-// Run syncs at start and then every interval until ctx ends.
+const (
+	// DefaultRetryDelay is the wait after the first failed sync cycle.
+	DefaultRetryDelay = 5 * time.Second
+	// MaxRetryDelay bounds the growing retry delay, whatever the interval.
+	MaxRetryDelay = 5 * time.Minute
+)
+
+// Run syncs at start and then every interval until ctx ends. A failed
+// cycle is retried after a short, doubling delay, see Syncer.
 func (s *Syncer) Run(ctx context.Context, interval time.Duration) {
+	wait := s.wait
+	if wait == nil {
+		wait = sleep
+	}
+	retry := s.RetryDelay
+	if retry <= 0 {
+		retry = DefaultRetryDelay
+	}
+	delay := retry
 	for {
 		if err := s.Sync(ctx); err != nil && ctx.Err() == nil {
-			s.Logger.Warn("feed sync failed, keeping the last cache", "error", err.Error(), "posts", len(s.Cache.Posts()))
-			if len(s.Cache.Posts()) == 0 {
-				if !sleep(ctx, min(interval, 5*time.Minute)) {
-					return
-				}
-				continue
+			d := min(delay, interval, MaxRetryDelay)
+			s.Logger.Warn("feed sync failed, keeping the last cache", "error", err.Error(), "posts", len(s.Cache.Posts()), "retry_in", d.String())
+			if !wait(ctx, d) {
+				return
 			}
+			delay = min(delay*2, MaxRetryDelay)
+			continue
 		}
-		if !sleep(ctx, interval+time.Duration(rand.Int64N(int64(interval/10)+1))) {
+		delay = retry
+		if !wait(ctx, interval+time.Duration(rand.Int64N(int64(interval/10)+1))) {
 			return
 		}
 	}

@@ -73,7 +73,7 @@ listener (`ADMIN_ADDR`), never on this public one; see the Configuration table b
 | `CONTACT_RATE_LIMIT_BURST` | Contact submissions one client address may make before waiting | `5` | no |
 | `CONTACT_RATE_LIMIT_PER` | That burst's refill period | `10m` | no |
 | `FEED_SERVICE_URL` | Origin of the feed service the Impressionen section is loaded from. Empty renders no section at all | none | no |
-| `FEED_REFRESH_INTERVAL` | How often the website asks the feed service for the post list, at least `1m` | `5m` | no |
+| `FEED_REFRESH_INTERVAL` | How often the website asks the feed service for the post list, at least `1m`. A failed sync is retried after 5s, 10s, 20s, 40s and so on (at most `5m` or this interval) until one succeeds | `5m` | no |
 | `UMAMI_URL` | Base URL of the Umami page views are reported to. `https`, or `http` only for localhost or a name inside the cluster. Empty counts nothing | none | no\*\* |
 | `UMAMI_WEBSITE_ID` | UUID of the website in Umami | none | no\*\* |
 | `UMAMI_TIMEOUT` | Bound of one post to Umami, `1s` to `30s` | `5s` | no |
