@@ -120,7 +120,8 @@ the variable.
 
 This binary has no Instagram or Meta credential and no OpenBao client: both live in the
 feed service instead, a second binary (`cmd/feed`) with its own configuration and its own
-chart entry, reached over `FEED_SERVICE_URL` alone.
+chart entry, reached over `FEED_SERVICE_URL` alone. Its variables are listed in
+`.env.example`; see "Running the real feed service locally" below for a local run.
 
 `CONTACT_RATE_LIMIT_BURST` bounds one client address; `MAIL_RATE_LIMIT_BURST` bounds the mail
 account itself, across every address at once, which the per-client limit alone cannot do: a
@@ -178,10 +179,11 @@ docker compose --profile feed up --build
 
 The `fakefeed` service (`cmd/fakefeed`) serves generated sample posts and pictures on the
 same routes as the real feed service, never real Instagram content. It publishes no host
-port: the website reaches it on the compose network. The real feed service needs OpenBao
-and a Meta token and cannot run locally. `POST_COUNT` in `.env` sets how many sample posts
-there are, 20 by default. The fake is its own `fakefeed` target in the `Dockerfile`; no
-production target depends on it and no workflow builds or publishes it.
+port: the website reaches it on the compose network. `POST_COUNT` in `.env` sets how many
+sample posts there are, 20 by default. The fake is its own `fakefeed` target in the
+`Dockerfile`; no production target depends on it and no workflow builds or publishes it.
+Compose forwards no OpenBao variable: the fake needs no OpenBao. See "Running the real feed
+service locally" below for the real one.
 
 Builds the multi-stage `Dockerfile` (frontend, prerender, static Go binary, then a
 minimal non-root runtime stage with no shell) and serves the site at
@@ -220,6 +222,32 @@ not and cannot prove that this service ever reaches `/readyz` 200, or that OpenB
 Kubernetes auth actually admits its role; both need a real cluster. The `docker-build-feed`
 job in `.github/workflows/checks.yaml` runs it the same way `docker-build` runs the
 website's own script.
+
+### Running the real feed service locally
+
+The real feed service needs OpenBao and a Meta access token already stored in it. In a
+cluster it logs in with the Kubernetes auth method. For a local run against a development
+OpenBao it uses the token method instead. Set these in the shell, or put them into `.env`
+and export them, then run `go run ./cmd/feed`:
+
+```sh
+OPENBAO_AUTH_METHOD=token
+OPENBAO_ADDR=http://127.0.0.1:8200
+OPENBAO_TOKEN=<a token allowed to read and write the secret below>
+OPENBAO_SECRET_PATH=<KV v2 data path of the secret>
+LISTEN_ADDR=:9081
+```
+
+- `OPENBAO_TOKEN_FILE` may name a file holding the token instead. Setting both is a startup
+  error.
+- `OPENBAO_SECRET_KEY_ACCESS_TOKEN` and `OPENBAO_SECRET_KEY_REFRESHED_AT` name the keys
+  inside the secret. They default to `access_token` and `refreshed_at`.
+- `OPENBAO_ROLE`, `OPENBAO_JWT_FILE` and `OPENBAO_AUTH_PATH` belong to the Kubernetes method.
+  Setting any of them with the token method is a startup error.
+- A token in `.env` is a secret. `.env` stays git ignored and must never be committed.
+- The service never renews the token. Once it expires or is revoked, OpenBao answers 403,
+  `/readyz` stays 503 and no request is retried. Give it a new token and restart it.
+- The token never appears in a log line, an error or a formatted value.
 
 ## Development
 

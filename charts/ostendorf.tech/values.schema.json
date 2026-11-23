@@ -194,6 +194,15 @@
             "expirationSeconds": { "type": "integer", "minimum": 1 }
           }
         },
+        "openBaoToken": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Reference to an existing Secret holding the OpenBao token of the token auth method. There is no field for the token itself: any other key is refused.",
+          "properties": {
+            "existingSecret": { "type": "string" },
+            "existingSecretKey": { "type": "string" }
+          }
+        },
         "resources": { "type": "object" },
         "startupProbe": { "type": "object" },
         "livenessProbe": { "type": "object" },
@@ -210,13 +219,31 @@
               "type": "string",
               "description": "The OpenBao address the feed service authenticates against. Required; enforced by a template required guard, not minLength, matching this chart's existing pattern for a value with no usable default."
             },
+            "openBaoAuthMethod": {
+              "type": "string",
+              "enum": ["kubernetes", "token"],
+              "description": "How the feed service logs in to OpenBao. kubernetes for a cluster, token for tests with feed.openBaoToken."
+            },
+            "openBaoToken": false,
+            "token": false,
             "openBaoAuthPath": { "type": "string", "minLength": 1 },
             "openBaoRole": {
               "type": "string",
               "description": "The OpenBao Kubernetes auth role the feed service logs in as. Required; enforced by a template required guard, not minLength; see openBaoAddr's own description."
             },
             "openBaoJwtFile": { "type": "string", "minLength": 1 },
-            "tokenPath": { "type": "string", "minLength": 1 },
+            "tokenPath": false,
+            "openBaoSecretPath": { "type": "string", "minLength": 1 },
+            "openBaoSecretKeyAccessToken": {
+              "type": "string",
+              "pattern": "^[^/\\x00-\\x1f\\x7f]+$",
+              "description": "Key of the Instagram access token inside the secret. Not empty, no slash, no control character."
+            },
+            "openBaoSecretKeyRefreshedAt": {
+              "type": "string",
+              "pattern": "^[^/\\x00-\\x1f\\x7f]+$",
+              "description": "Key of the RFC 3339 refresh time inside the secret. Same rules as openBaoSecretKeyAccessToken."
+            },
             "syncInterval": { "type": "string", "minLength": 1 },
             "tokenRefreshAge": { "type": "string", "minLength": 1 },
             "apiVersion": { "type": "string", "minLength": 1 },

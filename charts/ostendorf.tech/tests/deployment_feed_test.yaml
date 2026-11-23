@@ -82,8 +82,33 @@ tests:
           path: spec.template.spec.containers[0].startupProbe.httpGet.port
           value: http
 
-  - it: wires every one of the eleven plain env vars with their documented defaults
+  - it: wires every plain env var with its documented defaults
     asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_AUTH_METHOD
+            value: "kubernetes"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TOKEN_PATH
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_TOKEN
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_SECRET_KEY_ACCESS_TOKEN
+            value: "access_token"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENBAO_SECRET_KEY_REFRESHED_AT
+            value: "refreshed_at"
       - contains:
           path: spec.template.spec.containers[0].env
           content:
@@ -117,7 +142,7 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
-            name: TOKEN_PATH
+            name: OPENBAO_SECRET_PATH
             value: "instagram.com/api-tokens/data/simonostendorf.vtech"
       - contains:
           path: spec.template.spec.containers[0].env

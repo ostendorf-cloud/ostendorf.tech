@@ -1,7 +1,12 @@
 // Package openbao talks to OpenBao over its HTTP API for the feed service:
-// logging in with the Kubernetes auth method and reading and writing one KV
-// v2 secret. It needs no SDK, so the image this builds into stays standard
-// library only.
+// logging in through a Login (the Kubernetes auth method in a cluster, a
+// static token for a local run) and reading and writing one KV v2 secret.
+// It needs no SDK, so the image this builds into stays standard library
+// only.
+//
+// No token ever travels into an error, a log line or a formatted value: it
+// is held as a Token, which prints as "[redacted]", and converted to a plain
+// string only for the X-Vault-Token header.
 package openbao
 
 import (
@@ -13,7 +18,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +38,11 @@ var (
 	ErrNotFound = errors.New("openbao: secret not found")
 	// ErrCASMismatch means another writer changed the secret since it was read.
 	ErrCASMismatch = errors.New("openbao: check-and-set version mismatch")
+	// ErrForbidden means OpenBao refused a static token with 403: it expired,
+	// was revoked or lacks the policy. It carries neither the token nor
+	// OpenBao's response body, and the request is not retried, since logging
+	// in again cannot yield a different static token.
+	ErrForbidden = errors.New("openbao: permission denied for the configured token")
 )
 
 // Secret is the data of one KV v2 secret and its version.
@@ -48,66 +57,64 @@ func (s Secret) String(key string) string {
 	return v
 }
 
-// Client logs in with the Kubernetes auth method and keeps the token fresh.
+// Client logs in through a Login and keeps the token fresh.
 //
-// Everything that identifies it to OpenBao, the address, the auth mount, the
-// role and the service account token path, is fixed at construction and
-// never exported: the cached token and its renewal time depend on all four,
-// so letting a caller change one later without resetting the other two
-// would risk a token built for one identity being reused under another.
-// http and now stay package private too; a test in this package reaches
-// them directly instead of through an exported seam the rest of the world
-// could also reach for.
+// Everything that identifies it to OpenBao, the address and the login
+// method with its credentials, is fixed at construction and never exported:
+// the cached token and its renewal time depend on both, so letting a caller
+// change one later would risk a token built for one identity being reused
+// under another. http and now stay package private too; a test in this
+// package reaches them directly instead of through an exported seam the
+// rest of the world could also reach for.
+//
+// Client prints as its address only (see Format), so a Client in a format
+// string or a struct dump never shows the cached token.
 type Client struct {
-	addr     string
-	authPath string
-	role     string
-	jwtFile  string
-	http     *http.Client
-	logger   *slog.Logger
-	now      func() time.Time
+	addr   string
+	login  Login
+	http   *http.Client
+	logger *slog.Logger
+	now    func() time.Time
 
 	mu      sync.Mutex
-	token   string
+	token   Token
+	static  bool
 	renewAt time.Time
 }
 
-// New returns a client for addr, authenticating at authPath as role with the
-// Kubernetes service account token read from jwtFile, with a 10 second
-// per-request timeout. logger is the caller's own, never built here.
-func New(addr, authPath, role, jwtFile string, logger *slog.Logger) *Client {
+// New returns a client for addr that authenticates through login, with a 10
+// second per-request timeout. logger is the caller's own, never built here.
+func New(addr string, login Login, logger *slog.Logger) *Client {
 	return &Client{
-		addr:     strings.TrimRight(addr, "/"),
-		authPath: strings.Trim(authPath, "/"),
-		role:     role,
-		jwtFile:  jwtFile,
-		http:     &http.Client{Timeout: 10 * time.Second},
-		logger:   logger,
-		now:      time.Now,
+		addr:   strings.TrimRight(addr, "/"),
+		login:  login,
+		http:   &http.Client{Timeout: 10 * time.Second},
+		logger: logger,
+		now:    time.Now,
 	}
 }
 
-type loginResponse struct {
-	Auth struct {
-		ClientToken   string `json:"client_token"`
-		LeaseDuration int64  `json:"lease_duration"`
-	} `json:"auth"`
+// Format implements fmt.Formatter: a Client prints as its address only,
+// under every verb, never with its cached token.
+func (c *Client) Format(f fmt.State, _ rune) {
+	_, _ = fmt.Fprintf(f, "openbao.Client(%s)", c.addr)
 }
 
 // currentToken returns a valid token, logging in first when there is none or
 // when two thirds of its TTL have passed. Logging in again instead of
-// renewing also survives a token that reached its max TTL.
-func (c *Client) currentToken(ctx context.Context) (string, error) {
+// renewing also survives a token that reached its max TTL. A static token is
+// never renewed: it is returned as is for the life of the process.
+func (c *Client) currentToken(ctx context.Context) (Token, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.token != "" && c.now().Before(c.renewAt) {
-		return c.token, nil
+	if c.token != "" && (c.static || c.now().Before(c.renewAt)) {
+		return c.token, c.static, nil
 	}
 	return c.loginLocked(ctx)
 }
 
 // invalidate drops token unless another request already replaced it.
-func (c *Client) invalidate(token string) {
+func (c *Client) invalidate(token Token) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.token == token {
@@ -116,45 +123,37 @@ func (c *Client) invalidate(token string) {
 }
 
 // loginLocked authenticates and caches the result. Callers hold mu.
-func (c *Client) loginLocked(ctx context.Context) (string, error) {
-	jwt, err := os.ReadFile(c.jwtFile)
+func (c *Client) loginLocked(ctx context.Context) (Token, bool, error) {
+	send := func(ctx context.Context, method, path string, body []byte) (int, []byte, error) {
+		return c.send(ctx, method, path, "", body)
+	}
+	auth, err := c.login.Login(ctx, send)
 	if err != nil {
-		return "", fmt.Errorf("openbao login: read service account token: %w", err)
+		return "", false, err
 	}
-	body, err := json.Marshal(map[string]string{"role": c.role, "jwt": strings.TrimSpace(string(jwt))})
-	if err != nil {
-		return "", fmt.Errorf("openbao login: %w", err)
+	if auth.Token == "" {
+		return "", false, errors.New("openbao login: no client token")
 	}
-	status, data, err := c.send(ctx, http.MethodPost, "auth/"+c.authPath+"/login", "", body)
-	if err != nil {
-		return "", fmt.Errorf("openbao login: %w", err)
+	c.token, c.static = auth.Token, auth.Static
+	if auth.Static {
+		c.logger.Info("openbao: using the configured token, it is never renewed")
+		return c.token, true, nil
 	}
-	if status != http.StatusOK {
-		return "", fmt.Errorf("openbao login: unexpected status %d%s", status, apiErrors(data))
-	}
-	var resp loginResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
-		return "", fmt.Errorf("openbao login: decode response: %w", err)
-	}
-	if resp.Auth.ClientToken == "" {
-		return "", errors.New("openbao login: no client token in response")
-	}
-	ttl := time.Duration(resp.Auth.LeaseDuration) * time.Second
+	ttl := auth.Lease
 	if ttl <= 0 {
 		// A token without a lease duration never expires on its own;
 		// still log in again on the same schedule an hour and a half
 		// lease would give, rather than trusting it forever.
 		ttl = assumedTTL
 	}
-	c.token = resp.Auth.ClientToken
 	c.renewAt = c.now().Add(ttl * 2 / 3)
-	c.logger.Info("openbao: logged in", "auth_path", c.authPath, "role", c.role, "lease", ttl.String())
-	return c.token, nil
+	c.logger.Info("openbao: logged in", "lease", ttl.String())
+	return c.token, false, nil
 }
 
 // send performs one request and returns its status and body. The token
 // travels only in a header, never in a logged or returned string.
-func (c *Client) send(ctx context.Context, method, path, token string, body []byte) (int, []byte, error) {
+func (c *Client) send(ctx context.Context, method, path string, token Token, body []byte) (int, []byte, error) {
 	var reader io.Reader
 	if body != nil {
 		reader = bytes.NewReader(body)
@@ -167,7 +166,8 @@ func (c *Client) send(ctx context.Context, method, path, token string, body []by
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if token != "" {
-		req.Header.Set("X-Vault-Token", token)
+		// The one place a token becomes a plain string.
+		req.Header.Set("X-Vault-Token", string(token))
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -181,18 +181,24 @@ func (c *Client) send(ctx context.Context, method, path, token string, body []by
 	return resp.StatusCode, data, nil
 }
 
-// do sends an authenticated request. A 403 means the token was revoked or
-// expired early, so it logs in once more and retries; a second 403 is
-// returned to the caller rather than retried again.
+// do sends an authenticated request. With a login method that can issue a
+// new token, a 403 means the token was revoked or expired early, so it logs
+// in once more and retries; a second 403 is returned to the caller rather
+// than retried again. A static token cannot be replaced by logging in, so
+// its 403 is returned at once as ErrForbidden, with no retry and without
+// OpenBao's response body.
 func (c *Client) do(ctx context.Context, method, path string, body []byte) (int, []byte, error) {
 	for attempt := 0; ; attempt++ {
-		token, err := c.currentToken(ctx)
+		token, static, err := c.currentToken(ctx)
 		if err != nil {
 			return 0, nil, err
 		}
 		status, data, err := c.send(ctx, method, path, token, body)
 		if err != nil {
 			return 0, nil, err
+		}
+		if status == http.StatusForbidden && static {
+			return 0, nil, ErrForbidden
 		}
 		if status == http.StatusForbidden && attempt == 0 {
 			c.logger.Warn("openbao: request rejected, logging in again", "method", method, "path", path)

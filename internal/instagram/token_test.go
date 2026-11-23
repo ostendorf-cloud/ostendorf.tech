@@ -124,7 +124,8 @@ func newTestClient(t *testing.T, bao *fakeBao, logs io.Writer) *openbao.Client {
 	if err := os.WriteFile(jwtPath, []byte("test-service-account-jwt\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return openbao.New(server.URL, testAuthPath, testRole, jwtPath, slog.New(slog.NewTextHandler(logs, nil)))
+	login := openbao.Kubernetes{AuthPath: testAuthPath, Role: testRole, JWTFile: jwtPath}
+	return openbao.New(server.URL, login, slog.New(slog.NewTextHandler(logs, nil)))
 }
 
 // newTestStore builds a TokenStore on top of newTestClient, with a fake
@@ -142,12 +143,14 @@ func newTestStoreWithClock(t *testing.T, bao *fakeBao, refresher Refresher, logs
 		logs = io.Discard
 	}
 	return &TokenStore{
-		Store:      newTestClient(t, bao, logs),
-		Refresher:  refresher,
-		Path:       testPath,
-		RefreshAge: 24 * time.Hour,
-		Logger:     slog.New(slog.NewTextHandler(logs, nil)),
-		Now:        now,
+		Store:          newTestClient(t, bao, logs),
+		Refresher:      refresher,
+		Path:           testPath,
+		AccessTokenKey: "access_token",
+		RefreshedAtKey: "refreshed_at",
+		RefreshAge:     24 * time.Hour,
+		Logger:         slog.New(slog.NewTextHandler(logs, nil)),
+		Now:            now,
 	}
 }
 
@@ -415,12 +418,14 @@ func TestTokenStore_Token_successfulWriteResetsTheEscalationClock(t *testing.T) 
 	now := testNow
 	var logs bytes.Buffer
 	store := &TokenStore{
-		Store:      newTestClient(t, bao, &logs),
-		Refresher:  refresher,
-		Path:       testPath,
-		RefreshAge: time.Hour,
-		Logger:     slog.New(slog.NewTextHandler(&logs, nil)),
-		Now:        func() time.Time { return now },
+		Store:          newTestClient(t, bao, &logs),
+		Refresher:      refresher,
+		Path:           testPath,
+		AccessTokenKey: "access_token",
+		RefreshedAtKey: "refreshed_at",
+		RefreshAge:     time.Hour,
+		Logger:         slog.New(slog.NewTextHandler(&logs, nil)),
+		Now:            func() time.Time { return now },
 	}
 
 	// First call: write fails, unstoredSince is set to now.

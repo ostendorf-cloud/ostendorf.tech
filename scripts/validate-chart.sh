@@ -2,7 +2,9 @@
 # Validates charts/ostendorf.tech: a must-succeed set for its default values and every
 # documented non-default combination, and a must-fail set proving every
 # templates/deployment.yaml, templates/deployment-feed.yaml and templates/httproute.yaml
-# fail/required guard actually rejects the values it is meant to reject. Shared by
+# fail/required guard actually rejects the values it is meant to reject, plus the
+# values.schema.json refusals of the feed's OpenBao auth values (a plain token value
+# above all). Shared by
 # task lint:helm and task validate:kubeconform so CI and a local run check the exact same
 # succeed combinations. Every combination, succeed and fail alike, also carries the
 # baseline below: existingSecret.name has no usable default and is enforced by a
@@ -68,6 +70,16 @@ httproute_valid="${httproute_valid},httpRoute.parentRefs.name=shared-gateway,htt
 # once feed.enabled is true, so this combination sets all three together.
 feed_valid="feed.enabled=true,feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200,feed.config.openBaoRole=ostendorf-tech-feed"
 
+# The feed service with the token auth method: no role, the token from an existing
+# Secret reference only, never a value.
+feed_base="feed.enabled=true,feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200"
+feed_token_valid="${feed_base},feed.config.openBaoAuthMethod=token"
+feed_token_valid="${feed_token_valid},feed.openBaoToken.existingSecret=feed-openbao-token,feed.openBaoToken.existingSecretKey=token"
+
+# The feed service with a custom secret path and custom key names inside it.
+feed_secret_valid="${feed_valid},feed.config.openBaoSecretPath=kv/data/instagram"
+feed_secret_valid="${feed_secret_valid},feed.config.openBaoSecretKeyAccessToken=ig_token,feed.config.openBaoSecretKeyRefreshedAt=ig_refreshed"
+
 # config.smtpHost defaults to empty, so the default values combination renders without
 # SMTP settings (the contact form answers 503); this one sets the server and the secret
 # keys the contact form needs.
@@ -80,6 +92,8 @@ names=(
   "ingress enabled"
   "httpRoute enabled"
   "feed enabled"
+  "feed enabled with the token auth method"
+  "feed enabled with a custom secret path and key names"
   "contact form configured"
 )
 
@@ -91,6 +105,8 @@ sets=(
   "${baseline},${ingress_valid}"
   "${baseline},${httproute_valid}"
   "${baseline},${feed_valid}"
+  "${baseline},${feed_token_valid}"
+  "${baseline},${feed_secret_valid}"
   "${baseline},${contact_valid}"
 )
 
@@ -140,6 +156,14 @@ if [ "$mode" = "lint" ]; then
     "existingSecret.name left empty"
     "feed.enabled true with feed.config.openBaoAddr left empty"
     "feed.enabled true with feed.config.openBaoRole left empty"
+    "feed token auth method without a token Secret reference"
+    "feed token auth method with an empty token Secret key"
+    "feed token auth method with a Kubernetes role"
+    "feed kubernetes auth method with a token Secret reference"
+    "feed unknown auth method"
+    "feed token given as a plain value"
+    "feed removed tokenPath value"
+    "feed secret key name with a slash"
     "config.allowPlainHttp true with an https config.siteUrl"
     "config.allowPlainHttp true with an upper case HTTPS config.siteUrl"
   )
@@ -153,6 +177,14 @@ if [ "$mode" = "lint" ]; then
     "replicaCount=1"
     "${baseline},feed.enabled=true,feed.config.openBaoRole=ostendorf-tech-feed"
     "${baseline},feed.enabled=true,feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200"
+    "${baseline},${feed_base},feed.config.openBaoAuthMethod=token"
+    "${baseline},${feed_token_valid},feed.openBaoToken.existingSecretKey="
+    "${baseline},${feed_token_valid},feed.config.openBaoRole=ostendorf-tech-feed"
+    "${baseline},${feed_valid},feed.openBaoToken.existingSecret=feed-openbao-token"
+    "${baseline},${feed_valid},feed.config.openBaoAuthMethod=approle"
+    "${baseline},${feed_token_valid},feed.openBaoToken.value=not-a-real-token"
+    "${baseline},${feed_valid},feed.config.tokenPath=old/data/path"
+    "${baseline},${feed_valid},feed.config.openBaoSecretKeyAccessToken=ig/token"
     "${baseline},config.allowPlainHttp=true,config.siteUrl=https://ostendorf.tech"
     "${baseline},config.allowPlainHttp=true,config.siteUrl=HTTPS://ostendorf.tech"
   )
@@ -166,6 +198,14 @@ if [ "$mode" = "lint" ]; then
     "existingSecret.name is required: set it to the name of an existing Secret carrying CHALLENGE_KEY and the SMTP credentials, without which the contact form answers 503."
     "feed.config.openBaoAddr is required: set it to the OpenBao address the feed service authenticates against. There is no default, since none could ever point at an OpenBao installation that actually exists."
     "feed.config.openBaoRole is required: set it to the OpenBao Kubernetes auth role the feed service logs in as. There is no default, since none could ever name a role that actually exists in your OpenBao installation."
+    "feed.openBaoToken.existingSecret is required with feed.config.openBaoAuthMethod=token: set it to the name of an existing Secret holding the OpenBao token."
+    "feed.openBaoToken.existingSecretKey is required with feed.config.openBaoAuthMethod=token: set it to the key of the OpenBao token inside that Secret."
+    "feed.config.openBaoRole must not be set with feed.config.openBaoAuthMethod=token: the role belongs to the kubernetes method."
+    "feed.openBaoToken.existingSecret must not be set with feed.config.openBaoAuthMethod=kubernetes: the token belongs to the token method."
+    "at '/feed/config/openBaoAuthMethod': value must be one of 'kubernetes', 'token'"
+    "at '/feed/openBaoToken': additional properties 'value' not allowed"
+    "at '/feed/config/tokenPath': false schema"
+    "at '/feed/config/openBaoSecretKeyAccessToken'"
     "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
     "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
   )

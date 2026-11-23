@@ -49,7 +49,9 @@ The global baseline already applies here and is not repeated below.
 - `internal/instagram` is the domain logic behind the home page's Impressionen section:
   a `Client` against Meta's Graph API, a `Feed` cache of the posts and their picture
   bytes, a `Syncer` that keeps `Feed` current, and a `TokenStore` that reads and writes
-  the access token through `internal/openbao`'s KV v2 API under optimistic concurrency
+  the access token and its refresh time under two configured key names (it has no built-in
+  defaults; `internal/feedconfig` supplies them), keeping every other key of the secret,
+  through `internal/openbao`'s KV v2 API under optimistic concurrency
   (CAS), refreshing it against Meta once it passes `TokenRefreshAge` and treating a CAS
   mismatch as the other side's write winning rather than an error. None of this runs
   inside the website any more: `cmd/feed` is the only binary that imports this package,
@@ -60,18 +62,31 @@ The global baseline already applies here and is not repeated below.
   merely less frequent. Ported from old_simon-ostendorf.de's `internal/instagram`, with
   the same one change as before this split: where a refreshed token is stored, OpenBao
   rather than nowhere.
-- `internal/openbao` is a small, standard library only HTTP client against OpenBao's
-  Kubernetes auth method and its KV v2 API, ported unchanged from
-  old_simon-ostendorf.de's own `internal/openbao`. It reads the projected service account
-  token fresh on every login rather than caching it, because the kubelet rotates that
-  file; it re-logs in at two thirds of the lease instead of waiting for `renew-self` to
-  fail, and retries a login once on a 403. `Write` is a full-document overwrite guarded
-  by the version `Read` last saw, so two replicas writing at once cannot silently clobber
-  each other. `cmd/feed` is the only binary that constructs one of these: the website has
-  no OpenBao client at all.
+- `internal/openbao` is a small, standard library only HTTP client against OpenBao's KV v2
+  API, ported from old_simon-ostendorf.de's own `internal/openbao`. It logs in through a
+  `Login` interface that returns the token and its lease. `Kubernetes` is the method for a
+  cluster: it reads the projected service account token fresh on every login rather than
+  caching it, because the kubelet rotates that file; the client re-logs in at two thirds of
+  the lease instead of waiting for `renew-self` to fail, and retries a login once on a 403.
+  `StaticToken` is the method for local tests: a token handed to the process, sent as
+  `X-Vault-Token`, never renewed, and its 403 is the fixed `ErrForbidden` with no retry and
+  no response body. Another method is one more `Login` implementation. Every token is an
+  `openbao.Token`, which prints as `[redacted]` under every `fmt` verb, in `slog` and in
+  JSON; the one plain string conversion is the request header. `Write` is a full-document
+  overwrite guarded by the version `Read` last saw, so two replicas writing at once cannot
+  silently clobber each other. `cmd/feed` is the only binary that constructs one of these:
+  the website has no OpenBao client at all. `internal/secrettest` holds the test helpers
+  that prove a secret stays out of every error in an unwrap tree and every formatted value.
 - `cmd/feed` wires the feed service: a second binary alongside `cmd/website`, with its
   own configuration (`internal/feedconfig`) and its own chart entry
-  (`charts/ostendorf.tech/templates/deployment-feed.yaml` and friends). `internal/feed`
+  (`charts/ostendorf.tech/templates/deployment-feed.yaml` and friends).
+  `OPENBAO_AUTH_METHOD` is `kubernetes` (default, in a cluster) or `token` (local tests,
+  `OPENBAO_TOKEN` or its `OPENBAO_TOKEN_FILE` twin); the variables of the other method are
+  refused at startup, and no error quotes a refused value. The service never renews a
+  static token. `OPENBAO_SECRET_PATH` is the KV v2 data path of the secret, and
+  `OPENBAO_SECRET_KEY_ACCESS_TOKEN` and `OPENBAO_SECRET_KEY_REFRESHED_AT` (defaults
+  `access_token` and `refreshed_at`) name the two keys inside it; a refresh rewrites only
+  those two and keeps every other key. `internal/feed`
   builds it: the background loop that keeps `internal/instagram`'s `Feed` current from
   Meta using the OpenBao-backed token above, and the internal-only HTTP surface the
   website reads from, `GET /api/v1/posts` and `GET /api/v1/posts/{id}/image`, alongside

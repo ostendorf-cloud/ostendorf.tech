@@ -10,14 +10,8 @@ import (
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/openbao"
 )
 
-// accessTokenKey and refreshedAtKey name the two fields
-// old_simon-ostendorf.de wrote into the secret. TokenStore reads and writes
-// the same two keys, at the same path, so a secret an operator wrote in by
-// hand keeps working unchanged.
-const (
-	accessTokenKey = "access_token"
-	refreshedAtKey = "refreshed_at"
-)
+// errNoKeys means a TokenStore was built without its two key names.
+var errNoKeys = errors.New("instagram token: the secret key names are not configured")
 
 // writeFailureEscalateAfter is how long a refreshed token may stay unstored
 // before a write failure is reported as an error instead of a warning. A
@@ -74,7 +68,14 @@ type TokenStore struct {
 	Refresher Refresher
 	// Path is the KV v2 data path the secret lives at.
 	Path string
-	// RefreshAge is how old refreshed_at may get before a refresh is tried.
+	// AccessTokenKey and RefreshedAtKey name the two keys inside the secret
+	// that hold the access token and the RFC 3339 time it was last
+	// refreshed. Both are read and written under exactly these names; any
+	// other key in the secret is kept unchanged on a write. Neither has a
+	// default here: internal/feedconfig supplies them.
+	AccessTokenKey string
+	RefreshedAtKey string
+	// RefreshAge is how old the refresh time may get before a refresh is tried.
 	RefreshAge time.Duration
 	// Logger receives the lifecycle events below. Never the token itself.
 	Logger *slog.Logger
@@ -92,22 +93,25 @@ type TokenStore struct {
 }
 
 // Token returns the token to call the Graph API with, refreshing it first
-// when refreshed_at is missing, unparsable, or older than RefreshAge. See
-// the type doc for what a read, refresh, write or CAS failure each do.
+// when the refresh time is missing, unparsable, or older than RefreshAge.
+// See the type doc for what a read, refresh, write or CAS failure each do.
 func (s *TokenStore) Token(ctx context.Context) (string, error) {
+	if s.AccessTokenKey == "" || s.RefreshedAtKey == "" {
+		return "", errNoKeys
+	}
 	secret, err := s.Store.Read(ctx, s.Path)
 	if err != nil {
 		return "", fmt.Errorf("instagram token: %w", err)
 	}
-	token := secret.String(accessTokenKey)
+	token := secret.String(s.AccessTokenKey)
 	if token == "" {
-		return "", errors.New("instagram token: access_token missing in OpenBao")
+		return "", errors.New("instagram token: the access token key is missing in the OpenBao secret")
 	}
 
-	// A missing or unparsable refreshed_at cannot be assumed fresh, so it
+	// A missing or unparsable refresh time cannot be assumed fresh, so it
 	// falls through to a refresh attempt the same as a stale one would.
 	now := s.Now()
-	refreshedAt, err := time.Parse(time.RFC3339, secret.String(refreshedAtKey))
+	refreshedAt, err := time.Parse(time.RFC3339, secret.String(s.RefreshedAtKey))
 	if err == nil && now.Sub(refreshedAt) < s.RefreshAge {
 		// token is exactly what was just read from OpenBao: persisted,
 		// whether by this process earlier, another replica, or an
@@ -126,12 +130,14 @@ func (s *TokenStore) Token(ctx context.Context) (string, error) {
 		return token, nil
 	}
 
-	values := make(map[string]any, len(secret.Data))
+	// A KV v2 write replaces the whole document, so every other key the
+	// secret already holds is carried over and only the two keys change.
+	values := make(map[string]any, len(secret.Data)+2)
 	for k, v := range secret.Data {
 		values[k] = v
 	}
-	values[accessTokenKey] = fresh
-	values[refreshedAtKey] = now.UTC().Format(time.RFC3339)
+	values[s.AccessTokenKey] = fresh
+	values[s.RefreshedAtKey] = now.UTC().Format(time.RFC3339)
 
 	switch writeErr := s.Store.Write(ctx, s.Path, values, secret.Version); {
 	case writeErr == nil:
@@ -169,13 +175,13 @@ func (s *TokenStore) tokenAfterCASMismatch(ctx context.Context, fresh string) (s
 	s.Logger.Info("instagram token refreshed by another replica")
 	again, err := s.Store.Read(ctx, s.Path)
 	if err == nil {
-		if token := again.String(accessTokenKey); token != "" {
+		if token := again.String(s.AccessTokenKey); token != "" {
 			// Stored, just by someone else: the token this process cares
 			// about is persisted either way.
 			s.unstoredSince = time.Time{}
 			return token, nil
 		}
-		err = errors.New("access_token missing")
+		err = errors.New("the access token key is missing")
 	}
 	// The fresh token fetched here is valid too, just not stored; the next
 	// cycle re-reads and, if still due, refreshes again.

@@ -78,8 +78,9 @@ refuses. The website holds no CSRF key and no session any more: the contact form
 stateless one.
 
 This chart never handles the Meta access token the feed service needs at all any more: it
-lives in OpenBao, read by the feed service itself through the Kubernetes auth method, never
-through a Kubernetes `Secret` or a value in this chart. See "Feed service" below.
+lives in OpenBao, read by the feed service itself, never through a Kubernetes `Secret` or a
+value in this chart. The only feed secret the chart can reference is the OpenBao token of the
+`token` auth method, and only as an existing `Secret`. See "Feed service" below.
 
 ## Rotating the challenge key
 
@@ -213,11 +214,40 @@ missing value and why it is needed, the same pattern `existingSecret.name` alrea
 The role and its OpenBao policy are created once, by hand, in OpenBao itself; this chart only
 references the role by name.
 
-The policy must grant `read`, `create` and `update` on `feed.config.tokenPath` itself, the KV v2
-data path, and nothing else:
+`feed.config.openBaoAuthMethod` picks how the feed service logs in. `kubernetes`, the default,
+is the method for a cluster and is described above. `token` is meant for tests: the feed service
+then sends a fixed OpenBao token as `X-Vault-Token` and never renews it. Once it expires or is
+revoked, OpenBao answers 403, the pod stays `0/1` ready, and only a new token and a restart help.
+The token comes only from an existing Secret, never from a value: `values.schema.json` has no
+field that could carry it and refuses any key under `feed.openBaoToken` other than the two below.
+
+```sh
+helm install ostendorf-tech charts/ostendorf.tech \
+  --set existingSecret.name=ostendorf-tech-secrets \
+  --set feed.enabled=true \
+  --set feed.config.openBaoAddr=https://openbao.openbao.svc.cluster.local:8200 \
+  --set feed.config.openBaoAuthMethod=token \
+  --set feed.openBaoToken.existingSecret=feed-openbao-token \
+  --set feed.openBaoToken.existingSecretKey=token
+```
+
+A mixed configuration fails at render time: the token method without
+`feed.openBaoToken.existingSecret` or with an empty `existingSecretKey`, the token method with
+`feed.config.openBaoRole` set, and the kubernetes method with `feed.openBaoToken.existingSecret`
+set. With the token method, no `OPENBAO_ROLE`, `OPENBAO_AUTH_PATH` or `OPENBAO_JWT_FILE` is
+rendered and no projected token is mounted.
+
+The Instagram access token lives in one KV v2 secret at `feed.config.openBaoSecretPath`, under
+the key `feed.config.openBaoSecretKeyAccessToken` (default `access_token`), with the time of its
+last refresh under `feed.config.openBaoSecretKeyRefreshedAt` (default `refreshed_at`, RFC 3339).
+A refresh rewrites these two keys with check-and-set on the version it read and keeps every
+other key of the secret.
+
+The policy must grant `read`, `create` and `update` on `feed.config.openBaoSecretPath` itself,
+the KV v2 data path, and nothing else:
 
 ```hcl
-path "<feed.config.tokenPath>" {
+path "<feed.config.openBaoSecretPath>" {
   capabilities = ["read", "create", "update"]
 }
 ```
@@ -391,12 +421,17 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `feed.image.repository` | Feed service container image, published by the `feed-image` job; see "Feed service" above | `ghcr.io/ostendorf-cloud/ostendorf.tech-feed` |
 | `feed.service.port` | Feed service's one container and Service port | `8081` |
 | `feed.config.openBaoAddr` | OpenBao address the feed service authenticates against. Required when `feed.enabled` is true; see "Feed service" above | `""` (required) |
-| `feed.config.openBaoRole` | OpenBao Kubernetes auth role the feed service logs in as. Required when `feed.enabled` is true; see "Feed service" above | `""` (required) |
+| `feed.config.openBaoAuthMethod` | How the feed service logs in to OpenBao: `kubernetes` for a cluster, `token` for tests; see "Feed service" above | `kubernetes` |
+| `feed.config.openBaoRole` | OpenBao Kubernetes auth role the feed service logs in as. Required with the `kubernetes` method, refused with `token`; see "Feed service" above | `""` (required) |
+| `feed.openBaoToken.existingSecret` | Name of an existing Secret holding the OpenBao token. Required with the `token` method, refused with `kubernetes`. There is no value for the token itself | `""` |
+| `feed.openBaoToken.existingSecretKey` | Key of the OpenBao token inside that Secret | `token` |
 | `feed.config.listenAddr` | Address the feed service binds (`LISTEN_ADDR`); must match `feed.service.port` | `:8081` |
 | `feed.config.logLevel` | `debug`, `info`, `warn` or `error` | `info` |
 | `feed.config.openBaoAuthPath` | Mount path of OpenBao's Kubernetes auth method | `kubernetes` |
 | `feed.config.openBaoJwtFile` | Path the projected service account token is mounted at | `/var/run/secrets/openbao/token` |
-| `feed.config.tokenPath` | OpenBao KV v2 data path the Instagram access token is stored at; the policy in "Feed service" grants access to it | `instagram.com/api-tokens/data/simonostendorf.vtech` |
+| `feed.config.openBaoSecretPath` | OpenBao KV v2 data path of the secret holding the Instagram access token; the policy in "Feed service" grants access to it | `instagram.com/api-tokens/data/simonostendorf.vtech` |
+| `feed.config.openBaoSecretKeyAccessToken` | Key of the Instagram access token inside that secret. Not empty, no `/`, no control character | `access_token` |
+| `feed.config.openBaoSecretKeyRefreshedAt` | Key of the RFC 3339 refresh time inside that secret. Same rules | `refreshed_at` |
 | `feed.config.syncInterval` | How often the feed is reloaded from Meta, `1m` to `24h` | `1h` |
 | `feed.config.tokenRefreshAge` | Token age after which a refresh is tried, `24h` to `50d` | `7d` |
 | `feed.config.apiVersion` | Graph API version calls are made against | `v23.0` |
