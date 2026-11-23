@@ -1,10 +1,12 @@
+import bademeisterPhoto from '../assets/bands/bademeister.webp'
 import herrenjedeckLogo from '../assets/bands/herrenjedeck-logo.webp'
+import rubikPhoto from '../assets/bands/rubik.webp'
 
 /**
- * The bands and ensembles shown on the home page. Only the facts that do
- * not translate live here: the slug ties a band to its i18n messages under
- * bands.<slug>.name and bands.<slug>.paragraphs, and the Instagram link is
- * the same in both locales.
+ * The bands and ensembles shown on the home page, in the order of the cards.
+ * Only the facts that do not translate live here: the slug ties a band to
+ * its i18n messages under bands.<slug>.name and bands.<slug>.paragraphs, and
+ * the Instagram link is the same in both locales.
  *
  * hasDescription is false for a band with no description text yet, in
  * which case only the name and the Instagram link are rendered.
@@ -21,6 +23,10 @@ import herrenjedeckLogo from '../assets/bands/herrenjedeck-logo.webp'
  * into src/assets/bands/, import it here and set { src, width, height }
  * with the file's real pixel size, then add bands.<slug>.logoAlt to both
  * locales. Get the band's permission before a logo goes on the site.
+ *
+ * photo is optional too, for a square profile picture or photo. Unlike a
+ * logo it needs no plate: BandPhoto.vue shows it as a rounded square. Same
+ * steps as for a logo, with bands.<slug>.photoAlt as the alt text.
  */
 export type BandAccent = 'accent' | 'info' | 'success'
 
@@ -30,6 +36,8 @@ export interface BandLogo {
   height: number
 }
 
+export type BandPhoto = BandLogo
+
 export interface Band {
   slug: string
   instagramHandle: string
@@ -37,51 +45,10 @@ export interface Band {
   hasDescription: boolean
   accent: BandAccent
   logo?: BandLogo
+  photo?: BandPhoto
 }
 
 export const bands: Band[] = [
-  {
-    slug: 'rubik',
-    instagramHandle: '@wirsindrubik',
-    instagramUrl: 'https://www.instagram.com/wirsindrubik/',
-    hasDescription: true,
-    accent: 'accent',
-  },
-  {
-    slug: 'bademeister',
-    instagramHandle: '@bademeister.band',
-    instagramUrl: 'https://www.instagram.com/bademeister.band',
-    hasDescription: true,
-    accent: 'info',
-  },
-  {
-    slug: 'fourfold',
-    instagramHandle: '@fourfoldband',
-    instagramUrl: 'https://www.instagram.com/fourfoldband/',
-    hasDescription: true,
-    accent: 'success',
-  },
-  {
-    slug: 'singingLittleBigBand',
-    instagramHandle: '@fhaachenbigband',
-    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
-    hasDescription: true,
-    accent: 'accent',
-  },
-  {
-    slug: 'bigBand',
-    instagramHandle: '@fhaachenbigband',
-    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
-    hasDescription: true,
-    accent: 'info',
-  },
-  {
-    slug: 'jazzCombo',
-    instagramHandle: '@fhaachenbigband',
-    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
-    hasDescription: true,
-    accent: 'success',
-  },
   {
     slug: 'herrenjedeck',
     instagramHandle: '@herrenjedeck',
@@ -90,5 +57,51 @@ export const bands: Band[] = [
     accent: 'accent',
     // The band's own logo; the owner confirmed the band's permission (see NOTICE).
     logo: { src: herrenjedeckLogo, width: 480, height: 489 },
+  },
+  {
+    slug: 'rubik',
+    instagramHandle: '@wirsindrubik',
+    instagramUrl: 'https://www.instagram.com/wirsindrubik/',
+    hasDescription: true,
+    accent: 'info',
+    // Shown with the band's permission (see NOTICE); the file is 315 px square.
+    photo: { src: rubikPhoto, width: 315, height: 315 },
+  },
+  {
+    slug: 'singingLittleBigBand',
+    instagramHandle: '@fhaachenbigband',
+    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
+    hasDescription: true,
+    accent: 'success',
+  },
+  {
+    slug: 'bademeister',
+    instagramHandle: '@bademeister.band',
+    instagramUrl: 'https://www.instagram.com/bademeister.band',
+    hasDescription: true,
+    accent: 'accent',
+    // The band's profile picture, shown with its permission (see NOTICE).
+    photo: { src: bademeisterPhoto, width: 640, height: 640 },
+  },
+  {
+    slug: 'fourfold',
+    instagramHandle: '@fourfoldband',
+    instagramUrl: 'https://www.instagram.com/fourfoldband/',
+    hasDescription: true,
+    accent: 'info',
+  },
+  {
+    slug: 'bigBand',
+    instagramHandle: '@fhaachenbigband',
+    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
+    hasDescription: true,
+    accent: 'success',
+  },
+  {
+    slug: 'jazzCombo',
+    instagramHandle: '@fhaachenbigband',
+    instagramUrl: 'https://www.instagram.com/fhaachenbigband/',
+    hasDescription: true,
+    accent: 'accent',
   },
 ]

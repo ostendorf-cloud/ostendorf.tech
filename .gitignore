@@ -43,3 +43,4 @@ web/playwright-report/
 
 # Band logo sources, downloaded by hand; see AGENTS.md, "Generated files".
 web/src/assets/bands/*-logo-dark.png
+web/src/assets/bands/*-source.jpg

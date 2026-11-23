@@ -22,6 +22,22 @@ describe('bands data', () => {
     }
   })
 
+  it('lists the bands in the agreed order', () => {
+    expect(bands.map((band) => band.slug)).toEqual([
+      'herrenjedeck',
+      'rubik',
+      'singingLittleBigBand',
+      'bademeister',
+      'fourfold',
+      'bigBand',
+      'jazzCombo',
+    ])
+  })
+
+  it('keeps the hero headline on one line from 1280 px', () => {
+    expect(home).toMatch(/<h1[^>]*class="[^"]*\bhero-title\b[^"]*\bxl:whitespace-nowrap\b/)
+  })
+
   // Three roles for seven bands: the last card cannot differ from the
   // first, but any three bands in a row, a full row on a wide screen, can.
   it('gives any three consecutive bands three different accents', () => {
@@ -62,6 +78,37 @@ describe('bands data', () => {
       const width = bytes.readUIntLE(24, 3) + 1
       const height = bytes.readUIntLE(27, 3) + 1
       expect({ width: band.logo?.width, height: band.logo?.height }).toEqual({ width, height })
+    }
+  })
+
+  it('gives a photo to Rubik and Bademeister only', () => {
+    expect(bands.filter((band) => band.photo).map((band) => band.slug)).toEqual([
+      'rubik',
+      'bademeister',
+    ])
+  })
+
+  it('states the real pixel size of every photo file and keeps it under 60 KB', () => {
+    for (const band of bands.filter((entry) => entry.photo)) {
+      const bytes = readFileSync(`${process.cwd()}/src/assets/bands/${band.slug}.webp`)
+      expect(bytes.toString('ascii', 0, 4)).toBe('RIFF')
+      expect(bytes.toString('ascii', 8, 12)).toBe('WEBP')
+      // A lossy file without alpha: the VP8 frame header holds 14 bit width
+      // and height as little endian numbers at bytes 26 and 28.
+      expect(bytes.toString('ascii', 12, 16), 'VP8 header').toBe('VP8 ')
+      const width = bytes.readUInt16LE(26) & 0x3fff
+      const height = bytes.readUInt16LE(28) & 0x3fff
+      expect({ width: band.photo?.width, height: band.photo?.height }).toEqual({ width, height })
+      expect(bytes.length).toBeLessThan(60 * 1024)
+    }
+  })
+
+  it('names every photo in both locales', () => {
+    for (const band of bands.filter((entry) => entry.photo)) {
+      for (const catalogue of [de, en]) {
+        const entry = (catalogue.bands as Record<string, { photoAlt?: string }>)[band.slug]
+        expect(entry.photoAlt ?? '').not.toBe('')
+      }
     }
   })
 
