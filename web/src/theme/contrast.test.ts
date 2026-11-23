@@ -62,6 +62,8 @@ const TEXT_PAIRS: Array<[fg: string, bg: string]> = [
 const NON_TEXT_PAIRS: Array<[fg: string, bg: string]> = [
   ['border-strong', 'bg'],
   ['border-strong', 'surface'],
+  // A Leistungen card's border on hover, drawn on the hover ground.
+  ['border-strong', 'surface-hover'],
   ['accent', 'bg'],
   ['accent', 'surface'],
   // The far end of the line gradient, which paints button borders and lit edges.

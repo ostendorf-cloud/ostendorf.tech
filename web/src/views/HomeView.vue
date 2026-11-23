@@ -162,23 +162,19 @@ const aboutFacts = computed<Fact[]>(() => [
       </ul>
 
       <div class="areas-block">
-        <GovueCard class="panel-lit">
-          <h3 class="mb-4 text-lg font-semibold text-text">{{ t('home.services.panelAreas') }}</h3>
-          <ul class="flex flex-wrap gap-2" role="list">
-            <li
-              v-for="area in tm('home.services.areas')"
-              :key="rt(area)"
-              class="rounded-sm bg-bg-subtle px-2 py-1 text-sm text-text"
-            >
-              {{ rt(area) }}
-            </li>
-          </ul>
-          <p class="mt-auto pt-5 text-sm">
-            <a href="mailto:simon@ostendorf.tech" class="text-accent-text hover:underline">
-              {{ t('home.services.more') }}
-            </a>
-          </p>
-        </GovueCard>
+        <h3 class="areas-heading text-lg font-semibold text-text">
+          {{ t('home.services.panelAreas') }}
+        </h3>
+        <ul class="areas-list grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3" role="list">
+          <li v-for="area in tm('home.services.areas')" :key="rt(area)" class="area text-base">
+            {{ rt(area) }}
+          </li>
+        </ul>
+        <p class="areas-more text-base">
+          <a href="mailto:simon@ostendorf.tech" class="areas-link text-accent-text">
+            {{ t('home.services.more') }}
+          </a>
+        </p>
       </div>
     </section>
 
@@ -592,6 +588,55 @@ const aboutFacts = computed<Fact[]>(() => [
   margin-top: clamp(2.5rem, 1.6rem + 3.6vw, 4rem);
 }
 
+/* The areas are plain text on the page ground: a small accent dot, a
+   generous row gap and columns that never run past about 30 characters. */
+.areas-heading {
+  margin-bottom: clamp(1rem, 0.8rem + 0.8vw, 1.5rem);
+}
+
+.areas-list {
+  column-gap: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+  row-gap: 0.875rem;
+}
+
+.area {
+  position: relative;
+  padding-left: 1.25rem;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.area::before {
+  content: '';
+  position: absolute;
+  top: 0.6em;
+  left: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--color-accent);
+}
+
+.areas-more {
+  margin-top: 1.5rem;
+}
+
+.areas-link {
+  border-radius: 0.25rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  transition: color var(--default-transition-duration) var(--ease-out);
+}
+
+.areas-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.areas-link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
 /* A thin lit edge along the top of every panel, as on the old site: the
    depth comes from the light, not from a heavier shadow. */
 .panel-lit {
@@ -736,7 +781,8 @@ const aboutFacts = computed<Fact[]>(() => [
     animation: none;
   }
 
-  .service-card {
+  .service-card,
+  .areas-link {
     transition: none;
   }
 }
