@@ -418,6 +418,11 @@ const aboutFacts = computed<Fact[]>(() => [
    that keeps the flat colour above, which is a token in its own right. */
 @supports (background-clip: text) or (-webkit-background-clip: text) {
   .hero-title {
+    /* background-clip: text paints only inside the box: the descender of the
+       g and the overhang of the last letter, pulled in by the negative
+       letter spacing, need room. The margin takes the room back. */
+    padding: 0 0.08em 0.14em;
+    margin: 0.75rem -0.08em -0.14em;
     background: var(--brand-gradient-text);
     background-clip: text;
     -webkit-background-clip: text;
