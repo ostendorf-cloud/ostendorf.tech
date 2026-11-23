@@ -105,9 +105,9 @@ The global baseline already applies here and is not repeated below.
   and a `Syncer` that polls the feed service on an interval (`FEED_REFRESH_INTERVAL`) and
   keeps that `Cache` current, the same caching `internal/instagram` itself used to do
   before this split. A failed sync is retried after 5 s, doubling up to 5 minutes or the
-  interval, until one succeeds (`Syncer.RetryDelay`). Every call is bounded by a timeout, so an unreachable or slow feed
-  service can never hang a page; an empty `Cache`, whether from an unreachable feed
-  service, an unset `FEED_SERVICE_URL`, or a feed service with nothing to show, renders no
+  interval, until one succeeds (`Syncer.RetryDelay`). Every call is bounded by a timeout,
+  so an unreachable or slow feed service can never hang a page; an empty `Cache`, whether
+  from an unreachable feed service, an unset `FEED_SERVICE_URL`, or a feed service with nothing to show, renders no
   Impressionen section at all, exactly as an absent token did before this split.
   `internal/webapp/feed.go` is the one place this package is read from.
 - Page views are reported to Umami from the server by govue's `analytics` package; the
