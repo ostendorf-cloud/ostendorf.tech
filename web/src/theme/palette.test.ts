@@ -43,6 +43,23 @@ describe('the gradient button', () => {
     expect(styles).toMatch(/\.btn-gradient:is\(:hover, :focus-visible\)\s*\{\s*transform:/)
   })
 
+  it('glows from the theme tokens, stronger on hover and weaker when pressed', () => {
+    expect(styles).toMatch(/^\.btn-gradient\s*\{[^}]*box-shadow:[^}]*var\(--glow-purple\)/m)
+    expect(styles).toMatch(/\.btn-gradient:active\s*\{[^}]*box-shadow:/)
+    expect(source('src/theme/vtech.css')).toMatch(/--glow-purple:\s*light-dark\(/)
+    expect(source('src/theme/vtech.css')).toMatch(/--glow-cyan:\s*light-dark\(/)
+  })
+
+  it('has a visible focus ring and a ghost sibling that stills for reduced motion', () => {
+    expect(styles).toMatch(
+      /:is\(\.btn-gradient, \.btn-ghost\):focus-visible\s*\{\s*outline: 2px solid var\(--color-focus\)/,
+    )
+    expect(styles.match(/^\.btn-ghost\s*\{/gm)).toHaveLength(1)
+    expect(styles).toMatch(
+      /prefers-reduced-motion: reduce\)[\s\S]*\.btn-ghost\s*\{\s*transition: none/,
+    )
+  })
+
   it('restyles no govue link through its href: govue offers no hook for it', () => {
     expect(styles).not.toMatch(/a\[href/)
   })
@@ -58,6 +75,7 @@ describe('the gradient button', () => {
   it('is what the primary buttons of the home page use', () => {
     const home = source('src/views/HomeView.vue')
     expect(home.match(/class="btn-gradient /g)).toHaveLength(2)
+    expect(home.match(/class="btn-ghost /g)).toHaveLength(1)
     expect(home).not.toMatch(/bg-accent-strong/)
   })
 })

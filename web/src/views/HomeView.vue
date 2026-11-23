@@ -107,7 +107,7 @@ const aboutFacts = computed<Fact[]>(() => [
           </a>
           <a
             href="#services"
-            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border-strong bg-surface px-4 text-base font-medium text-text transition-colors hover:bg-surface-hover"
+            class="btn-ghost inline-flex min-h-11 items-center justify-center gap-2 px-6 text-base font-semibold"
           >
             {{ t('home.hero.ctaServices') }}
           </a>

@@ -246,6 +246,12 @@
      still holds 4.5:1 over both; src/theme/contrast.test.ts measures it. */
   --header-bg: color-mix(in srgb, var(--color-bg) 86%, transparent);
 
+  /* The glow of the gradient button, the old site's two shadows: the purple
+     below the button and the cyan around it. Light mode takes the deeper teal
+     and a weaker alpha, a glow on a pale page is a stain. Turn these to tune. */
+  --glow-purple: light-dark(rgb(123 60 245 / 0.45), rgb(123 60 245 / 0.8));
+  --glow-cyan: light-dark(rgb(10 143 163 / 0.4), rgb(30 227 245 / 0.7));
+
   /* The logo's own two stops, the favicon's values. A logo is not a text or
      icon role and is exempt from the contrast rules, and it must not change
      with the mode or with the palette, so these are plain colours, the same
