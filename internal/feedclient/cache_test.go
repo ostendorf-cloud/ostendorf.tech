@@ -223,6 +223,138 @@ func TestSyncKeepsLastCacheWhenAllImagesFail(t *testing.T) {
 	}
 }
 
+// runScript runs Run with a recording wait and calls step after each wait,
+// with the number of waits so far. Run stops when step returns false.
+func runScript(t *testing.T, s *Syncer, interval time.Duration, step func(n int) bool) []time.Duration {
+	t.Helper()
+	var delays []time.Duration
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	s.wait = func(_ context.Context, d time.Duration) bool {
+		delays = append(delays, d)
+		if !step(len(delays)) {
+			cancel()
+			return false
+		}
+		return true
+	}
+	s.Run(ctx, interval)
+	return delays
+}
+
+func TestRunRetriesFailedSyncWithGrowingDelay(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeFeedService()
+	f.failPosts = true
+	s := newSyncer(f, io.Discard)
+	const interval = 30 * time.Minute
+
+	got := runScript(t, s, interval, func(n int) bool { return n < 8 })
+	want := []time.Duration{
+		5 * time.Second, 10 * time.Second, 20 * time.Second, 40 * time.Second,
+		80 * time.Second, 160 * time.Second, 5 * time.Minute, 5 * time.Minute, // 320s exceeds MaxRetryDelay
+	}
+	if len(got) != len(want) {
+		t.Fatalf("delays = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("delay %d = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestRunCapsRetryAtInterval(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeFeedService()
+	f.failPosts = true
+	s := newSyncer(f, io.Discard)
+
+	got := runScript(t, s, 12*time.Second, func(n int) bool { return n < 4 })
+	want := []time.Duration{5 * time.Second, 10 * time.Second, 12 * time.Second, 12 * time.Second}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("delay %d = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestRunSuccessResetsRetryDelayAndReturnsToInterval(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeFeedService()
+	f.posts = []Post{{ID: "1", Alt: "a", Permalink: "https://www.instagram.com/p/A/"}}
+	f.failPosts = true
+	s := newSyncer(f, io.Discard)
+	const interval = time.Hour
+
+	setFail := func(v bool) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.failPosts = v
+	}
+	got := runScript(t, s, interval, func(n int) bool {
+		switch n {
+		case 2:
+			setFail(false) // the next attempt succeeds
+		case 3:
+			// success: the interval wait. Fail again afterwards.
+			setFail(true)
+		case 5:
+			return false
+		}
+		return true
+	})
+	if len(got) != 5 {
+		t.Fatalf("delays = %v, want 5", got)
+	}
+	if got[0] != 5*time.Second || got[1] != 10*time.Second {
+		t.Errorf("failure delays = %v, want 5s then 10s", got[:2])
+	}
+	if got[2] < interval || got[2] > interval+interval/10 {
+		t.Errorf("delay after success = %v, want the interval plus jitter, not a short retry", got[2])
+	}
+	if got[3] != 5*time.Second {
+		t.Errorf("first delay after the success = %v, want it reset to 5s", got[3])
+	}
+	if got[4] != 10*time.Second {
+		t.Errorf("second delay after the success = %v, want 10s", got[4])
+	}
+	if len(s.Cache.Posts()) != 1 {
+		t.Errorf("cache not filled by the retry")
+	}
+}
+
+func TestRunRetryDelayIsConfigurable(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeFeedService()
+	f.failPosts = true
+	s := newSyncer(f, io.Discard)
+	s.RetryDelay = 3 * time.Second
+
+	got := runScript(t, s, time.Hour, func(n int) bool { return n < 2 })
+	if got[0] != 3*time.Second || got[1] != 6*time.Second {
+		t.Errorf("delays = %v, want 3s, 6s", got)
+	}
+}
+
+func TestRunLogsOneLinePerFailedAttempt(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeFeedService()
+	f.failPosts = true
+	var logs strings.Builder
+	s := newSyncer(f, &logs)
+
+	runScript(t, s, time.Hour, func(n int) bool { return n < 3 })
+	if n := strings.Count(logs.String(), "feed sync failed"); n != 3 {
+		t.Errorf("failure log lines = %d, want 3 (one per attempt)", n)
+	}
+}
+
 func TestRunStopsWithItsContext(t *testing.T) {
 	t.Parallel()
 
