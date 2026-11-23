@@ -89,7 +89,7 @@ const aboutFacts = computed<Fact[]>(() => [
       <HeroStage :paused="motionPaused" />
 
       <div class="hero-inner">
-        <LogoMark class="hero-logo" :size="104" animated />
+        <LogoMark class="hero-logo" :size="104" animated :paused="motionPaused" />
         <p class="hero-eyebrow">{{ t('home.hero.eyebrow') }}</p>
         <h1 id="hero-title" class="hero-title xl:whitespace-nowrap">{{ t('home.hero.title') }}</h1>
         <p class="hero-tagline">
