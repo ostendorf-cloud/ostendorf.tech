@@ -137,6 +137,11 @@ tasks:
     cmds:
       - go test -race -count=1 -run TestPrerenderedOutputMatchesRouteTable ./cmd/website/...
 
+  check:build-once:
+    desc: Every target that needs the frontend starts web:build and prerender exactly once
+    cmds:
+      - scripts/check-build-once.sh
+
   # The web/ half. Every target below runs inside web/ and depends on web:deps,
   # so one of them on its own is enough in a fresh checkout and in CI.
   web:deps:
@@ -174,9 +179,14 @@ tasks:
     cmds:
       - pnpm run test
 
+  # run: once, because prerender depends on this task and so do lint:vet, build and
+  # test:go directly: Task starts the same task once per path in a dependency graph
+  # unless it is told otherwise, and two vite builds on cmd/website/dist at once make
+  # vite:prepare-out-dir fail with ENOTEMPTY. scripts/check-build-once.sh asserts it.
   web:build:
     desc: Build the SPA bundle into cmd/website/dist
     dir: web
+    run: once
     deps: [web:deps]
     cmds:
       - pnpm run build
@@ -191,6 +201,7 @@ tasks:
   prerender:
     desc: Render every route of every locale to static HTML into cmd/website/prerendered
     dir: web
+    run: once
     deps: [web:build]
     cmds:
       - pnpm run prerender
@@ -246,6 +257,7 @@ tasks:
       - task: build:feed
       - task: test:go
       - task: check:govue-version
+      - task: check:build-once
       - task: test:routes
 
   fmt:

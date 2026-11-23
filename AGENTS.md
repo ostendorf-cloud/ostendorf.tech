@@ -215,6 +215,11 @@ through Task always populates the frontend first. A bare `go build ./cmd/website
 `task build` or `task test:go` instead, or `task web:build && task prerender` once by
 hand before reaching for the Go toolchain directly.
 
+`web:build` and `prerender` carry `run: once`: several targets reach them by more than one
+path, and two vite builds on `cmd/website/dist` at once fail with `ENOTEMPTY`. Keep that
+when adding a target that needs the frontend; `task check:build-once` asserts one start of
+each per target through `task --dry`, and its target list is in `scripts/check-build-once.sh`.
+
 `cmd/feed` has no `go:embed` directive anywhere in its own tree and needs none of this:
 `task build:feed` declares no frontend dependency, on purpose, and `go build ./cmd/feed`
 compiles on a fresh checkout with no prior step at all.
