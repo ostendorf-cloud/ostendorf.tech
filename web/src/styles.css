@@ -52,13 +52,65 @@
     linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
     var(--brand-gradient) border-box;
   color: var(--color-text);
+  /* The glow: the purple below and the cyan around, the old site's lit channel. */
+  box-shadow:
+    0 10px 34px -14px var(--glow-purple),
+    0 0 26px -12px var(--glow-cyan);
   transition:
     background-color var(--default-transition-duration) var(--ease-out),
+    box-shadow 200ms var(--ease-out),
     transform 200ms var(--ease-out);
 }
 
 .btn-gradient:is(:hover, :focus-visible) {
   transform: translateY(-2px);
+  box-shadow:
+    0 14px 40px -12px var(--glow-purple),
+    0 0 32px -8px var(--glow-cyan);
+}
+
+/* Pressed: the button sinks back and the glow draws in. */
+.btn-gradient:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow:
+    0 4px 18px -10px var(--glow-purple),
+    0 0 16px -10px var(--glow-cyan);
+}
+
+/*
+ * The secondary button: the same pill, with the strong border instead of the
+ * gradient. Hover and focus tint it with the cyan, as on the old site's ghost
+ * button; the tint is 6% of the accent, which leaves the label above 4.5:1.
+ */
+.btn-ghost {
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition:
+    background-color 200ms var(--ease-out),
+    border-color 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+
+.btn-ghost:is(:hover, :focus-visible) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+  box-shadow: 0 0 26px -12px var(--glow-cyan);
+}
+
+.btn-ghost:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+
+/* A ring that does not depend on the glow, in the focus token (3:1 on the
+   page and on the surface, see src/theme/contrast.test.ts). */
+:is(.btn-gradient, .btn-ghost):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -69,11 +121,24 @@
   .btn-gradient:is(:hover, :focus-visible) {
     transform: none;
   }
+
+  .btn-ghost {
+    transition: none;
+  }
+
+  :is(.btn-gradient, .btn-ghost):is(:hover, :focus-visible, :active) {
+    transform: none;
+  }
 }
 
 @media (forced-colors: active) {
   .btn-gradient {
     border-color: ButtonText;
+    box-shadow: none;
+  }
+
+  .btn-ghost {
+    box-shadow: none;
   }
 }
 
@@ -94,6 +159,29 @@
     background-color: var(--header-bg);
     -webkit-backdrop-filter: blur(14px) saturate(1.2);
     backdrop-filter: blur(14px) saturate(1.2);
+  }
+}
+
+/*
+ * The page ground follows the section in view, as on the old site: the
+ * sections marked data-section-tone="alt" (Impressionen, Über mich) lie on
+ * the raised ground, the others on the page's own. src/lib/sectionBackground.ts
+ * sets data-section-bg on the root. Only the colour changes, so nothing moves.
+ * The hero paints its own scrim and does not read the body, and the prerendered
+ * page and a visitor without script stay on the page ground. Every text role
+ * is proven on bg-subtle in src/theme/contrast.test.ts.
+ */
+body {
+  transition: background-color 500ms var(--ease-out);
+}
+
+:root[data-section-bg='alt'] body {
+  background-color: var(--color-bg-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
   }
 }
 

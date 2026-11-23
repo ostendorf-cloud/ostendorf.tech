@@ -109,6 +109,7 @@ onMounted(async () => {
     v-if="posts.length > 0"
     :id="IMPRESSIONS_ID"
     aria-labelledby="impressions-title"
+    data-section-tone="alt"
     class="py-8 sm:py-14"
   >
     <header class="mb-6 flex flex-col gap-2">

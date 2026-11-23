@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   createClient,
@@ -22,6 +22,7 @@ import ServiceIcon from '../components/ServiceIcon.vue'
 import { bands } from '../data/bands'
 import { serviceIcons } from '../data/services'
 import { isLocale } from '../i18n'
+import { trackSectionBackground } from '../lib/sectionBackground'
 import { experienceYearsFloor } from '../lib/experienceYears'
 import type { Fact } from '../lib/facts'
 import {
@@ -54,8 +55,15 @@ const motionPaused = ref(false)
 // there is nothing to pause. Set in onMounted, so server and first client
 // render agree.
 const mounted = ref(false)
+// The page ground follows the section under the middle of the window; see
+// src/lib/sectionBackground.ts. Browser only, the prerendered page is base.
+let stopSectionBackground = (): void => {}
 onMounted(() => {
   mounted.value = true
+  stopSectionBackground = trackSectionBackground()
+})
+onBeforeUnmount(() => {
+  stopSectionBackground()
 })
 
 // Annotated so the v-for below sees a real array type and a numeric
@@ -107,7 +115,7 @@ const aboutFacts = computed<Fact[]>(() => [
           </a>
           <a
             href="#services"
-            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border-strong bg-surface px-4 text-base font-medium text-text transition-colors hover:bg-surface-hover"
+            class="btn-ghost inline-flex min-h-11 items-center justify-center gap-2 px-6 text-base font-semibold"
           >
             {{ t('home.hero.ctaServices') }}
           </a>
@@ -225,7 +233,7 @@ const aboutFacts = computed<Fact[]>(() => [
       </CardCarousel>
     </section>
 
-    <section id="about" aria-labelledby="about-title" class="py-8 sm:py-14">
+    <section id="about" aria-labelledby="about-title" data-section-tone="alt" class="py-8 sm:py-14">
       <div class="grid items-center gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <!-- The gradient is the frame itself: two pixels of padding under
              the picture, so the brand holds the portrait rather than
