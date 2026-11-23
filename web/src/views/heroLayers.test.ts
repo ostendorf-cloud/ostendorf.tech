@@ -47,8 +47,31 @@ const theme = source('src/theme/vtech.css')
 const heroStage = source('src/components/HeroStage.vue')
 const homeView = source('src/views/HomeView.vue')
 
+/** removeUntilStable applies one replacement until the text stops
+ *  changing, so a removal cannot leave a new match behind. */
+function removeUntilStable(text: string, pattern: RegExp): string {
+  let current = text
+  for (;;) {
+    const next = current.replaceAll(pattern, '')
+    if (next === current) {
+      return current
+    }
+    current = next
+  }
+}
+
 function withoutComments(text: string): string {
-  return text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/<!--[\s\S]*?-->/g, '')
+  let current = text
+  for (;;) {
+    const next = removeUntilStable(
+      removeUntilStable(current, /\/\*[\s\S]*?\*\//g),
+      /<!--[\s\S]*?-->/g,
+    )
+    if (next === current) {
+      return current
+    }
+    current = next
+  }
 }
 
 /** styleBlock is a single file component's scoped stylesheet. */
@@ -237,5 +260,17 @@ describe('the hero paint layers', () => {
     expect(inner.markup).toContain('class="hero-actions"')
     expect(inner.markup).toContain("t('home.hero.ctaContact')")
     expect(inner.markup).toContain("t('home.hero.ctaServices')")
+  })
+})
+
+describe('withoutComments', () => {
+  it('removes a plain HTML and CSS comment', () => {
+    expect(withoutComments('a<!-- x -->b/* y */c')).toBe('abc')
+  })
+
+  it('leaves no comment opener behind when removal joins one', () => {
+    expect(withoutComments('<!<!-- x -->-- y -->z')).toBe('z')
+    expect(withoutComments('/<!-- x -->* y */z')).toBe('z')
+    expect(withoutComments('/*/* x */ y */z')).not.toContain('/*')
   })
 })

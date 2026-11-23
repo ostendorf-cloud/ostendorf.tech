@@ -45,6 +45,7 @@ import { attachLocaleSync, createAppRouter, NOT_FOUND_ROUTE_NAME } from '../src/
 // without a path to the stylesheet that has to survive the SSR build's
 // output directory.
 import vtechCss from '../src/theme/vtech.css?raw'
+import { jsLiteral } from './jsLiteral'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const distDir = join(here, '../../cmd/website/dist')
@@ -159,7 +160,7 @@ const themeColorMeta = `<meta name="theme-color" content="${themeColorValues[DEF
  *  since this site's CSP carries no 'unsafe-inline' for script-src and
  *  this static HTML has no per-response nonce to carry. The id="theme-boot"
  *  attribute is what that Go code locates the script by. */
-const themeBootScript = `<script id="theme-boot">(function(){try{var raw=localStorage.getItem(${JSON.stringify(STORAGE_KEY)});if(!raw){return}var stored=JSON.parse(raw);var mode=stored&&stored.mode;if(mode!=='light'&&mode!=='dark'&&mode!=='system'){return}var root=document.documentElement;var resolved=mode;if(mode==='system'){root.removeAttribute('data-mode');resolved=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}else{root.setAttribute('data-mode',mode)}if(resolved==='light'){var meta=document.querySelector('meta[name="theme-color"]');if(meta){meta.setAttribute('content',${JSON.stringify(themeColorValues.light)})}}}catch(e){}})();</script>`
+const themeBootScript = `<script id="theme-boot">(function(){try{var raw=localStorage.getItem(${jsLiteral(STORAGE_KEY)});if(!raw){return}var stored=JSON.parse(raw);var mode=stored&&stored.mode;if(mode!=='light'&&mode!=='dark'&&mode!=='system'){return}var root=document.documentElement;var resolved=mode;if(mode==='system'){root.removeAttribute('data-mode');resolved=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}else{root.setAttribute('data-mode',mode)}if(resolved==='light'){var meta=document.querySelector('meta[name="theme-color"]');if(meta){meta.setAttribute('content',${jsLiteral(themeColorValues.light)})}}}catch(e){}})();</script>`
 
 function heroSrcset(manifest: Record<string, ManifestEntry>): string {
   const variants = Object.entries(manifest)
