@@ -127,12 +127,16 @@ httpRoute:
 resources:
   requests:
     cpu: 50m
-    memory: 64Mi
+    # The website holds a copy of every post's picture the feed service
+    # serves: feed.config.postCount times the picture size, about 100 to
+    # 300 KiB per post, so the default 200 posts take about 20 to 60 MiB on
+    # top of the server itself. See "Feed service" in the README.
+    memory: 96Mi
   limits:
     # No CPU limit: serving a prerendered page and the SPA bundle is
     # bursty on a page load, not broken for being briefly busy. A memory
     # limit stays in place as a safety net against a genuine leak.
-    memory: 128Mi
+    memory: 192Mi
 
 startupProbe:
   # Disabled by default: startup only loads the embedded frontend and
@@ -433,16 +437,18 @@ feed:
 
   resources:
     requests:
-      # Lower than the website's own defaults: this pod caches around 20
-      # posts' worth of image bytes, nothing else.
+      # This pod caches every post's picture up to feed.config.postCount:
+      # about 100 to 300 KiB per post, so the default 200 posts take about
+      # 20 to 60 MiB. Raise both values with postCount; see "Feed service"
+      # in the README for the formula.
       cpu: 10m
-      memory: 32Mi
+      memory: 64Mi
     limits:
       # No CPU limit: syncing with Meta and OpenBao is bursty on a sync
       # cycle, not broken for being briefly busy; same reasoning as the
       # website's own resources comment. A memory limit stays in place as a
       # safety net against a genuine leak.
-      memory: 64Mi
+      memory: 160Mi
 
   startupProbe:
     # Disabled by default: startup only logs in to OpenBao and runs one sync
@@ -518,4 +524,13 @@ feed:
     syncInterval: "1h"
     tokenRefreshAge: "7d"
     apiVersion: "v23.0"
-    postCount: 20
+    # Cap on the posts one sync collects across all pages, 0 for no cap
+    # (every post of the account), at most 10000. Every post costs its
+    # picture in this pod and again in the website: see the resources
+    # above and "Feed service" in the README.
+    postCount: 200
+    # Posts one request to Meta asks for, 1 to 100 (Meta's maximum). The
+    # feed service follows Meta's paging cursor, one page after the other
+    # with a short pause, until the account has no further page or
+    # postCount is reached.
+    postsPerRequest: 50

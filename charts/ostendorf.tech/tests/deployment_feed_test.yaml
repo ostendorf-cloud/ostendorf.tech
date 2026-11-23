@@ -163,7 +163,30 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: POST_COUNT
-            value: "20"
+            value: "200"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTS_PER_REQUEST
+            value: "50"
+
+  - it: passes postCount 0, no cap, and a custom postsPerRequest through
+    set:
+      feed:
+        config:
+          postCount: 0
+          postsPerRequest: 100
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POST_COUNT
+            value: "0"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTS_PER_REQUEST
+            value: "100"
 
   - it: moves OPENBAO_JWT_FILE, the volume mount path and the projected source's path together when overridden
     set:

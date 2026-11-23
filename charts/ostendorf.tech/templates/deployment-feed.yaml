@@ -95,6 +95,8 @@ spec:
               value: {{ .Values.feed.config.apiVersion | quote }}
             - name: POST_COUNT
               value: {{ .Values.feed.config.postCount | quote }}
+            - name: POSTS_PER_REQUEST
+              value: {{ .Values.feed.config.postsPerRequest | quote }}
           {{- if $kubernetes }}
           volumeMounts:
             - name: openbao-token

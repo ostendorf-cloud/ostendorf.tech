@@ -278,6 +278,27 @@ The website reaches the feed service over `FEED_SERVICE_URL`, computed by
 for it: this value must always resolve to this exact release's own feed `Service`, in the same
 namespace, so there is no legitimate reason for an installer to point it elsewhere.
 
+### Posts and memory
+
+The feed service collects every post of the account, up to `feed.config.postCount` (default
+`200`, `0` for no cap, at most `10000`). It asks Meta for `feed.config.postsPerRequest` posts
+per request (default `50`, `1` to `100`) and follows Meta's paging cursor. The pages of one sync
+are fetched one after the other with a pause of 500 ms between them (`DefaultPagePause` in
+`internal/instagram/client.go`). A 429 or any other 4xx from Meta ends the sync, and the last good
+feed stays until a sync reads every page.
+
+Every post is held in memory with its picture, in the feed pod and again in the website pod:
+
+```text
+memory per pod ≈ base + posts × average picture size
+posts          = postCount, or every post of the account with postCount 0
+picture size   ≈ 100 to 300 KiB for Instagram's 1080 px JPEGs, at most 4 MiB each
+```
+
+The default 200 posts take about 20 to 60 MiB in each pod, which the default `resources` and
+`feed.resources` cover. Raise both before raising `postCount`: 1000 posts take about 100 to
+300 MiB in each pod. The website keeps at most 10000 posts whatever the feed service sends.
+
 ## NetworkPolicy
 
 `feed.networkPolicy.enabled` defaults to `true`, but only takes effect once `feed.enabled` is
@@ -435,7 +456,8 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `feed.config.syncInterval` | How often the feed is reloaded from Meta, `1m` to `24h` | `1h` |
 | `feed.config.tokenRefreshAge` | Token age after which a refresh is tried, `24h` to `50d` | `7d` |
 | `feed.config.apiVersion` | Graph API version calls are made against | `v23.0` |
-| `feed.config.postCount` | Posts asked for per sync, `1` to `100` | `20` |
+| `feed.config.postCount` | Cap on the posts one sync collects, `0` (no cap) to `10000`; each costs its picture in memory, see "Posts and memory" | `200` |
+| `feed.config.postsPerRequest` | Posts one request to Meta asks for, `1` to `100` | `50` |
 | `feed.serviceAccountToken.audience` | Audience of the projected token. Empty uses the API server's default | `""` |
 | `feed.serviceAccountToken.expirationSeconds` | Lifetime of the projected token | `3600` |
 | `feed.networkPolicy.enabled` | Create a `NetworkPolicy` restricting the feed service's traffic, once `feed.enabled` is also true; see "NetworkPolicy" above | `true` |

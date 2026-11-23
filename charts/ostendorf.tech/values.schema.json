@@ -247,7 +247,18 @@
             "syncInterval": { "type": "string", "minLength": 1 },
             "tokenRefreshAge": { "type": "string", "minLength": 1 },
             "apiVersion": { "type": "string", "minLength": 1 },
-            "postCount": { "type": "integer", "minimum": 1, "maximum": 100 }
+            "postCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "description": "Cap on the posts one sync collects across all pages. 0 means no cap."
+            },
+            "postsPerRequest": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Posts one request to Meta asks for. 100 is Meta's maximum."
+            }
           }
         }
       }

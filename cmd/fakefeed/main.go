@@ -39,11 +39,14 @@ const (
 	// website's admin listener, and 9081 is the port .env.example already uses for a
 	// feed service on the same machine.
 	defaultListenAddr = ":9081"
-	// defaultPostCount mirrors internal/feedconfig's default, 20; the bounds mirror
-	// its ceiling of 100.
-	defaultPostCount = 20
-	minPostCount     = 1
-	maxPostCount     = 100
+	// defaultPostCount is the size of the sample account: enough posts for several
+	// "load more" clicks, few enough to draw in a moment at startup. The real feed
+	// service reads POST_COUNT as a cap on a real account, with 0 for no cap; here
+	// it is the number of samples, and 0 or empty means the whole sample account.
+	// maxPostCount keeps the startup drawing short.
+	defaultPostCount = 40
+	minPostCount     = 0
+	maxPostCount     = 200
 
 	// imageSize is the edge of the square pictures, the shape of an Instagram feed
 	// post.
@@ -114,8 +117,9 @@ func run(logger *slog.Logger) error {
 	return nil
 }
 
-// parsePostCount reads POST_COUNT the way internal/feedconfig does: empty is the
-// default, anything else must be an integer from 1 to 100.
+// parsePostCount reads POST_COUNT as the number of sample posts: empty and 0 are
+// the whole sample account, defaultPostCount, anything else must be an integer from
+// 1 to maxPostCount.
 func parsePostCount(raw string) (int, error) {
 	if raw == "" {
 		return defaultPostCount, nil
@@ -123,6 +127,9 @@ func parsePostCount(raw string) (int, error) {
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < minPostCount || n > maxPostCount {
 		return 0, fmt.Errorf("fakefeed: POST_COUNT %q: want an integer from %d to %d", raw, minPostCount, maxPostCount)
+	}
+	if n == 0 {
+		return defaultPostCount, nil
 	}
 	return n, nil
 }
