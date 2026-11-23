@@ -26,7 +26,7 @@ import (
 // package already embeds, rather than keeping a second copy of its text
 // in Go that could silently drift from what prerender.ts actually writes.
 const (
-	themeBootScriptOpen  = `<script id="theme-boot">`
+	themeBootScriptOpen  = `<script id="theme-boot"`
 	themeBootScriptClose = `</script>`
 )
 
@@ -84,6 +84,15 @@ func extractThemeBootScript(html string) (string, bool) {
 		return "", false
 	}
 	start += len(themeBootScriptOpen)
+	// The open tag may carry attributes (the two data attributes
+	// prerender.ts writes); they are not part of the hashed text. Their
+	// values are written with every angle bracket encoded, so the first
+	// '>' ends the tag.
+	tagEnd := strings.Index(html[start:], ">")
+	if tagEnd == -1 {
+		return "", false
+	}
+	start += tagEnd + 1
 	rest := html[start:]
 	end := strings.Index(rest, themeBootScriptClose)
 	if end == -1 {

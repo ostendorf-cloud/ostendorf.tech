@@ -16,6 +16,15 @@ func TestExtractThemeBootScript(t *testing.T) {
 			wantText: "console.log(1)",
 			wantOK:   true,
 		},
+		"attributes on the open tag are not part of the text": {
+			html:     `<html><head><script id="theme-boot" data-storage-key="k" data-theme-color-light="#fff">console.log(1)</script></head></html>`,
+			wantText: "console.log(1)",
+			wantOK:   true,
+		},
+		"open tag never closed": {
+			html:   `<html><head><script id="theme-boot" data-storage-key="k"`,
+			wantOK: false,
+		},
 		"no marker at all": {
 			html:   `<html><head></head></html>`,
 			wantOK: false,
