@@ -38,7 +38,11 @@ const (
 	// connect, any redirect and reading the whole response.
 	RequestTimeout = 5 * time.Second
 
-	maxPostsBytes = 1 << 20
+	// maxPostsBytes bounds the post list. One entry is an id of at most 64
+	// characters, an alt text of at most 150 runes and a permalink, well
+	// under 1 KiB even with every character escaped, so maxPosts entries
+	// fit with room to spare.
+	maxPostsBytes = 16 << 20
 	// MaxImageBytes bounds one picture download. The feed service already
 	// enforces its own ceiling on what it ever downloaded from Meta's CDN
 	// (internal/instagram.Client.MaxImageBytes); this is a second,
@@ -46,15 +50,14 @@ const (
 	// that does not honour that ceiling, not the only one.
 	MaxImageBytes = 4 << 20
 	// maxPosts bounds how many posts one sync cycle will ever process,
-	// mirroring internal/feedconfig's own ceiling on POST_COUNT (also 100):
-	// the feed service already caps itself to at most that many, but
+	// mirroring internal/feedconfig's own ceiling on POST_COUNT (10000):
 	// maxPostsBytes alone does not stand in for a post count limit, since
-	// a 1 MiB JSON body is roughly ten thousand small post entries, each
-	// able to pull a MaxImageBytes image. A second, independent limit
-	// against a feed service response that does not honour its own
+	// every entry can pull a MaxImageBytes image. A second, independent
+	// limit against a feed service response that does not honour its own
 	// ceiling, the same reasoning MaxImageBytes above already states for
-	// image size.
-	maxPosts = 100
+	// image size. A feed service run with POST_COUNT=0, no cap, on an
+	// account with more posts than this shows the newest maxPosts here.
+	maxPosts = 10000
 )
 
 // allowedImageTypes are the formats served back to the browser.

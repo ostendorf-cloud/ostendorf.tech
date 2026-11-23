@@ -167,6 +167,30 @@ describe('InstagramFeed', () => {
       )
     })
 
+    it('reveals every post of a large feed batch by batch, with one request', async () => {
+      let requests = 0
+      render(InstagramFeed, {
+        props: {
+          client: fakeClient(() => {
+            requests += 1
+            return Promise.resolve({ posts: manyPosts(200) })
+          }),
+        },
+        global: { plugins: [createAppI18n('de')] },
+      })
+      await waitFor(() => {
+        expect(screen.getAllByRole('img')).toHaveLength(12)
+      })
+      let clicks = 0
+      while (screen.queryByRole('button', { name: 'Mehr laden' })) {
+        await fireEvent.click(screen.getByRole('button', { name: 'Mehr laden' }))
+        clicks += 1
+      }
+      expect(screen.getAllByRole('img')).toHaveLength(200)
+      expect(clicks).toBe(Math.ceil(200 / 12) - 1)
+      expect(requests).toBe(1)
+    })
+
     it('announces a single new picture in the singular', async () => {
       await renderMany(13)
       await fireEvent.click(screen.getByRole('button', { name: 'Mehr laden' }))
