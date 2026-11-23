@@ -85,7 +85,9 @@
       "eyebrow": "From the field",
       "title": "Impressions",
       "lead": "Recent jobs, straight from Instagram.",
-      "follow": "Follow on Instagram"
+      "follow": "Follow on Instagram",
+      "loadMore": "Load more",
+      "loaded": "{n} more picture loaded | {n} more pictures loaded"
     },
     "bands": {
       "eyebrow": "On stage",

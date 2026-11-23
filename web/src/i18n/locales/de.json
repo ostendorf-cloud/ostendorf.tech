@@ -94,7 +94,9 @@
       "eyebrow": "Aus der Praxis",
       "title": "Impressionen",
       "lead": "Aktuelle Einsätze, direkt von Instagram.",
-      "follow": "Auf Instagram folgen"
+      "follow": "Auf Instagram folgen",
+      "loadMore": "Mehr laden",
+      "loaded": "{n} weiteres Bild geladen | {n} weitere Bilder geladen"
     },
     "bands": {
       "eyebrow": "Auf der Bühne",

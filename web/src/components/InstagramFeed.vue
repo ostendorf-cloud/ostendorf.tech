@@ -15,7 +15,7 @@
  * request that failed all end the same way: no section at all, and nothing
  * else on the page affected.
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { createClient } from '@ostendorf-cloud/govue'
 
@@ -46,6 +46,30 @@ const props = withDefaults(
 const { t } = useI18n()
 
 const posts = ref<InstagramPost[]>([])
+
+/**
+ * Tiles per batch. The grid has 2, 3 and 4 columns (see the template), so
+ * 12, their least common multiple, fills every row at every breakpoint. The
+ * old site's page carries no load more code to copy a size from.
+ */
+const BATCH_SIZE = 12
+
+const shown = ref(BATCH_SIZE)
+const visiblePosts = computed(() => posts.value.slice(0, shown.value))
+const hasMore = computed(() => shown.value < posts.value.length)
+
+// Announcement for screen readers. A polite live region was chosen over moving
+// focus: focus stays on the button, so the keyboard user can press it again
+// without tabbing back, and nothing jumps. The region is always in the DOM
+// (live regions only announce changes to an existing node).
+const announcement = ref('')
+
+function showMore() {
+  const before = Math.min(shown.value, posts.value.length)
+  shown.value += BATCH_SIZE
+  const added = Math.min(shown.value, posts.value.length) - before
+  announcement.value = t('home.impressions.loaded', { n: added }, added)
+}
 
 /** imageUrl is this service's own copy of the picture, never Meta's CDN. */
 function imageUrl(post: InstagramPost): string {
@@ -98,7 +122,7 @@ onMounted(async () => {
     </header>
 
     <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" role="list">
-      <li v-for="post in posts" :key="post.id">
+      <li v-for="post in visiblePosts" :key="post.id">
         <a :href="post.permalink" target="_blank" rel="noopener noreferrer" class="insta-tile">
           <img
             :src="imageUrl(post)"
@@ -117,7 +141,19 @@ onMounted(async () => {
       </li>
     </ul>
 
-    <p class="mt-6">
+    <p class="sr-only" role="status" aria-live="polite" data-testid="insta-announce">
+      {{ announcement }}
+    </p>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <button
+        v-if="hasMore"
+        type="button"
+        class="insta-more inline-flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-border-strong bg-surface px-4 text-base font-medium text-text transition-colors hover:bg-surface-hover"
+        @click="showMore"
+      >
+        {{ t('home.impressions.loadMore') }}
+      </button>
       <a
         :href="PROFILE_URL"
         target="_blank"
@@ -126,11 +162,18 @@ onMounted(async () => {
       >
         {{ t('home.impressions.follow') }}
       </a>
-    </p>
+    </div>
   </section>
 </template>
 
 <style scoped>
+/* Visible focus ring in both themes; no entrance animation exists for new
+   tiles, so there is nothing to switch off for reduced motion. */
+.insta-more:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 /*
  * A tile as on the old site: on hover or keyboard focus the picture grows
  * to 1.06 over 600 ms while the brand gradient fades in over it, 250 ms,
