@@ -137,6 +137,63 @@
   --hero-scrim-alpha: 0.74;
 
   /*
+   * Light mode's own alpha, switched in by the two rules at the end of this
+   * file; dark mode never reads it. In light mode the tokens used inside the
+   * hero are the light ones (the production build resolves a token where it
+   * is declared, on :root), so the scrim is the pale page ground and the
+   * text is navy. The picture shows through at 1 minus this: 48% instead of
+   * 26%. It is the token to turn: lower shows more picture and darkens the
+   * ground under the navy text, higher is paler and safer. The owner chose
+   * to relax the guaranteed pure white pixel floor for the light hero, see
+   * "in light mode" in src/theme/contrast.test.ts for the measured floor
+   * this value is pinned to. It moved from 0.5 to 0.52 with the gentler
+   * photo grade below, which darkens the picture behind the navy text.
+   */
+  --hero-scrim-alpha-light: 0.52;
+
+  /*
+   * The other light mode hero tokens, switched in by the same rules.
+   * - --hero-photo-filter-light: the light photo grade. The dark grade's
+   *   brightness(1.55) clips the stage lights to white over a pale scrim;
+   *   about 1.0 to 1.1 keeps the highlights. Saturation is kept. Lower
+   *   brightness darkens the ground under the navy text, so the scrim alpha
+   *   above has to be re-measured when this moves.
+   * - --hero-title-from-light and --hero-title-to-light: the headline
+   *   gradient, the logo's cyan family into the brand purple, clear hues
+   *   instead of the theme's teal into violet. The gradient is
+   *   interpolated in oklch, where available, so the middle stays a clean
+   *   blue instead of turning grey. The stops are clear hues, not darkened
+   *   until they pass 3:1.
+   * - --hero-title-glow: one very subtle pale edge, in the page ground,
+   *   around the glyphs. It is a filter, not a text shadow, because a shadow
+   *   shows through a glyph that is filled by a clipped background. It is
+   *   deliberately weak: the large headline's 3:1 against the darkest part
+   *   of the photograph is not guaranteed in the light hero, by the owner's
+   *   decision, since dark is the default mode. Dark mode has no glow.
+   * - --hero-beam-opacity-light: the stage beams a bit brighter, 0.95
+   *   instead of 0.75. They screen over the photo, so this only adds light.
+   */
+  --hero-photo-filter-light: brightness(1.05) saturate(1.45);
+  --hero-title-from-light: #0077a0;
+  --hero-title-to-light: #7b3cf5;
+  --hero-title-gradient-light: linear-gradient(
+    90deg,
+    var(--hero-title-from-light),
+    var(--hero-title-to-light)
+  );
+  --hero-title-glow-light: drop-shadow(
+    0 0 0.05em color-mix(in srgb, var(--color-bg) 40%, transparent)
+  );
+  --hero-beam-opacity-light: 0.95;
+
+  /* Dark mode's values for the hero headline and beam tokens: the theme's
+     own gradient, no glow and the beams' own opacity, exactly as before the
+     tokens existed. */
+  --hero-title-gradient: var(--brand-gradient-text);
+  --hero-title-glow: none;
+  --hero-beam-opacity: 0.75;
+
+  /*
    * The hero's two paint layers, as numbers rather than as an accident of
    * document order. The scrim guarantee above is a statement about what
    * the hero's text sits on, and it only holds if the text actually paints
@@ -206,4 +263,36 @@
     var(--brand-gradient-from),
     var(--brand-gradient-to)
   );
+}
+
+/* Browsers that interpolate in oklch get the headline gradient without the
+   grey middle; the others keep the sRGB one declared above. */
+@supports (background: linear-gradient(in oklch, red, blue)) {
+  :root[data-theme='vtech'] {
+    --hero-title-gradient-light: linear-gradient(
+      90deg in oklch,
+      var(--hero-title-from-light),
+      var(--hero-title-to-light)
+    );
+  }
+}
+
+/* The hero's light mode tokens, explicit or following the system (no
+   data-mode attribute). Dark mode matches neither selector. */
+:root[data-mode='light'] .hero {
+  --hero-scrim-alpha: var(--hero-scrim-alpha-light);
+  --hero-photo-filter: var(--hero-photo-filter-light);
+  --hero-title-gradient: var(--hero-title-gradient-light);
+  --hero-title-glow: var(--hero-title-glow-light);
+  --hero-beam-opacity: var(--hero-beam-opacity-light);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-mode]) .hero {
+    --hero-scrim-alpha: var(--hero-scrim-alpha-light);
+    --hero-photo-filter: var(--hero-photo-filter-light);
+    --hero-title-gradient: var(--hero-title-gradient-light);
+    --hero-title-glow: var(--hero-title-glow-light);
+    --hero-beam-opacity: var(--hero-beam-opacity-light);
+  }
 }

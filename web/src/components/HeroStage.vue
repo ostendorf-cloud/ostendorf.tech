@@ -139,7 +139,7 @@ onMounted(() => {
   transform: rotate(var(--from));
   filter: blur(16px);
   mix-blend-mode: var(--hero-beam-blend);
-  opacity: 0.75;
+  opacity: var(--hero-beam-opacity);
   will-change: transform;
   --sway: 12s;
   --sway-delay: 0s;
