@@ -137,6 +137,20 @@
   --hero-scrim-alpha: 0.74;
 
   /*
+   * Light mode's own alpha, switched in by the two rules at the end of this
+   * file; dark mode never reads it. In light mode the tokens used inside the
+   * hero are the light ones (the production build resolves a token where it
+   * is declared, on :root), so the scrim is the pale page ground and the
+   * text is navy. The picture shows through at 1 minus this: 50% instead of
+   * 26%. It is the token to turn: lower shows more picture and darkens the
+   * ground under the navy text, higher is paler and safer. The owner chose
+   * to relax the guaranteed pure white pixel floor for the light hero, see
+   * "in light mode" in src/theme/contrast.test.ts for the measured floor
+   * this value is pinned to.
+   */
+  --hero-scrim-alpha-light: 0.5;
+
+  /*
    * The hero's two paint layers, as numbers rather than as an accident of
    * document order. The scrim guarantee above is a statement about what
    * the hero's text sits on, and it only holds if the text actually paints
@@ -206,4 +220,16 @@
     var(--brand-gradient-from),
     var(--brand-gradient-to)
   );
+}
+
+/* The hero's scrim in light mode only, explicit or following the system (no
+   data-mode attribute). Dark mode matches neither selector. */
+:root[data-mode='light'] .hero {
+  --hero-scrim-alpha: var(--hero-scrim-alpha-light);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-mode]) .hero {
+    --hero-scrim-alpha: var(--hero-scrim-alpha-light);
+  }
 }

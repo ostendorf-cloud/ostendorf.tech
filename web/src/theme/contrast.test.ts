@@ -397,6 +397,73 @@ describe('the hero scrim', () => {
     expect(heroFailures(dark, hero.refs, ground)).toEqual([])
   })
 
+  // Light mode. The test above measures the dark palette against a pure
+  // white pixel, which is what the hero would paint if the production build
+  // resolved the pinned dark scheme; it does not: tokens are fixed where
+  // they are declared (on :root), so in light mode the hero paints the pale
+  // page ground as its scrim and navy text on it. That was never proven by a
+  // test. The owner decided to keep that look and thin it, which no longer
+  // holds the pure white pixel floor (navy text is lightest-ground limited
+  // by a DARK pixel, not a white one). The floor is therefore relaxed for
+  // the light hero, to a measured one:
+  //
+  // - Measured on web/src/assets/hero-1280.jpg, after the hero's own photo
+  //   grade (brightness(1.55) saturate(1.45)): the darkest 1% of pixels
+  //   (1st percentile luminance 0.0077) are about rgb(23, 7, 70). The
+  //   brightest 1% (luminance 0.873) is irrelevant to dark text: a light
+  //   pixel only raises the ground.
+  // - Navy body text (eyebrow, tagline) over the pale scrim over that pixel
+  //   must carry 4.5:1. 0.45 gives 3.9:1 and fails, 0.48 is the break even
+  //   point over the middle of the picture, 0.5 holds with margin over the
+  //   whole picture.
+  // - Not held, and not held on main either: the headline gradient's teal
+  //   end. Teal is darker than the scrim ground, so a darker ground only
+  //   lowers it: 2.0:1 over the same pixel at the old 0.74, about 1.1:1 at
+  //   0.5. It would need a scrim near 0.9. It is reported in the pull
+  //   request rather than pinned here.
+  describe('in light mode', () => {
+    const alphaLight = Number(/--hero-scrim-alpha-light:\s*([0-9.]+)\s*;/.exec(css)?.[1])
+    const DARKEST_PERCENT_OF_PHOTO = [23, 7, 70]
+
+    function groundOver(alpha: number, behind: number[]): string {
+      const scrim = Number.parseInt(light.bg.slice(1), 16)
+      const channels = [(scrim >> 16) & 0xff, (scrim >> 8) & 0xff, scrim & 0xff].map((c, i) =>
+        Math.round(alpha * c + (1 - alpha) * behind[i]),
+      )
+      return `#${channels.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+    }
+
+    it('pins the thinner light scrim', () => {
+      expect(alphaLight).toBe(0.5)
+    })
+
+    it('carries the navy body text over the darkest 1% of the photograph at 4.5:1', () => {
+      const ground = groundOver(alphaLight, DARKEST_PERCENT_OF_PHOTO)
+      expect(round(ratio(light.text, ground))).toBeGreaterThanOrEqual(TEXT_MINIMUM)
+    })
+
+    it('would not hold at the 0.45 that was first asked for', () => {
+      const ground = groundOver(0.45, DARKEST_PERCENT_OF_PHOTO)
+      expect(ratio(light.text, ground)).toBeLessThan(TEXT_MINIMUM)
+    })
+
+    it('reaches the hero through rules that only light mode matches', () => {
+      const selectors = [
+        ...css.matchAll(/([^{}]*)\{\s*--hero-scrim-alpha:\s*var\(--hero-scrim-alpha-light\)/g),
+      ].map((match) => match[1].replaceAll(/\/\*[\s\S]*?\*\//g, '').trim())
+      expect(selectors).toEqual([":root[data-mode='light'] .hero", ':root:not([data-mode]) .hero'])
+    })
+  })
+
+  // Dark mode is exactly what main shipped.
+  it('leaves the dark hero values as they were', () => {
+    const value = (name: string) => new RegExp(`--${name}:\\s*([^;]+);`).exec(css)?.[1].trim()
+    expect(value('hero-scrim-color')).toBe('var(--color-bg)')
+    expect(value('hero-scrim-alpha')).toBe('0.74')
+    expect(value('hero-photo-filter')).toBe('brightness(1.55) saturate(1.45)')
+    expect(value('hero-beam-blend')).toBe('screen')
+  })
+
   // There is deliberately no assertion here pinning the alpha to its
   // exact floor, the way "carries every hero role over the brightest
   // possible pixel" above pins the floor itself. The floor is derived
