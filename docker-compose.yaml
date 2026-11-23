@@ -39,10 +39,15 @@ services:
       # Empty values count as unset.
       UMAMI_URL: "${UMAMI_URL:-}"
       UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
-      # Empty without the "feed" profile, which switches the Impressionen
-      # section off. With "docker compose --profile feed up", put
-      # FEED_SERVICE_URL=http://fakefeed:9081 in .env; the port must be the
-      # one fakefeed listens on below. internal/envsync checks that.
+      # Empty without a feed profile, which switches the Impressionen
+      # section off. The website talks to exactly one feed service, chosen by
+      # this one variable together with the profile that starts it:
+      #   --profile feed      FEED_SERVICE_URL=http://fakefeed:9081
+      #   --profile realfeed  FEED_SERVICE_URL=http://realfeed:9081
+      # Both services listen on 9081 inside the compose network and publish no
+      # host port, so they cannot collide on a port; start only one of the two.
+      # The ports must be the ones the services listen on below.
+      # internal/envsync checks that.
       FEED_SERVICE_URL: "${FEED_SERVICE_URL:-}"
     ports:
       # Loopback only. The admin listener (ADMIN_ADDR, 8081) is not published.
@@ -50,8 +55,8 @@ services:
 
   # Development only: sample posts with generated pictures, no real Instagram
   # content. Not started by a plain "docker compose up", only with
-  # "docker compose --profile feed up". The real feed service needs OpenBao and
-  # a Meta token and cannot run here. Not published to the host: the website
+  # "docker compose --profile feed up". The real feed service is the
+  # "realfeed" service below. Not published to the host: the website
   # reaches it on the compose network at http://fakefeed:9081. The image is
   # distroless, with no shell or curl, so there is no healthcheck.
   fakefeed:
@@ -65,3 +70,39 @@ services:
       LISTEN_ADDR: ":9081"
       # Number of sample posts, 1 to 100. Empty means the default, 20.
       POST_COUNT: "${POST_COUNT:-}"
+
+  # Development only: the real feed service (cmd/feed, Dockerfile target
+  # "feed") against an OpenBao the owner runs, with the token method. Started
+  # only with "docker compose --profile realfeed up --build", instead of the
+  # "feed" profile, never next to it. Set FEED_SERVICE_URL=http://realfeed:9081
+  # in .env so the website reads from it. Not published to the host. The image
+  # is distroless, with no shell or curl, so there is no healthcheck: ask
+  # /readyz from inside the network, or read the logs.
+  # Every value is a pass-through from .env or the shell. OPENBAO_TOKEN is a
+  # secret: it is never written in this file. Empty values count as unset, so
+  # the service's own defaults apply, except for OPENBAO_ADDR and OPENBAO_TOKEN,
+  # which it then refuses to start without. OPENBAO_TOKEN_FILE is not forwarded:
+  # a compose bind mount of a file that may not exist cannot be optional.
+  # An OpenBao on the host is not 127.0.0.1 inside the container: use
+  # http://host.containers.internal:8200 (Podman) or
+  # http://host.docker.internal:8200 (Docker) for OPENBAO_ADDR.
+  realfeed:
+    profiles: ["realfeed"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: feed
+    restart: unless-stopped
+    environment:
+      LISTEN_ADDR: ":9081"
+      OPENBAO_AUTH_METHOD: "${OPENBAO_AUTH_METHOD:-token}"
+      OPENBAO_ADDR: "${OPENBAO_ADDR:-}"
+      OPENBAO_TOKEN: "${OPENBAO_TOKEN:-}"
+      OPENBAO_SECRET_PATH: "${OPENBAO_SECRET_PATH:-}"
+      OPENBAO_SECRET_KEY_ACCESS_TOKEN: "${OPENBAO_SECRET_KEY_ACCESS_TOKEN:-}"
+      OPENBAO_SECRET_KEY_REFRESHED_AT: "${OPENBAO_SECRET_KEY_REFRESHED_AT:-}"
+      SYNC_INTERVAL: "${SYNC_INTERVAL:-}"
+      TOKEN_REFRESH_AGE: "${TOKEN_REFRESH_AGE:-}"
+      API_VERSION: "${API_VERSION:-}"
+      POST_COUNT: "${POST_COUNT:-}"
+      LOG_LEVEL: "${LOG_LEVEL:-}"
