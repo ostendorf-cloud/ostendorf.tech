@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/ostendorf-cloud/govue v0.9.0
-	go.yaml.in/yaml/v3 v3.0.6
+	go.yaml.in/yaml/v4 v4.0.0
 )
 
 require (

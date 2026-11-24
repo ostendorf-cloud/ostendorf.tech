@@ -299,17 +299,32 @@ pnpm/pnpm#12344, not backported to the pnpm 10 release line as far as this repos
 could establish). `check:govue-version` therefore also reads `web/pnpm-lock.yaml`
 directly and fails when that dependency's resolution carries no `path: /web`.
 
-## pnpm is pinned twice and moves once
+Renovate raises both halves in one pull request, group `govue` in `renovate.json`.
+Its own npm manager skips the `&path:/web` specifier (`unversioned-reference`), so a
+regex custom manager reads the tag from `web/package.json`. Renovate regenerates no lock
+file for a custom manager, so the shared preset `govue-lockfile` (extended in
+`renovate.json`) runs one fixed post upgrade command, `pnpm --dir web install
+--lockfile-only --ignore-scripts --ignore-pnpmfile`, and commits `web/pnpm-lock.yaml`.
+The `constraints.pnpm` value of the govue rule equals the pin in `mise.toml`: move both
+together. Check on every govue pull request that the lock file entry still carries
+`path: /web`: `task check:govue-version` fails when it does not. The command and its limits
+are described in the workflows repository, `docs/concepts/renovate-post-upgrade.md`.
+`internal/depsync/renovate_test.go` fails when the group or the manager goes missing.
 
-`mise.toml` pins pnpm for a local run and the Dockerfile's Node stage installs the same
+## pnpm is pinned three times and moves once
+
+`mise.toml` pins pnpm for a local run, the Dockerfile's Node stage installs the same
 patch through corepack from its `ARG PNPM_VERSION`, so the image reads the lockfile with
-the pnpm that wrote it. Renovate's mise manager reads the first pin; a regex custom
-manager in `renovate.json` reads the argument under its `# renovate: datasource=npm
-depName=pnpm` comment, and the package rule with `groupName` `pnpm` puts both into one
-pull request with no manual step. `internal/envsync`'s `TestDockerfilePnpmMatchesMise`
-fails when the two differ or when the install line names a literal version, and
-`internal/depsync`'s `renovate_test.go` fails when the manager no longer extracts the
-argument or the group is gone.
+the pnpm that wrote it, and the govue rule's `constraints.pnpm` in `renovate.json` names
+it for the post upgrade lock file command. Renovate's mise manager reads the first pin, a
+regex custom manager reads the argument under its `# renovate: datasource=npm
+depName=pnpm` comment, and Renovate's own `renovate-config` manager reads the constraint
+as a tool constraint. The package rule with `groupName` `pnpm` matches all three
+managers and puts the three edits into one pull request with no manual step.
+`internal/envsync`'s `TestDockerfilePnpmMatchesMise` fails when the Dockerfile and
+`mise.toml` differ or the install line names a literal version, and
+`internal/depsync/renovate_test.go` fails when the argument is no longer extracted, the
+group misses a manager, or the constraint differs from `mise.toml`.
 
 ## Verify before committing
 

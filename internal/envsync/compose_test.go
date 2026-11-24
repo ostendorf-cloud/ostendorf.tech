@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/frontendconfig"
