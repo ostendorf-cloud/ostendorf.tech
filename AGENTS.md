@@ -47,8 +47,12 @@ The global baseline already applies here and is not repeated below.
   and a submission without a ticked box is a field error before the proof of work. The
   mail body is a German intro line, govue's `contact.DefaultBody` (name, address,
   message) and one line stating that the browser reported the box as ticked and the
-  server's receive time (`Request.Received`), a claim of the client, not a proof. The
-  privacy page says so in both languages; change it with the body.
+  server's receive time (`Request.Received`), a claim of the client, not a proof.
+  `DefaultBody` takes its labels from `Request.Language`, the page language
+  `GovueContactForm` sends: `E-Mail:` and `Nachricht:` from a German page, so that mail
+  is German throughout, and the English labels from an English page or without a
+  language. The privacy page says what the mail holds in both languages; change it with
+  the body.
   `internal/webapp/contact_test.go` proves the wiring through the real handler chain with
   a fake `mail.Sender`.
 - `internal/instagram` is the domain logic behind the home page's Impressionen section:
@@ -96,8 +100,9 @@ The global baseline already applies here and is not repeated below.
   JSON; the one plain string conversion is the request header. `Write` is a full-document
   overwrite guarded by the version `Read` last saw, so two replicas writing at once cannot
   silently clobber each other. `cmd/feed` is the only binary that constructs one of these:
-  the frontend and the API have no OpenBao client at all. `internal/secrettest` holds the test helpers
-  that prove a secret stays out of every error in an unwrap tree and every formatted value.
+  the frontend and the API have no OpenBao client at all. `internal/secrettest` holds the
+  test helpers that prove a secret stays out of every error in an unwrap tree and every
+  formatted value.
 - `cmd/feed` wires the feed service: a third binary alongside `cmd/frontend` and
   `cmd/api`, with its own configuration (`internal/feedconfig`) and its own chart entry
   (`charts/ostendorf.tech/templates/deployment-feed.yaml` and friends).
@@ -205,7 +210,7 @@ The global baseline already applies here and is not repeated below.
   either. The frontend has no such state and may run several replicas. Lifts only once
   all of them move to a shared store: `pow.Config.Seen` is an interface that can take
   one, but `contact.Config`'s limiters are `*ratelimit.Limiter`, a concrete in-memory
-  type, so govue offers no shared limiter in v0.9.0.
+  type, so govue offers no shared limiter in v0.10.0.
 - `web/` is the Vue SPA, consuming govue's Vue package as a pnpm git dependency. `web/src`
   holds the app. The contact section in `web/src/views/HomeView.vue` renders govue's
   `GovueContactForm` with a cookie free client (`createClient({ credentials: 'omit' })`),
@@ -218,8 +223,16 @@ The global baseline already applies here and is not repeated below.
   default `worker-src 'self'` allows. `web/src/views/contactSection.test.ts` proves the
   section in both languages. The header (`web/src/components/AppHeader.vue`) is govue's
   `GovueHeader` with the navigation at the end, the contact link as the `cta` nav item,
-  `GovueLanguageSwitch` in link mode (`linkFor`, `navigate` to the router) and the
-  compact `GovueThemeSwitch` in the `#theme` slot; its translucent ground is govue's
+  `GovueLanguageSwitch` in link mode (`linkFor`, `navigate` to the router) and
+  `GovueThemeSwitch` in the `#theme` slot, in govue's narrow setup: below 1024 px the
+  `cycle` button and the `othersOnly` link to the other language, from 1024 px the
+  `compact` switch and both languages. Both variants are in the markup, in
+  `contents lg:hidden` and `hidden lg:contents` wrappers, so the hidden one leaves the
+  accessibility tree. Below 480 px govue's header has two rows, the brand row and the
+  navigation row, which the owner accepted. `web/src/styles.css` holds the prerender
+  fallback of `--header-height` per breakpoint, 57 px from 480 px and 109 px below,
+  read from govue's header classes; `AppHeader.test.ts` derives both from those classes
+  and fails when the stylesheet or govue moves. Its translucent ground is govue's
   `--color-header-bg` and `--header-backdrop` tokens in `web/src/theme/vtech.css`. On the
   home page it is govue's `overlay` header, transparent over the hero until the page
   scrolls. That is an exception to govue's documented hero bound: the brightest hero
