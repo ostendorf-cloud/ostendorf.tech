@@ -174,8 +174,7 @@ func TestFeedSyncerBuiltWhenFeedServiceConfigured(t *testing.T) {
 	cfg := testConfig(t, map[string]string{
 		"FEED_SERVICE_URL": "http://feed.ostendorf-tech.svc.cluster.local",
 	})
-	dist, prerendered := testFS()
-	app, err := New(cfg, discardLogger(), dist, prerendered)
+	app, err := New(cfg, discardLogger())
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

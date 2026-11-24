@@ -1,9 +1,14 @@
+# The API: the contact form and the feed proxy (cmd/api). The file keeps its name
+# from before the split into frontend, API and feed; the chart's top level values
+# (replicaCount, image, resources, probes, config, existingSecret) are this
+# workload's. The static pages are the frontend's own Deployment, see
+# templates/deployment-frontend.yaml.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "ostendorf-tech.fullname" . }}
+  name: {{ include "ostendorf-tech.api.fullname" . }}
   labels:
-    {{- include "ostendorf-tech.labels" . | nindent 4 }}
+    {{- include "ostendorf-tech.api.labels" . | nindent 4 }}
 spec:
   {{/*
   Ingress and httpRoute are mutually exclusive: both pick an external route
@@ -16,9 +21,10 @@ spec:
   routing templates themselves, where Helm's own template engine aborts the
   whole render at the first of the two to fail and never reaches the second,
   making only one of two duplicated guards ever observable. This is about
-  the website's own ingress/httpRoute/replicaCount only: the second,
-  independent Deployment in templates/deployment-feed.yaml must not
-  duplicate these guards, since they are unrelated to the feed workload.
+  the API's own replicaCount and the routing flags only: the other
+  Deployments in templates/deployment-frontend.yaml and
+  templates/deployment-feed.yaml must not duplicate these guards, since they
+  are unrelated to those workloads.
   */}}
   {{- if and .Values.ingress.enabled .Values.httpRoute.enabled }}
   {{ fail "ingress.enabled and httpRoute.enabled cannot both be true: pick one external route and turn the other off." }}
@@ -32,6 +38,9 @@ spec:
   the name is required even while every key below is left unset.
   */}}
   {{- $_ := include "ostendorf-tech.existingSecretName" . }}
+  {{- if and .Values.existingSecret.challengeKeyPreviousKey (not .Values.existingSecret.challengeKeyKey) }}
+  {{ fail "existingSecret.challengeKeyPreviousKey needs existingSecret.challengeKeyKey: the previous key only verifies during a rotation, and the API refuses to start with it alone, since a retired key would then issue challenges again." }}
+  {{- end }}
   {{- if and .Values.ingress.enabled (not .Values.config.trustedProxies) }}
   {{ fail "config.trustedProxies must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md." }}
   {{- end }}
@@ -40,20 +49,21 @@ spec:
   {{- end }}
   {{- include "ostendorf-tech.checkGoMemLimit" (list "goMemLimit" .Values.goMemLimit "resources.limits.memory" (dig "limits" "memory" "" (.Values.resources | default dict))) }}
   replicas: {{ .Values.replicaCount }}
-  # Recreate, not the default RollingUpdate: a rolling update's maxSurge
-  # would otherwise briefly run two pods, each with its own rate limits, mail
-  # ceiling and proof of work replay set, which is exactly what the
-  # replicaCount guard above exists to prevent. This holds the single-pod
-  # invariant during a rollout too, not only at a fixed replicaCount.
+  # Recreate, not the default RollingUpdate: the contact form's per client
+  # limits, its global mail ceiling and its proof of work replay set live in
+  # the memory of one process. A rolling update's maxSurge would briefly run
+  # two pods, each with its own copy, which is exactly what the replicaCount
+  # guard above exists to prevent. This holds the single-pod invariant during
+  # a rollout too, not only at a fixed replicaCount.
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "ostendorf-tech.selectorLabels" . | nindent 6 }}
+      {{- include "ostendorf-tech.api.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "ostendorf-tech.labels" . | nindent 8 }}
+        {{- include "ostendorf-tech.api.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -66,7 +76,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "ostendorf-tech.serviceAccountName" . }}
+      serviceAccountName: {{ include "ostendorf-tech.api.serviceAccountName" . }}
       # This application makes no Kubernetes API calls of its own; see
       # templates/serviceaccount.yaml and values.yaml. Set on the pod too,
       # not only the ServiceAccount, since the pod spec's own value would
@@ -75,7 +85,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: api
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -146,42 +156,40 @@ spec:
             - name: FEED_SERVICE_URL
               value: {{ printf "http://%s:%v" (include "ostendorf-tech.feed.fullname" .) .Values.feed.service.port | quote }}
             {{- end }}
-            {{- if .Values.config.umamiUrl }}
-            - name: UMAMI_URL
-              value: {{ .Values.config.umamiUrl | quote }}
-            {{- end }}
-            {{- if .Values.config.umamiWebsiteId }}
-            - name: UMAMI_WEBSITE_ID
-              value: {{ .Values.config.umamiWebsiteId | quote }}
-            {{- end }}
+            {{- /* No UMAMI_* here: the API counts no page views, the
+                   frontend serves the pages and counts them. */}}
+            {{- /* The challenge keys and the SMTP credentials are files from
+                   Secret volumes, read through their _FILE twins, so no
+                   secret value is in the container's environment. */}}
             {{- if .Values.existingSecret.challengeKeyKey }}
-            - name: CHALLENGE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.challengeKeyKey }}
+            - name: CHALLENGE_KEY_FILE
+              value: /run/secrets/challenge/current
             {{- end }}
             {{- if .Values.existingSecret.challengeKeyPreviousKey }}
-            - name: CHALLENGE_KEY_PREVIOUS
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.challengeKeyPreviousKey }}
+            - name: CHALLENGE_KEY_PREVIOUS_FILE
+              value: /run/secrets/challenge/previous
             {{- end }}
             {{- if .Values.existingSecret.smtpUsernameKey }}
-            - name: SMTP_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.smtpUsernameKey }}
+            - name: SMTP_USERNAME_FILE
+              value: /run/secrets/smtp/username
             {{- end }}
             {{- if .Values.existingSecret.smtpPasswordKey }}
-            - name: SMTP_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.smtpPasswordKey }}
+            - name: SMTP_PASSWORD_FILE
+              value: /run/secrets/smtp/password
             {{- end }}
+          {{- if or .Values.existingSecret.challengeKeyKey .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
+          volumeMounts:
+            {{- if .Values.existingSecret.challengeKeyKey }}
+            - name: challenge-keys
+              mountPath: /run/secrets/challenge
+              readOnly: true
+            {{- end }}
+            {{- if or .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
+            - name: smtp-credentials
+              mountPath: /run/secrets/smtp
+              readOnly: true
+            {{- end }}
+          {{- end }}
           {{- if .Values.startupProbe.enabled }}
           startupProbe:
             httpGet:
@@ -207,6 +215,39 @@ spec:
             failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      {{- if or .Values.existingSecret.challengeKeyKey .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
+      volumes:
+        {{- if .Values.existingSecret.challengeKeyKey }}
+        - name: challenge-keys
+          secret:
+            secretName: {{ include "ostendorf-tech.existingSecretName" . }}
+            # Readable by the pod's fsGroup only, the group the process runs in.
+            defaultMode: 0440
+            items:
+              - key: {{ .Values.existingSecret.challengeKeyKey }}
+                path: current
+              {{- with .Values.existingSecret.challengeKeyPreviousKey }}
+              - key: {{ . }}
+                path: previous
+              {{- end }}
+        {{- end }}
+        {{- if or .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
+        - name: smtp-credentials
+          secret:
+            secretName: {{ include "ostendorf-tech.existingSecretName" . }}
+            # Readable by the pod's fsGroup only, the group the process runs in.
+            defaultMode: 0440
+            items:
+              {{- with .Values.existingSecret.smtpUsernameKey }}
+              - key: {{ . }}
+                path: username
+              {{- end }}
+              {{- with .Values.existingSecret.smtpPasswordKey }}
+              - key: {{ . }}
+                path: password
+              {{- end }}
+        {{- end }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
 #
-# Starts the container image given as $1 and asserts it actually serves
-# the site, the way the Helm chart would run it: health, readiness and
-# metrics on the admin listener, the home page in each locale with its
-# prerendered content intact and robots.txt/sitemap.xml on the public
-# one, and that the public listener itself no longer answers /metrics.
-# Run by the docker-build job in .github/workflows/checks.yaml right
-# after it builds and loads the image, so this never needs a registry.
+# Starts the container image given as $1, of the kind $2 ("frontend" or
+# "api"), and asserts it serves its part of the site the way the Helm chart
+# runs it: health, readiness and metrics on the admin listener, and on the
+# public one the prerendered home page in each locale, robots.txt and the
+# sitemap for the frontend, or the API routes and no page for the API. Run
+# by the docker-build job in .github/workflows/checks.yaml right after it
+# builds and loads the image, so this never needs a registry.
 #
 # The container starts with no secret at all: without CHALLENGE_KEY and
-# SMTP_HOST the contact form answers 503 and every page still serves.
+# SMTP_HOST the contact form answers 503 and everything else still serves.
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <image-ref>" >&2
+if [[ $# -ne 2 || ($2 != "frontend" && $2 != "api") ]]; then
+  echo "usage: $0 <image-ref> frontend|api" >&2
   exit 1
 fi
 
 image="$1"
+kind="$2"
 container="ostendorf-tech-smoke-$$"
 base_url="http://127.0.0.1:8080"
 admin_url="http://127.0.0.1:8081"
@@ -101,28 +102,32 @@ assert_status "/healthz" "200" "$admin_url"
 assert_status "/readyz" "200" "$admin_url"
 assert_status "/metrics" "200" "$admin_url"
 
-# The public listener moved these three to the admin listener above: it
-# must no longer answer /metrics itself. pageHandler's catch-all answers
-# every unknown path with the locale's own 404 page (internal/webapp's
-# own TestAppPublicHandlerServesNoOperationalEndpoints proves the same
-# thing at the Go level), which is what a request for /metrics on the
-# public listener now actually is.
+# The public listener answers none of the admin routes.
 assert_status "/metrics" "404"
 
-# id="hero-title" is structural markup on the home page's hero section
-# (web/src/views/HomeView.vue), not copy: it exists only in the real,
-# server-rendered component tree internal/webapp/pages.go serves from
-# cmd/website/prerendered, never in the empty "<div id=\"app\"></div>"
-# SPA shell web/index.html ships. Asserting on it, rather than on a 200
-# alone, is what actually proves the prerendered HTML survived into this
-# image instead of an empty shell that would also answer 200.
-assert_status "/de/" "200"
-assert_contains "/de/" 'id="hero-title"'
-assert_status "/en/" "200"
-assert_contains "/en/" 'id="hero-title"'
-
-assert_status "/robots.txt" "200"
-assert_status "/sitemap.xml" "200"
+case "$kind" in
+  frontend)
+    # id="hero-title" is structural markup on the home page's hero section
+    # (web/src/views/HomeView.vue), not copy: it exists only in the
+    # prerendered page, never in the empty SPA shell web/index.html ships.
+    # Asserting on it proves the prerendered HTML survived into this image.
+    assert_status "/de/" "200"
+    assert_contains "/de/" 'id="hero-title"'
+    assert_status "/en/" "200"
+    assert_contains "/en/" 'id="hero-title"'
+    assert_status "/robots.txt" "200"
+    assert_status "/sitemap.xml" "200"
+    # The frontend serves no API: the Ingress routes /api to the API image.
+    assert_status "/api/v1/instagram" "404"
+    ;;
+  api)
+    # The feed section's read answers from an empty cache without a feed
+    # service, and the API serves no page.
+    assert_status "/api/v1/instagram" "200"
+    assert_status "/de/" "404"
+    assert_status "/sitemap.xml" "404"
+    ;;
+esac
 
 if [[ $fail -ne 0 ]]; then
   echo "smoke test failed" >&2

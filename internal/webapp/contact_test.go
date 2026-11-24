@@ -64,8 +64,7 @@ func contactApp(t *testing.T, env map[string]string) (*App, *fakeSender, *testCl
 	}
 	sender := &fakeSender{}
 	clock := &testClock{now: time.Now()}
-	dist, prerendered := testFS()
-	app, err := New(testConfig(t, merged), discardLogger(), dist, prerendered,
+	app, err := New(testConfig(t, merged), discardLogger(),
 		WithMailSender(sender), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -97,15 +96,29 @@ func fetchChallenge(t *testing.T, app *App, remoteAddr string) (pow.Solution, *h
 	return pow.Solution{}, nil
 }
 
-// submission is the body GovueContactForm posts: no consent field, it stays
-// in the browser.
+// submission is the body GovueContactForm posts with requireConsent: the
+// consent box ticked.
 func submission(t *testing.T, sol *pow.Solution) string {
+	t.Helper()
+	return submissionWith(t, sol, map[string]any{"consent": true})
+}
+
+// submissionWith is submission with fields replaced, or removed when the
+// value is nil.
+func submissionWith(t *testing.T, sol *pow.Solution, fields map[string]any) string {
 	t.Helper()
 	body := map[string]any{
 		"name":    "Erika Mustermann",
 		"email":   "erika@example.test",
 		"message": "Hallo,\nich brauche Technik.",
 		"website": "",
+	}
+	for k, v := range fields {
+		if v == nil {
+			delete(body, k)
+			continue
+		}
+		body[k] = v
 	}
 	if sol != nil {
 		body["pow"] = sol
@@ -135,15 +148,20 @@ func postContact(t *testing.T, app *App, remoteAddr, body string, mod func(*http
 // TestContactSendsTheSiteMailThroughTheRealChain proves the site mounts
 // govue's handlers with its own envelope, subject and body: one valid
 // challenge and submission sends exactly one mail, From and To are the
-// site's, the visitor is only in Reply-To, and the body is the site's text
-// without the consent timestamp the site's own builder used to add.
+// site's, the visitor is only in Reply-To, and the body is the site's intro,
+// govue's DefaultBody and one line on the consent box with the server's
+// receive time. The submission carries language "de", as GovueContactForm
+// sends it on a German page. The mail is German throughout in every language,
+// see TestContactBodyIsGermanInEveryLanguage.
 func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	app, sender, clock := contactApp(t, nil)
 	const addr = "198.51.100.10:1234"
 
 	sol, _ := fetchChallenge(t, app, addr)
 	clock.Advance(5 * time.Second)
-	rec := postContact(t, app, addr, submission(t, &sol), nil)
+	received := clock.Now().UTC().Format(time.RFC3339)
+	body := submissionWith(t, &sol, map[string]any{"consent": true, "language": "de"})
+	rec := postContact(t, app, addr, body, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("submit status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
 	}
@@ -165,17 +183,107 @@ func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	if m.Subject != "Kontaktanfrage von Erika Mustermann" {
 		t.Errorf("Subject = %q, want the site's subject", m.Subject)
 	}
-	const wantBody = "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n" +
+	wantBody := "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n" +
 		"Name: Erika Mustermann\n" +
 		"E-Mail: erika@example.test\n\n" +
-		"Nachricht:\nHallo,\nich brauche Technik.\n"
+		"Nachricht:\nHallo,\nich brauche Technik.\n" +
+		"\nEinwilligung: Kontrollkästchen laut Browser angehakt, Eingang beim Server " +
+		received + " (Angabe des Browsers, kein Nachweis)\n"
 	if m.Body != wantBody {
 		t.Errorf("Body = %q, want %q", m.Body, wantBody)
 	}
-	for _, gone := range []string{"Datenschutz", "Einverständnis", "erteilt am", "Uhr"} {
-		if strings.Contains(m.Body, gone) {
-			t.Errorf("Body contains %q, the consent timestamp is dropped", gone)
-		}
+	if n := strings.Count(m.Body, "Einwilligung"); n != 1 {
+		t.Errorf("Body names the consent %d times, want one line", n)
+	}
+}
+
+// TestContactBodyIsGermanInEveryLanguage proves the labels are German
+// whatever page language the form sends: the mail goes to the German owner.
+// The site's intro and consent line are German as well.
+func TestContactBodyIsGermanInEveryLanguage(t *testing.T) {
+	want := []string{"\nE-Mail: erika@example.test\n", "\nNachricht:\nHallo,"}
+	absent := []string{"Email:", "Message:"}
+	cases := []struct {
+		name     string
+		language any
+	}{
+		{name: "en", language: "en"},
+		{name: "de", language: "de"},
+		{name: "none", language: nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app, sender, clock := contactApp(t, nil)
+			const addr = "198.51.100.12:1234"
+			sol, _ := fetchChallenge(t, app, addr)
+			clock.Advance(5 * time.Second)
+
+			body := submissionWith(t, &sol, map[string]any{"consent": true, "language": tc.language})
+			rec := postContact(t, app, addr, body, nil)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("submit status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
+			}
+			sent := sender.messages()
+			if len(sent) != 1 {
+				t.Fatalf("sent %d mails, want 1", len(sent))
+			}
+			got := sent[0].Body
+			if !strings.HasPrefix(got, "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n") {
+				t.Errorf("Body = %q, want the German intro first", got)
+			}
+			if !strings.Contains(got, "\nEinwilligung: ") {
+				t.Errorf("Body = %q, want the German consent line", got)
+			}
+			for _, w := range want {
+				if !strings.Contains(got, w) {
+					t.Errorf("Body = %q, want %q", got, w)
+				}
+			}
+			for _, a := range absent {
+				if strings.Contains(got, a) {
+					t.Errorf("Body = %q, want no %q", got, a)
+				}
+			}
+		})
+	}
+}
+
+// TestContactRequiresTheConsentBox proves RequireConsent is on: a
+// submission without the box, or with it unticked, is a field error on
+// consent before the proof of work, and nothing is sent.
+func TestContactRequiresTheConsentBox(t *testing.T) {
+	for name, consent := range map[string]any{"missing": nil, "unticked": false} {
+		t.Run(name, func(t *testing.T) {
+			app, sender, clock := contactApp(t, nil)
+			const addr = "198.51.100.11:1234"
+			sol, _ := fetchChallenge(t, app, addr)
+			clock.Advance(5 * time.Second)
+
+			rec := postContact(t, app, addr, submissionWith(t, &sol, map[string]any{"consent": consent}), nil)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusBadRequest, rec.Body)
+			}
+			if !strings.Contains(rec.Body.String(), `"consent":"required"`) {
+				t.Errorf("body = %s, want the consent field error", rec.Body)
+			}
+			if n := len(sender.messages()); n != 0 {
+				t.Errorf("sent %d mails, want none", n)
+			}
+		})
+	}
+}
+
+// TestContactConsentLineStatesTheBox pins the wording for both states, so
+// the line never claims a ticked box the request did not carry.
+func TestContactConsentLineStatesTheBox(t *testing.T) {
+	at := time.Date(2026, 11, 24, 8, 30, 0, 0, time.UTC)
+	ticked := consentLine(contact.Request{Consent: true, Received: at})
+	if !strings.Contains(ticked, "laut Browser angehakt") || !strings.Contains(ticked, "2026-11-24T08:30:00Z") {
+		t.Errorf("ticked line = %q", ticked)
+	}
+	unticked := consentLine(contact.Request{Received: at})
+	if !strings.Contains(unticked, "nicht angehakt") {
+		t.Errorf("unticked line = %q", unticked)
 	}
 }
 
@@ -287,8 +395,7 @@ func TestContactNotConfiguredWithoutKeyOrSMTP(t *testing.T) {
 // form send: without SMTP_HOST and without a sender, the submission answers
 // 503 not_configured.
 func TestContactNotConfiguredWithoutSMTP(t *testing.T) {
-	dist, prerendered := testFS()
-	app, err := New(testConfig(t, map[string]string{"CHALLENGE_KEY": validHexKey}), discardLogger(), dist, prerendered)
+	app, err := New(testConfig(t, map[string]string{"CHALLENGE_KEY": validHexKey}), discardLogger())
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -304,13 +411,12 @@ func TestContactNotConfiguredWithoutSMTP(t *testing.T) {
 // TestContactSMTPHostConfiguresTheForm proves SMTP_HOST plus the key is
 // what makes the form configured with the real SMTP sender.
 func TestContactSMTPHostConfiguresTheForm(t *testing.T) {
-	dist, prerendered := testFS()
 	app, err := New(testConfig(t, map[string]string{
 		"CHALLENGE_KEY": validHexKey,
 		"SMTP_HOST":     "mail.example.test",
 		"SMTP_USERNAME": "no-reply@example.test",
 		"SMTP_PASSWORD": "s3cret",
-	}), discardLogger(), dist, prerendered)
+	}), discardLogger())
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -430,11 +536,10 @@ func TestContactAcceptsASolutionSignedWithThePreviousKey(t *testing.T) {
 	sol, _ := fetchChallenge(t, old, addr)
 
 	sender := &fakeSender{}
-	dist, prerendered := testFS()
 	rotated, err := New(testConfig(t, map[string]string{
 		"CHALLENGE_KEY":          validHexKey,
 		"CHALLENGE_KEY_PREVIOUS": previous,
-	}), discardLogger(), dist, prerendered, WithMailSender(sender), WithClock(clock.Now))
+	}), discardLogger(), WithMailSender(sender), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -449,7 +554,7 @@ func TestContactAcceptsASolutionSignedWithThePreviousKey(t *testing.T) {
 	// Without the previous key the same kind of solution is refused.
 	sol2, _ := fetchChallenge(t, old, "198.51.100.22:1234")
 	dropped, err := New(testConfig(t, map[string]string{"CHALLENGE_KEY": validHexKey}),
-		discardLogger(), dist, prerendered, WithMailSender(&fakeSender{}), WithClock(clock.Now))
+		discardLogger(), WithMailSender(&fakeSender{}), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -468,9 +573,8 @@ func TestContactChallengeAudienceIsTheSiteHost(t *testing.T) {
 	sol, _ := fetchChallenge(t, other, "198.51.100.23:1234")
 
 	sender := &fakeSender{}
-	dist, prerendered := testFS()
 	app, err := New(testConfig(t, map[string]string{"CHALLENGE_KEY": validHexKey}),
-		discardLogger(), dist, prerendered, WithMailSender(sender), WithClock(clock.Now))
+		discardLogger(), WithMailSender(sender), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

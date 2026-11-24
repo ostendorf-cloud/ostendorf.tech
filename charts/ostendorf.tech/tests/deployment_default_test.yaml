@@ -9,6 +9,11 @@ templates:
   - templates/service-feed.yaml
   - templates/serviceaccount-feed.yaml
   - templates/networkpolicy.yaml
+  - templates/networkpolicy-api.yaml
+  - templates/networkpolicy-frontend.yaml
+  - templates/deployment-frontend.yaml
+  - templates/service-frontend.yaml
+  - templates/serviceaccount-frontend.yaml
 set:
   existingSecret:
     name: ostendorf-tech-secrets
@@ -125,21 +130,29 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: CHALLENGE_KEY
+            name: CHALLENGE_KEY_FILE
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: CHALLENGE_KEY_PREVIOUS
+            name: CHALLENGE_KEY_PREVIOUS_FILE
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: SMTP_USERNAME
+            name: SMTP_USERNAME_FILE
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: SMTP_PASSWORD
+            name: SMTP_PASSWORD_FILE
+          any: true
+      - notExists:
+          path: spec.template.spec.volumes
+      - notExists:
+          path: spec.template.spec.containers[0].volumeMounts
 
-  - it: counts no page views until Umami is configured
+  - it: counts no page views in the API, whatever the Umami values
     template: templates/deployment.yaml
     asserts:
       - notContains:
@@ -249,8 +262,14 @@ tests:
     template: templates/deployment.yaml
     asserts:
       - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ostendorf-tech-api
+      - equal:
           path: metadata.labels["app.kubernetes.io/name"]
-          value: ostendorf-tech
+          value: ostendorf-tech-api
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: api
       - equal:
           path: metadata.labels["app.kubernetes.io/version"]
           value: "0.1.0"
@@ -262,11 +281,34 @@ tests:
           value: Helm
       - equal:
           path: spec.template.metadata.labels["app.kubernetes.io/name"]
-          value: ostendorf-tech
+          value: ostendorf-tech-api
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: ostendorf-tech-api
 
-  - it: renders a ClusterIP Service by default
+  - it: runs the API image of the same version tag as the other parts
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/ostendorf-cloud/ostendorf-tech-api:0.1.0
+
+  - it: names its container api, as the frontend's and the feed's are named after their part
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: api
+
+  - it: renders a ClusterIP Service by default, named after the API
     template: templates/service.yaml
     asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ostendorf-tech-api
+      - equal:
+          path: spec.selector["app.kubernetes.io/name"]
+          value: ostendorf-tech-api
       - equal:
           path: spec.type
           value: ClusterIP
@@ -296,11 +338,21 @@ tests:
           path: spec.ports[1].targetPort
           value: admin
 
-  - it: creates a ServiceAccount with no RBAC by default
+  - it: creates a ServiceAccount with no RBAC by default, named after the API
     template: templates/serviceaccount.yaml
     asserts:
       - isKind:
           of: ServiceAccount
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ostendorf-tech-api
+
+  - it: runs the API pod as that ServiceAccount
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: RELEASE-NAME-ostendorf-tech-api
 
   - it: never auto-mounts the ServiceAccount token onto the ServiceAccount itself
     template: templates/serviceaccount.yaml
@@ -342,3 +394,21 @@ tests:
       - hasDocuments:
           count: 0
         template: templates/networkpolicy.yaml
+
+  - it: renders the frontend's Deployment, Service and ServiceAccount but no NetworkPolicy of the API or the frontend by default
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: templates/deployment-frontend.yaml
+      - hasDocuments:
+          count: 1
+        template: templates/service-frontend.yaml
+      - hasDocuments:
+          count: 1
+        template: templates/serviceaccount-frontend.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/networkpolicy-api.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/networkpolicy-frontend.yaml

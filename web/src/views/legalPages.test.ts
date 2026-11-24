@@ -120,11 +120,16 @@ describe('legal pages', () => {
       )
       // The localStorage text of the colour scheme stays.
       expect(text).toContain('govue-theme')
+      // The consent box reaches the server now, so the old claim is gone.
+      expect(text).not.toMatch(
+        /diese Angabe wird nicht an unseren Server übertragen|this information is not transmitted to our server/,
+      )
 
       for (const fact of locale === 'de'
         ? [
             'aber weder Ihre IP-Adresse noch Angaben zu Ihrem Browser',
-            'diese Angabe wird nicht an unseren Server übertragen',
+            'Ihr Browser übermittelt außerdem, ob Sie das Kästchen zur Einwilligung angekreuzt haben.',
+            'dass Ihr Browser das Kästchen als angekreuzt gemeldet hat, und den Zeitpunkt, zu dem unser Server das Formular erhalten hat',
             'Unser Server speichert die ausgegebenen Aufgaben nicht.',
             'bis diese Liste voll ist und abgelaufene Einträge entfernt werden, oder bis unser Server neu startet',
             'nach Ablauf der Begrenzung bei der nächsten Bereinigung aus dem Arbeitsspeicher entfernt',
@@ -134,7 +139,8 @@ describe('legal pages', () => {
           ]
         : [
             'but neither your IP address nor any details about your browser',
-            'this information is not transmitted to our server',
+            'Your browser also sends whether you ticked the consent box.',
+            'that your browser reported the box as ticked, and the time our server received the form',
             'Our server does not store the tasks it issues.',
             'until this list is full and expired entries are removed, or until our server restarts',
             'dropped from memory after the limit has run out, at the next cleanup',

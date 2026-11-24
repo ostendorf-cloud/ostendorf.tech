@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
 )
@@ -50,69 +49,55 @@ func errorCode(t *testing.T, body []byte) string {
 	return envelope.Error.Code
 }
 
-func testFS() (dist, prerendered fstest.MapFS) {
-	dist = testDist()
-	prerendered = fstest.MapFS{
-		// de/index.html carries the theme-boot marker every real
-		// prerendered page does, so New's themeBootScriptHash finds
-		// something to hash, the same as it would against the real
-		// build output.
-		"de/index.html": &fstest.MapFile{Data: []byte(`<html><head><script id="theme-boot">(function(){})();</script></head><body>Startseite</body></html>`)},
-		"de/404.html":   &fstest.MapFile{Data: []byte("<html><body>Nicht gefunden</body></html>")},
-		"en/index.html": &fstest.MapFile{Data: []byte("<html><body>Home</body></html>")},
-		"en/404.html":   &fstest.MapFile{Data: []byte("<html><body>Not found</body></html>")},
-	}
-	return dist, prerendered
-}
-
 func testApp(t *testing.T) *App {
 	t.Helper()
-	cfg := testConfig(t, map[string]string{
+	return testAppWith(t, map[string]string{
 		"RATE_LIMIT_BURST": "100",
 		"RATE_LIMIT_PER":   "1s",
 	})
-	dist, prerendered := testFS()
-	app, err := New(cfg, discardLogger(), dist, prerendered)
+}
+
+func testAppWith(t *testing.T, env map[string]string) *App {
+	t.Helper()
+	app, err := New(testConfig(t, env), discardLogger())
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
 	return app
 }
 
-// TestAppPublicHandlerServesNoOperationalEndpoints proves the move to the
-// admin listener actually happened on the public side: /healthz, /readyz
-// and /metrics moved to AdminHandler (see
-// TestAppAdminHandlerServesHealthReadinessAndMetrics), so none of the three
-// may still answer on the public handler. pageHandler's catch-all answers
-// every unknown path with the locale's own 404 page, which is what a
-// request for any of these three now actually is from the public
-// handler's point of view.
+func get(t *testing.T, h http.Handler, path, remoteAddr string, header http.Header) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
+	if remoteAddr != "" {
+		req.RemoteAddr = remoteAddr
+	}
+	for k, v := range header {
+		req.Header[k] = v
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// TestAppPublicHandlerServesNoOperationalEndpoints proves /healthz, /readyz
+// and /metrics answer on the admin handler only: the public handler gives
+// its JSON 404 for all three.
 func TestAppPublicHandlerServesNoOperationalEndpoints(t *testing.T) {
 	app := testApp(t)
-	handler := app.Handler()
-
 	for _, path := range []string{"/healthz", "/readyz", "/metrics"} {
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-		if rec.Code != http.StatusNotFound {
+		if rec := get(t, app.Handler(), path, "", nil); rec.Code != http.StatusNotFound {
 			t.Errorf("GET %s on the public handler status = %d, want %d", path, rec.Code, http.StatusNotFound)
 		}
 	}
 }
 
 // TestAppAdminHandlerServesHealthReadinessAndMetrics proves the admin
-// handler, not the public one, now answers all three operational routes;
-// see AdminHandler.
+// handler answers all three operational routes; see AdminHandler.
 func TestAppAdminHandlerServesHealthReadinessAndMetrics(t *testing.T) {
 	app := testApp(t)
-	handler := app.AdminHandler()
-
 	for _, path := range []string{"/healthz", "/readyz", "/metrics"} {
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
+		if rec := get(t, app.AdminHandler(), path, "", nil); rec.Code != http.StatusOK {
 			t.Errorf("GET %s on the admin handler status = %d, want %d", path, rec.Code, http.StatusOK)
 		}
 	}
@@ -121,241 +106,94 @@ func TestAppAdminHandlerServesHealthReadinessAndMetrics(t *testing.T) {
 func TestAppDrainingFailsReadiness(t *testing.T) {
 	app := testApp(t)
 	app.Health().Drain()
-
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/readyz", nil)
-	rec := httptest.NewRecorder()
-	app.AdminHandler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusServiceUnavailable {
+	if rec := get(t, app.AdminHandler(), "/readyz", "", nil); rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 	}
 }
 
 // TestAppSecurityPolicyAllowsTheProofOfWorkWorker proves worker-src 'self'
-// is actually on the response: govue's contact form Worker loads from a
-// same-origin module URL (see webapp.go's own comment on why this is set
-// explicitly rather than left to CSP's script-src fallback), and the
-// consequence of this header being wrong is that the form never submits.
+// is on the response exactly once, with no other source: govue's contact
+// form Worker loads from a same-origin module URL, and the consequence of
+// this header being wrong is that the form never submits. govue's default
+// policy carries the directive since v0.8.0, so the site adds nothing.
 func TestAppSecurityPolicyAllowsTheProofOfWorkWorker(t *testing.T) {
-	app := testApp(t)
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
-	rec := httptest.NewRecorder()
-	app.Handler().ServeHTTP(rec, req)
-
-	csp := rec.Header().Get("Content-Security-Policy")
-	if !strings.Contains(csp, "worker-src 'self'") {
-		t.Errorf("Content-Security-Policy = %q, want it to contain worker-src 'self'", csp)
-	}
-}
-
-func TestAppServesPrerenderedHome(t *testing.T) {
-	app := testApp(t)
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
-	rec := httptest.NewRecorder()
-	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-}
-
-func TestAppRateLimitsExcessRequests(t *testing.T) {
-	cfg := testConfig(t, map[string]string{
-		"RATE_LIMIT_BURST": "1",
-		"RATE_LIMIT_PER":   "1m",
-	})
-	dist := testDist()
-	prerendered := fstest.MapFS{
-		"de/index.html": &fstest.MapFile{Data: []byte(`<html><head><script id="theme-boot">(function(){})();</script></head></html>`)},
-		"de/404.html":   &fstest.MapFile{Data: []byte("<html></html>")},
-	}
-	app, err := New(cfg, discardLogger(), dist, prerendered)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
-	for i, wantStatus := range []int{http.StatusOK, http.StatusTooManyRequests} {
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
-		req.RemoteAddr = "203.0.113.1:1234"
-		rec := httptest.NewRecorder()
-		app.Handler().ServeHTTP(rec, req)
-		if rec.Code != wantStatus {
-			t.Errorf("request %d status = %d, want %d", i, rec.Code, wantStatus)
+	csp := get(t, testApp(t).Handler(), "/api/v1/instagram", "", nil).Header().Get("Content-Security-Policy")
+	var worker []string
+	for _, directive := range strings.Split(csp, ";") {
+		if fields := strings.Fields(directive); len(fields) > 0 && fields[0] == "worker-src" {
+			worker = append(worker, strings.Join(fields[1:], " "))
 		}
 	}
-}
-
-func TestAppUnknownRouteServesNotFound(t *testing.T) {
-	app := testApp(t)
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/does-not-exist/", nil)
-	rec := httptest.NewRecorder()
-	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusNotFound {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	if len(worker) != 1 || worker[0] != "'self'" {
+		t.Errorf("worker-src directives = %q in %q, want one with 'self' only", worker, csp)
 	}
 }
 
-func TestAppServesRobotsTxt(t *testing.T) {
+// TestAppServesNoPage proves the API serves no page and no file of the
+// build: every path outside its routes is the JSON 404.
+func TestAppServesNoPage(t *testing.T) {
 	app := testApp(t)
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/robots.txt", nil)
-	rec := httptest.NewRecorder()
-	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "Allow: /") || !strings.Contains(body, "Sitemap: https://ostendorf.tech/sitemap.xml") {
-		t.Errorf("body = %q, missing Allow or Sitemap line", body)
-	}
-}
-
-func TestAppSitemapListsEveryRouteOfEveryLocaleWithAlternates(t *testing.T) {
-	app := testApp(t)
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/sitemap.xml", nil)
-	rec := httptest.NewRecorder()
-	app.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-	body := rec.Body.String()
-	for _, want := range []string{
-		"<loc>https://ostendorf.tech/de/</loc>",
-		"<loc>https://ostendorf.tech/en/</loc>",
-		"<loc>https://ostendorf.tech/de/imprint</loc>",
-		"<loc>https://ostendorf.tech/en/privacy</loc>",
-		"<loc>https://ostendorf.tech/de/terms</loc>",
-		`hreflang="en" href="https://ostendorf.tech/en/"`,
-		`hreflang="x-default" href="https://ostendorf.tech/de/"`,
+	for _, path := range []string{
+		"/", "/de/", "/de/imprint", "/impressum", "/sitemap.xml", "/robots.txt",
+		"/favicon.svg", "/assets/index.js", "/api/v1/nope",
 	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("sitemap lacks %q", want)
+		rec := get(t, app.Handler(), path, "", nil)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("GET %s status = %d, want %d", path, rec.Code, http.StatusNotFound)
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+			t.Errorf("GET %s Content-Type = %q, want JSON", path, ct)
 		}
 	}
 }
 
-// TestAppClientIPWiringHonoursTrustedProxy proves TRUSTED_PROXIES
-// actually changes what the rate limiter keys on, not only that config.Load
-// parses it (internal/config's own tests already cover that): a request
-// relayed through a trusted proxy is attributed to the address it names in
-// X-Forwarded-For, not the proxy's own TCP peer, so two distinct visitors
-// behind the same proxy get two distinct buckets.
+// TestAppRateLimitAnswersJSON proves the general rate limit sits in front
+// of the API routes and answers govue's JSON envelope with Retry-After.
+func TestAppRateLimitAnswersJSON(t *testing.T) {
+	app := testAppWith(t, map[string]string{"RATE_LIMIT_BURST": "1", "RATE_LIMIT_PER": "1m"})
+	const addr = "203.0.113.1:1234"
+	if rec := get(t, app.Handler(), "/api/v1/instagram", addr, nil); rec.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	rec := get(t, app.Handler(), "/api/v1/instagram", addr, nil)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request status = %d, want %d", rec.Code, http.StatusTooManyRequests)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Errorf("Content-Type = %q, want JSON", ct)
+	}
+	if rec.Header().Get("Retry-After") == "" {
+		t.Error("no Retry-After")
+	}
+}
+
+// TestAppClientIPWiringHonoursTrustedProxy proves TRUSTED_PROXIES changes
+// what the rate limiter keys on: a request relayed through a trusted proxy
+// is attributed to the address it names in X-Forwarded-For, and an
+// untrusted peer's header is ignored.
 func TestAppClientIPWiringHonoursTrustedProxy(t *testing.T) {
-	cfg := testConfig(t, map[string]string{
+	app := testAppWith(t, map[string]string{
 		"TRUSTED_PROXIES":  "203.0.113.0/24",
 		"RATE_LIMIT_BURST": "1",
 		"RATE_LIMIT_PER":   "1m",
 	})
-	dist, prerendered := testFS()
-	app, err := New(cfg, discardLogger(), dist, prerendered)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
+	via := func(remoteAddr, forwardedFor string) int {
+		return get(t, app.Handler(), "/api/v1/instagram", remoteAddr,
+			http.Header{"X-Forwarded-For": {forwardedFor}}).Code
 	}
-
-	get := func(remoteAddr, forwardedFor string) *httptest.ResponseRecorder {
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
-		req.RemoteAddr = remoteAddr
-		if forwardedFor != "" {
-			req.Header.Set("X-Forwarded-For", forwardedFor)
-		}
-		rec := httptest.NewRecorder()
-		app.Handler().ServeHTTP(rec, req)
-		return rec
-	}
-
 	const trustedProxy = "203.0.113.1:1234"
-	if rec := get(trustedProxy, "198.51.100.1"); rec.Code != http.StatusOK {
-		t.Fatalf("first forwarded client status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
-	}
-	if rec := get(trustedProxy, "198.51.100.2"); rec.Code != http.StatusOK {
-		t.Fatalf("second, distinct forwarded client status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
-	}
-	if rec := get(trustedProxy, "198.51.100.1"); rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("repeat of the first forwarded client status = %d, want %d (its own burst spent), body = %s",
-			rec.Code, http.StatusTooManyRequests, rec.Body)
-	}
-
-	// An untrusted peer's X-Forwarded-For must never be honoured: both
-	// requests collapse into the one bucket the TCP peer itself gets.
-	const untrustedPeer = "192.0.2.1:1234"
-	if rec := get(untrustedPeer, "198.51.100.3"); rec.Code != http.StatusOK {
-		t.Fatalf("first request from the untrusted peer status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
-	}
-	if rec := get(untrustedPeer, "198.51.100.4"); rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("second request from the same untrusted peer with a different spoofed X-Forwarded-For status = %d, want %d "+
-			"(the spoofed header must be ignored), body = %s", rec.Code, http.StatusTooManyRequests, rec.Body)
-	}
-}
-
-// TestAppPageRateLimitAnswersHTMLInTheVisitorsLocale proves
-// pageRateLimitRespond is wired into the page route's rate limiter: a 429 on
-// a page GET has to read as the locale's own page, not govue's JSON error
-// envelope a browser navigating to a page never expects.
-func TestAppPageRateLimitAnswersHTMLInTheVisitorsLocale(t *testing.T) {
-	cfg := testConfig(t, map[string]string{
-		"RATE_LIMIT_BURST": "1",
-		"RATE_LIMIT_PER":   "1m",
-	})
-	dist, prerendered := testFS()
-	app, err := New(cfg, discardLogger(), dist, prerendered)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
-	get := func() *httptest.ResponseRecorder {
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
-		req.RemoteAddr = "203.0.113.42:1234"
-		rec := httptest.NewRecorder()
-		app.Handler().ServeHTTP(rec, req)
-		return rec
-	}
-
-	if first := get(); first.Code != http.StatusOK {
-		t.Fatalf("first request status = %d, want %d, body = %s", first.Code, http.StatusOK, first.Body)
-	}
-	second := get()
-	if second.Code != http.StatusTooManyRequests {
-		t.Fatalf("second request status = %d, want %d, body = %s", second.Code, http.StatusTooManyRequests, second.Body)
-	}
-	if ct := second.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
-		t.Errorf("Content-Type = %q, want text/html, not govue's JSON error envelope", ct)
-	}
-	if !strings.Contains(second.Body.String(), pageMessagesDE.tooMany) {
-		t.Errorf("body = %q, want it to contain the localized tooMany message %q", second.Body.String(), pageMessagesDE.tooMany)
-	}
-}
-
-// TestAppAssetRateLimitStaysJSON proves pageRateLimitRespond's fallback: a
-// path that resolves to no locale, an asset in this case, keeps govue's
-// default JSON error shape rather than the page branch's HTML.
-func TestAppAssetRateLimitStaysJSON(t *testing.T) {
-	cfg := testConfig(t, map[string]string{
-		"RATE_LIMIT_BURST": "1",
-		"RATE_LIMIT_PER":   "1m",
-	})
-	dist := testDist()
-	prerendered := fstest.MapFS{
-		"de/index.html": &fstest.MapFile{Data: []byte(`<html><head><script id="theme-boot">(function(){})();</script></head></html>`)},
-		"de/404.html":   &fstest.MapFile{Data: []byte("<html></html>")},
-	}
-	app, err := New(cfg, discardLogger(), dist, prerendered)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
-	get := func() *httptest.ResponseRecorder {
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/assets/app.js", nil)
-		req.RemoteAddr = "203.0.113.43:1234"
-		rec := httptest.NewRecorder()
-		app.Handler().ServeHTTP(rec, req)
-		return rec
-	}
-
-	if first := get(); first.Code != http.StatusOK {
-		t.Fatalf("first request status = %d, want %d, body = %s", first.Code, http.StatusOK, first.Body)
-	}
-	second := get()
-	if second.Code != http.StatusTooManyRequests {
-		t.Fatalf("second request status = %d, want %d, body = %s", second.Code, http.StatusTooManyRequests, second.Body)
-	}
-	if ct := second.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
-		t.Errorf("Content-Type = %q, want govue's JSON shape, not HTML, for a non-page path", ct)
+	for i, tc := range []struct {
+		peer, forwarded string
+		want            int
+	}{
+		{trustedProxy, "198.51.100.1", http.StatusOK},
+		{trustedProxy, "198.51.100.2", http.StatusOK},
+		{trustedProxy, "198.51.100.1", http.StatusTooManyRequests},
+		{"192.0.2.1:1234", "198.51.100.3", http.StatusOK},
+		{"192.0.2.1:1234", "198.51.100.4", http.StatusTooManyRequests},
+	} {
+		if got := via(tc.peer, tc.forwarded); got != tc.want {
+			t.Errorf("request %d status = %d, want %d", i, got, tc.want)
+		}
 	}
 }

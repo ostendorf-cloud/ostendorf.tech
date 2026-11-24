@@ -13,10 +13,11 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Only the website's own pods may reach the feed service's API. No
-    # namespaceSelector: per the NetworkPolicy spec, omitting it means "pods in
-    # this NetworkPolicy's own namespace", correct here since the website and
-    # the feed service share one namespace.
+    # Only the API's own pods may reach the feed service's API, never the
+    # frontend's: the frontend has no use for the feed. No namespaceSelector:
+    # per the NetworkPolicy spec, omitting it means "pods in this
+    # NetworkPolicy's own namespace", correct here since the API and the feed
+    # service share one namespace.
     #
     # No rule admits kubelet probe traffic, and none is needed: per the
     # Kubernetes documentation
@@ -31,7 +32,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              {{- include "ostendorf-tech.selectorLabels" . | nindent 14 }}
+              {{- include "ostendorf-tech.api.selectorLabels" . | nindent 14 }}
       ports:
         - protocol: TCP
           port: {{ .Values.feed.service.port }}

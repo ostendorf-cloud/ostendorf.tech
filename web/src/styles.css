@@ -9,21 +9,6 @@
 @source '../node_modules/@ostendorf-cloud/govue/src';
 
 /*
- * The theme toggle drives its own circular reveal through the View
- * Transitions API (ThemeToggle.vue), clipping ::view-transition-new(root)
- * by hand with the Web Animations API. The browser's own default
- * cross-fade on the root pseudo-elements would otherwise run at the same
- * time and compete with that clip-path animation, so both are switched
- * off here; every other same-document view transition this app might
- * grow stays unaffected because neither selector matches a named group.
- */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-
-/*
  * The home page's hero breaks out of the page measure to span the window,
  * which it does in viewport units. Those count the classic scrollbar a
  * desktop browser may reserve, so the hero can end up a scrollbar wider
@@ -143,26 +128,6 @@
 }
 
 /*
- * The header as on the old site: translucent with a blur. This overrides
- * the bg-surface that GovueHeader sets on its root, because govue has no
- * header background token to set instead: a token for the header's ground
- * is the missing govue feature, and this one rule goes when it exists.
- * --header-bg is the theme's token for it. A browser without backdrop-filter
- * keeps govue's opaque ground, since a see-through bar over text is
- * unreadable. The old site also made the bar transparent over the hero
- * until the page scrolled; this one is a sticky row the hero starts below,
- * whose measured height (--header-height) drives the anchors and the hero's
- * own height, so it stays a bar.
- */
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .app-header {
-    background-color: var(--header-bg);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
-    backdrop-filter: blur(14px) saturate(1.2);
-  }
-}
-
-/*
  * The page ground follows the section in view, as on the old site: the
  * sections marked data-section-tone="alt" (Impressionen, Über mich) lie on
  * the raised ground, the others on the page's own. src/lib/sectionBackground.ts
@@ -191,16 +156,49 @@ body {
  * --header-height on the root element (src/lib/headerHeight.ts), and every
  * anchored heading lands below it through this one rule instead of a
  * per-section guess. The values here are only what applies before the
- * script has run, a prerendered page for instance.
+ * script has run, a prerendered page for instance, and they equal what the
+ * script measures, so the hero's top padding does not move when it runs.
+ * They are read from govue's GovueHeader classes, not measured in a browser:
+ *
+ * - from 480px: one row of h-header (--spacing-header, 56px) plus the 1px
+ *   border-b the header keeps in every state, 57px.
+ * - below 480px: py-2 (8px above and below), the brand row of 44px (the
+ *   min-h-11 brand, the cycle button and the language link), gap-y-1 (4px),
+ *   the navigation row of 44px (govue's min-h-11 menu button) and the 1px
+ *   border, 109px.
+ *
+ * AppHeader.test.ts reads govue's classes and these two values.
  */
 :root {
-  --header-height: var(--spacing-header);
+  --header-height: calc(var(--spacing-header) + 1px);
   scroll-padding-top: calc(var(--header-height) + 1rem);
 }
 
-@media (width < 30rem) {
+@media (width < 480px) {
   :root {
-    --header-height: 6.75rem;
+    --header-height: calc(0.5rem + 2.75rem + 0.25rem + 2.75rem + 0.5rem + 1px);
+  }
+}
+
+/*
+ * govue's overlay header paints the dark mode roles while it is transparent,
+ * which needs a dark hero. In light mode this site's hero is a pale ground
+ * (the light scrim and navy text, see "in light mode" in
+ * src/theme/contrast.test.ts), so the transparent header takes the light
+ * roles there, and the focus ring the navy text colour: the light focus
+ * violet is below 3:1 over the hero's darker areas. Only the header's own
+ * hooks, data-overlay and data-state, are used; the hero is unchanged.
+ * src/theme/contrast.test.ts measures both modes.
+ */
+:root[data-mode='light'] header[data-overlay='true'][data-state='transparent'] {
+  color-scheme: light;
+  --color-focus: var(--color-text);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-mode]) header[data-overlay='true'][data-state='transparent'] {
+    color-scheme: light;
+    --color-focus: var(--color-text);
   }
 }
 

@@ -12,6 +12,7 @@ import (
 	"go.yaml.in/yaml/v4"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/config"
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/frontendconfig"
 )
 
 const composePath = "../../docker-compose.yaml"
@@ -78,9 +79,9 @@ func loadCompose(t *testing.T) composeFile {
 func TestComposePublishedPortFollowsListenAddr(t *testing.T) {
 	t.Parallel()
 
-	website, ok := loadCompose(t).Services["website"]
+	website, ok := loadCompose(t).Services["frontend"]
 	if !ok {
-		t.Fatal("docker-compose.yaml has no website service")
+		t.Fatal("docker-compose.yaml has no frontend service")
 	}
 	listen, ok := website.Environment["LISTEN_ADDR"]
 	if !ok {
@@ -95,7 +96,7 @@ func TestComposePublishedPortFollowsListenAddr(t *testing.T) {
 		env      map[string]string
 		wantPort string
 	}{
-		{name: "default", env: map[string]string{}, wantPort: strings.TrimPrefix(config.DefaultListenAddr, ":")},
+		{name: "default", env: map[string]string{}, wantPort: strings.TrimPrefix(frontendconfig.DefaultListenAddr, ":")},
 		{name: "changed", env: map[string]string{"LISTEN_PORT": "8123"}, wantPort: "8123"},
 	}
 	for _, tc := range cases {
@@ -118,18 +119,67 @@ func TestComposePublishedPortFollowsListenAddr(t *testing.T) {
 				t.Fatalf("published port = %q, want %q (loopback, host port equal to the container port)", published, want)
 			}
 
-			cfg, err := config.Load(func(key string) string {
-				if key == "LISTEN_ADDR" {
-					return addr
+			cfg, err := frontendconfig.Load(func(key string) string {
+				v, err := expand(website.Environment[key], tc.env)
+				if err != nil {
+					t.Fatal(err)
 				}
-				return ""
+				return v
 			})
 			if err != nil {
-				t.Fatalf("config.Load with compose's environment: %v", err)
+				t.Fatalf("frontendconfig.Load with compose's environment: %v", err)
 			}
 			if cfg.ListenAddr != addr {
-				t.Fatalf("config.ListenAddr = %q, want %q", cfg.ListenAddr, addr)
+				t.Fatalf("frontendconfig.ListenAddr = %q, want %q", cfg.ListenAddr, addr)
 			}
 		})
+	}
+}
+
+// TestComposeOneOriginThroughTheDevProxy proves the stack has one browser
+// origin: only the frontend publishes a port, its development proxy points
+// at the api service on the port the API listens on, the API trusts the
+// frontend's origin, and the switch is accepted by the frontend config.
+func TestComposeOneOriginThroughTheDevProxy(t *testing.T) {
+	t.Parallel()
+
+	services := loadCompose(t).Services
+	front, api := services["frontend"], services["api"]
+	if len(api.Ports) != 0 {
+		t.Errorf("api publishes %v, want no host port: the browser reaches it through the frontend", api.Ports)
+	}
+	if len(front.Profiles) != 0 || len(api.Profiles) != 0 {
+		t.Error("frontend and api must start with a plain compose up, without a profile")
+	}
+	proxy := front.Environment[frontendconfig.EnvDevAPIProxy]
+	if want := "http://api" + api.Environment["LISTEN_ADDR"]; proxy != want {
+		t.Errorf("%s = %q, want %q, the api service's LISTEN_ADDR", frontendconfig.EnvDevAPIProxy, proxy, want)
+	}
+	if api.Build.Target != "api" || front.Build.Target != "frontend" {
+		t.Errorf("targets = %q/%q, want api/frontend", api.Build.Target, front.Build.Target)
+	}
+	for _, env := range []map[string]string{{}, {"LISTEN_PORT": "8123"}} {
+		frontSite, err := expand(front.Environment["SITE_URL"], env)
+		if err != nil {
+			t.Fatal(err)
+		}
+		apiSite, err := expand(api.Environment["SITE_URL"], env)
+		if err != nil {
+			t.Fatal(err)
+		}
+		port, _ := expand(front.Ports[0], env)
+		if apiSite != frontSite || !strings.HasSuffix(port, ":"+strings.TrimPrefix(frontSite, "http://localhost:")) {
+			t.Errorf("SITE_URL frontend %q, api %q, port %q: the API must trust the one origin", frontSite, apiSite, port)
+		}
+	}
+	cfg, err := config.Load(func(key string) string {
+		v, _ := expand(api.Environment[key], map[string]string{})
+		return v
+	})
+	if err != nil {
+		t.Fatalf("config.Load with compose's api environment: %v", err)
+	}
+	if cfg.ListenAddr != api.Environment["LISTEN_ADDR"] {
+		t.Errorf("api ListenAddr = %q", cfg.ListenAddr)
 	}
 }

@@ -3,7 +3,6 @@ package webapp
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/ostendorf-cloud/govue/contact"
@@ -39,16 +38,32 @@ func contactSubject(r contact.Request) string {
 	return "Kontaktanfrage von " + truncateRunes(r.Name, subjectNameRunes)
 }
 
-// contactBody is the plain text body of every contact mail. It is always
-// German: the mail is for Simon, whatever language the visitor saw. The
-// visitor's address is also in Reply-To, set by govue.
+// contactBody is the plain text body of every contact mail: a German intro
+// line, govue's body with the name, the address and the message, and one
+// line on the consent box. Every mail goes to the German owner, so the labels
+// are govue's German ones (E-Mail, Nachricht) whatever language the page
+// was in: Labels.Body, the documented way for a site's own Body, not
+// DefaultBody, which follows Request.Language. The visitor's address is also
+// in Reply-To, set by govue.
 func contactBody(r contact.Request) string {
-	var b strings.Builder
-	b.WriteString("Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n")
-	b.WriteString("Name: " + r.Name + "\n")
-	b.WriteString("E-Mail: " + r.Email + "\n\n")
-	b.WriteString("Nachricht:\n" + r.Message + "\n")
-	return b.String()
+	return "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n" +
+		contactLabels.Body(r) + "\n" + consentLine(r) + "\n"
+}
+
+// contactLabels are govue's built in German labels of the mail body.
+var contactLabels = contact.LabelsFor("de")
+
+// consentLine states the consent box as the browser sent it and the time the
+// server received the request. It records a claim of the client, not a
+// proof: a modified client can send a ticked box it never showed.
+func consentLine(r contact.Request) string {
+	state := "nicht angehakt"
+	if r.Consent {
+		state = "angehakt"
+	}
+	return "Einwilligung: Kontrollkästchen laut Browser " + state +
+		", Eingang beim Server " + r.Received.UTC().Format(time.RFC3339) +
+		" (Angabe des Browsers, kein Nachweis)"
 }
 
 func truncateRunes(s string, n int) string {
@@ -116,8 +131,11 @@ func (a *App) buildContact(cfg config.Config, sender mail.Sender, now func() tim
 		Logger:           a.logger,
 		Subject:          contactSubject,
 		Body:             contactBody,
-		SendTimeout:      contactSendTimeout,
-		Now:              now,
+		// The form shows the consent box (requireConsent in HomeView.vue),
+		// so a submission without a ticked box is a field error.
+		RequireConsent: true,
+		SendTimeout:    contactSendTimeout,
+		Now:            now,
 	})
 	if err != nil {
 		return fmt.Errorf("contact handlers: %w", err)

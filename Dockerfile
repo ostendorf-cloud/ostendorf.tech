@@ -1,29 +1,26 @@
 # syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 
-# This file builds two separate images, cmd/website and cmd/feed, as two
-# named final stages ("website" and "feed") rather than two Dockerfiles.
-# The two binaries share go.mod/go.sum and most of internal/, so one file
-# keeps the pinned base image digests below, Node included, in exactly one
-# place instead of two copies that could drift out of sync with each
-# other. "docker build --target website" or "--target feed" (see
-# .github/workflows/checks.yaml and publish.yaml) builds only the stages
-# that final stage actually depends on: BuildKit never evaluates a stage
-# that is not an ancestor of the requested target, so "--target feed"
-# never runs the frontend stage below at all. That matters here more than
-# it would for two ordinary Go binaries: cmd/feed embeds nothing and needs
-# no frontend, so building it against a target that pulled in the Vue
-# stage would silently cost minutes of pnpm/vite work and the resulting
-# image size for a dependency the binary never uses. Building with no
-# "--target" at all, as "docker compose build" and a bare "docker build ."
-# both do, resolves to this file's last stage, "website", matching the
-# only image this repository published before cmd/feed existed.
+# This file builds the site's three images as named final stages,
+# "frontend" (cmd/frontend), "api" (cmd/api) and "feed" (cmd/feed), plus the
+# development only "fakefeed", rather than four Dockerfiles. The binaries
+# share go.mod/go.sum and internal/, so one file keeps the pinned base image
+# digests below, Node included, in exactly one place. "docker build --target
+# <name>" (see .github/workflows/checks.yaml and publish.yaml) builds only the
+# stages that final stage depends on: BuildKit never evaluates a stage that
+# is not an ancestor of the requested target, so "--target api" and
+# "--target feed" never run the Node stage below. Only the frontend embeds
+# the build. All three images are released under one tag and deployed
+# together. A build with no "--target" resolves to the last stage,
+# "frontend".
 
-# Frontend stage: builds the Vue SPA bundle and the prerendered HTML
-# straight into cmd/website/dist and cmd/website/prerendered, the same
-# paths "task web:build" and "task prerender" write to locally; the Go
-# build stage below only ever copies those two directories out, never
-# runs Node itself. Only the "website" stage depends on this one; the
-# "feed" stage never triggers it, see this file's own top comment.
+# Node stage: builds the Vue SPA bundle and writes the prerendered pages into
+# it, cmd/frontend/dist, the same path "task web:build" and "task prerender"
+# write to locally. The Go build stage below only copies that directory out,
+# never runs Node itself. Only the "frontend" stage depends on this one.
+#
+# The pages, the sitemap and robots.txt carry the origin of SITE_URL in
+# web/src/lib/seo.ts, https://ostendorf.tech unless VITE_SITE_URL is set at
+# build time: the image is built for one production origin.
 #
 # Digest for node:26.13.1-bookworm-slim is the multi-platform image index
 # (linux/amd64, linux/arm64, linux/ppc64le), resolved against Docker Hub's
@@ -31,7 +28,7 @@
 # "docker buildx imagetools inspect node:26.13.1-bookworm-slim" if this
 # patch version ever moves. That command reports the index digest below,
 # the same one a plain "docker pull" resolves against on either platform.
-FROM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS frontend
+FROM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS web
 
 WORKDIR /src/web
 
@@ -43,7 +40,12 @@ WORKDIR /src/web
 # checked); corepack then installs the pinned pnpm version below, the
 # exact one mise.toml's "pnpm" tool resolves to, so the lockfile this
 # stage reads was written by the same pnpm a local "task setup" installs.
-RUN npm install -g corepack@0.36.0 && corepack enable && corepack prepare pnpm@12.21.0 --activate
+# Renovate updates PNPM_VERSION through the regex manager in renovate.json,
+# in the same pull request as the mise.toml pin (group "pnpm");
+# internal/envsync fails when the two differ.
+# renovate: datasource=npm depName=pnpm
+ARG PNPM_VERSION=12.21.0
+RUN npm install -g corepack@0.36.0 && corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -58,10 +60,8 @@ COPY internal/routes/routes.json /src/internal/routes/routes.json
 
 RUN pnpm run build && pnpm run prerender
 
-# Shared Go stage: downloads the module graph once, for both the
-# "build-website" and "build-feed" stages below, so the cache layer this
-# produces (and the base image digest it is pinned to) exists in one
-# place for both binaries instead of two.
+# Shared Go stage: downloads the module graph once, for every build stage
+# below, so the cache layer and the base image digest exist in one place.
 #
 # Digest for golang:1.27.4-bookworm is the multi-platform image index
 # (linux/amd64, linux/arm64, linux/386, linux/arm/v7, linux/ppc64le),
@@ -76,28 +76,30 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Build stage for cmd/website: compiles a fully static binary
-# (CGO_ENABLED=0), so the runtime stage below needs no libc and can be a
-# minimal, non-shell image.
-#
-# go:embed fails on an empty directory (see AGENTS.md's "A build needs the
-# frontend first"), so the frontend's output has to exist before this
-# COPY, same as it does before a local "go build".
-FROM go-deps AS build-website
+# Build stage for cmd/frontend: a fully static binary (CGO_ENABLED=0), so
+# the runtime stage needs no libc. go:embed fails on an empty directory (see
+# AGENTS.md's "A build needs the frontend first"), so the Node stage's
+# output has to exist before this COPY.
+FROM go-deps AS build-frontend
 
-COPY cmd/ cmd/
+COPY cmd/frontend/ cmd/frontend/
 COPY internal/ internal/
-COPY --from=frontend /src/cmd/website/dist cmd/website/dist
-COPY --from=frontend /src/cmd/website/prerendered cmd/website/prerendered
+COPY --from=web /src/cmd/frontend/dist cmd/frontend/dist
 
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/website ./cmd/website
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/frontend ./cmd/frontend
 
-# Build stage for cmd/feed: a fully static binary, same reasoning as
-# build-website above. cmd/feed embeds nothing (no go:embed directive
-# anywhere in internal/feed or internal/feedconfig) and needs no frontend
-# at all, so this stage copies only cmd/feed/ rather than the whole cmd/
-# tree, and never references the frontend stage above; a build with
-# "--target feed" therefore never runs it.
+# Build stage for cmd/api: a fully static binary. cmd/api embeds nothing,
+# so this stage copies only its own directory and never references the
+# Node stage.
+FROM go-deps AS build-api
+
+COPY cmd/api/ cmd/api/
+COPY internal/ internal/
+
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
+
+# Build stage for cmd/feed: a fully static binary that embeds nothing,
+# same as build-api.
 FROM go-deps AS build-feed
 
 COPY cmd/feed/ cmd/feed/
@@ -109,12 +111,9 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/feed ./cmd/feed
 # minimal root filesystem, ca-certificates and tzdata, nothing else, no
 # shell, no package manager. ca-certificates is what this image needs it
 # for: internal/openbao's client and internal/instagram's Meta client both
-# make outbound TLS connections (OpenBao's API and the Graph API),
-# verified against the OS trust store. tzdata is unused by this binary:
-# cmd/feed and the packages it imports have no need for time zones at
-# all, the same as cmd/website below. "scratch" was considered and rejected for the
-# ca-certificates gap alone. The ":nonroot" tag already runs as uid/gid
-# 65532, not root.
+# make outbound TLS connections, verified against the OS trust store.
+# "scratch" was considered and rejected for the ca-certificates gap alone.
+# The ":nonroot" tag already runs as uid/gid 65532, not root.
 #
 # Digest for gcr.io/distroless/static-debian12:nonroot is the multi-platform
 # image index (linux/amd64, linux/arm64, linux/arm/v7, linux/s390x,
@@ -125,38 +124,31 @@ FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c
 
 COPY --from=build-feed /out/feed /usr/local/bin/feed
 
-# Matches feedconfig.DefaultListenAddr (":8081", see internal/feedconfig
-# and charts/ostendorf.tech/README.md's "Health, readiness and metrics"
-# section). Unlike the website, there is no second, administrative
-# listener: internal/feed.App.buildHandler serves /healthz, /readyz and
-# the API routes on this one port, so there is only one EXPOSE line here.
+# Matches feedconfig.DefaultListenAddr (":8081"). The feed serves /healthz,
+# /readyz and its API routes on this one port.
 EXPOSE 8081
 
-# Numeric, not "nonroot:nonroot": the same uid/gid the base image's own
-# nonroot user already resolves to, but numeric form is what every
-# container runtime can resolve without reading /etc/passwd, redundant
-# here since the base image already defaults to it, kept explicit anyway.
+# Numeric, not "nonroot:nonroot": the uid/gid the base image's own nonroot
+# user resolves to, in the form every container runtime can resolve without
+# reading /etc/passwd.
 USER 65532:65532
 
 ENTRYPOINT ["/usr/local/bin/feed"]
 
 # Development only: the fake feed service for the local compose stack
-# (docker-compose.yaml, profile "feed"). Its two stages sit after "feed" and
-# before "website" so that "website" stays the last stage, and neither
-# "website" nor "feed" depends on them: BuildKit never evaluates them for
-# those two targets. No workflow builds or publishes this target;
-# internal/envsync checks both. It reuses the pinned bases above, so it adds
-# no new digest. cmd/fakefeed imports nothing from internal/, so only its own
-# directory is copied.
+# (docker-compose.yaml, profile "feed"). No published image depends on it,
+# and no workflow builds or publishes this target; internal/envsync checks
+# both. It reuses the pinned bases above. cmd/fakefeed imports nothing from
+# internal/, so only its own directory is copied.
 FROM go-deps AS build-fakefeed
 
 COPY cmd/fakefeed/ cmd/fakefeed/
 
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/fakefeed ./cmd/fakefeed
 
-# Same distroless base as the two runtime stages around it, so there is no
-# shell and no curl: a compose healthcheck has nothing to run, and this
-# stage declares none.
+# Same distroless base as the runtime stages around it, so there is no shell
+# and no curl: a compose healthcheck has nothing to run, and this stage
+# declares none.
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS fakefeed
 
 COPY --from=build-fakefeed /out/fakefeed /usr/local/bin/fakefeed
@@ -168,33 +160,34 @@ USER 65532:65532
 
 ENTRYPOINT ["/usr/local/bin/fakefeed"]
 
-# Runtime stage for cmd/website: same distroless base and the same
-# ca-certificates/no-shell reasoning as cmd/feed's own runtime stage
-# above. ca-certificates is what this image needs it for here: the
-# contact form's SMTP sender (govue's mail package) verifies the mail
-# server's certificate against the OS trust store at connect time. tzdata
-# is unused here too: no code in this binary loads a time zone, and govue
-# writes a contact mail's Date header in UTC. The base image bundles
-# tzdata anyway; this file installs nothing for it, so there is nothing
-# to remove.
-#
-# This is also why a bare "docker build ." or "docker compose build", with
-# no "--target", builds this stage: it is deliberately the last one in the
-# file, matching the only image this repository published before cmd/feed
-# existed, see this file's own top comment.
-FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS website
+# Runtime stage for cmd/api: same distroless base. ca-certificates is what
+# the contact form's SMTP sender needs, to verify the mail server's
+# certificate. No code in this binary loads a time zone.
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS api
 
-COPY --from=build-website /out/website /usr/local/bin/website
+COPY --from=build-api /out/api /usr/local/bin/api
 
-# Matches LISTEN_ADDR's and ADMIN_ADDR's defaults (":8080" and ":8081", see
-# README.md's Configuration table): the public listener and govue's own admin
-# listener (health, readiness, metrics). Override the two env vars and these two
-# EXPOSE lines together if either default port does not fit a deployment.
+# Matches LISTEN_ADDR's and ADMIN_ADDR's defaults (":8080" and ":8081"):
+# the public listener and govue's admin listener (health, readiness,
+# metrics).
 EXPOSE 8080
 EXPOSE 8081
 
-# Numeric, not "nonroot:nonroot"; see cmd/feed's own runtime stage comment
-# above for why.
 USER 65532:65532
 
-ENTRYPOINT ["/usr/local/bin/website"]
+ENTRYPOINT ["/usr/local/bin/api"]
+
+# Runtime stage for cmd/frontend: same distroless base. ca-certificates is
+# what page view counting needs when Umami is reached over https. The last
+# stage, so a build with no "--target" builds it.
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS frontend
+
+COPY --from=build-frontend /out/frontend /usr/local/bin/frontend
+
+# Matches LISTEN_ADDR's and ADMIN_ADDR's defaults (":8080" and ":8081").
+EXPOSE 8080
+EXPOSE 8081
+
+USER 65532:65532
+
+ENTRYPOINT ["/usr/local/bin/frontend"]

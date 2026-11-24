@@ -4,7 +4,7 @@ kind: Ingress
 metadata:
   name: {{ include "ostendorf-tech.fullname" . }}
   labels:
-    {{- include "ostendorf-tech.labels" . | nindent 4 }}
+    {{- include "ostendorf-tech.release.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -22,14 +22,23 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
-          {{- range .paths }}
-          - path: {{ .path }}
-            pathType: {{ .pathType }}
+          # The routing is fixed, not values-driven: /api is the API's, every
+          # other path is the frontend's. An Ingress controller picks the
+          # longest matching prefix, so /api wins over / whatever the order.
+          # Only the http ports are ever routed, never an admin port.
+          - path: /api
+            pathType: Prefix
             backend:
               service:
-                name: {{ include "ostendorf-tech.fullname" $ }}
+                name: {{ include "ostendorf-tech.api.fullname" $ }}
                 port:
                   number: {{ $.Values.service.port }}
-          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ostendorf-tech.frontend.fullname" $ }}
+                port:
+                  number: {{ $.Values.frontend.service.port }}
     {{- end }}
 {{- end -}}

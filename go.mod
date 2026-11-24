@@ -3,7 +3,7 @@ module github.com/ostendorf-cloud/ostendorf.tech
 go 1.27
 
 require (
-	github.com/ostendorf-cloud/govue v0.6.0
+	github.com/ostendorf-cloud/govue v0.10.0
 	go.yaml.in/yaml/v4 v4.0.0
 )
 

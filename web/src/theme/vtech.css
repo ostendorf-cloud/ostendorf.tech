@@ -15,7 +15,7 @@
  *
  * Dark mode is the primary, and it is also the default: every visitor
  * starts here, whatever their operating system is set to, and only their
- * own use of the toggle makes the page light; src/lib/theme.ts is where
+ * own use of the theme switch makes the page light; src/lib/theme.ts is where
  * that default is declared. The old muted and faint text were
  * translucent; they are stored here as the solid colour they come to over
  * the stage ground, because the contrast test measures solid colours.
@@ -240,11 +240,14 @@
    */
   --brand-gradient-from: var(--color-accent);
   --brand-gradient-to: var(--color-accent-text);
-  /* The header's translucent ground: the page background at 86%. The text on
-     it sits over whatever scrolls under the blur, white and black being the
-     two worst cases, and 0.86 is above the 0.85 floor where accent-text
-     still holds 4.5:1 over both; src/theme/contrast.test.ts measures it. */
-  --header-bg: color-mix(in srgb, var(--color-bg) 86%, transparent);
+  /* govue's header tokens. The ground is the page background at 86%, with
+     a blur, as on the old site. The text on it sits over whatever scrolls
+     under the blur, white and black being the two worst cases, and 0.86 is
+     above the 0.85 floor where accent-text still holds 4.5:1 over both;
+     src/theme/contrast.test.ts measures it. */
+  --color-header-bg: color-mix(in srgb, var(--color-bg) 86%, transparent);
+  --color-header-border: var(--color-border);
+  --header-backdrop: blur(14px) saturate(1.2);
 
   /* The glow of the gradient button, the old site's two shadows: the purple
      below the button and the cyan around it. Light mode takes the deeper teal

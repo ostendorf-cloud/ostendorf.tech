@@ -494,8 +494,10 @@ const germanHref = computed(
         E-Mail über unseren eigenen Mailserver an unser Postfach gesendet. Den Mailserver betreiben
         wir selbst. Die Übertragung vom Webserver zum Mailserver erfolgt verschlüsselt. Die E-Mail
         enthält Ihren Namen, Ihre E-Mail-Adresse und Ihre Nachricht, aber weder Ihre IP-Adresse noch
-        Angaben zu Ihrem Browser. Ob Sie das Kästchen zur Einwilligung angekreuzt haben, prüft Ihr
-        Browser vor dem Absenden; diese Angabe wird nicht an unseren Server übertragen.
+        Angaben zu Ihrem Browser. Ihr Browser übermittelt außerdem, ob Sie das Kästchen zur
+        Einwilligung angekreuzt haben. Unser Server nimmt das Formular nur mit angekreuztem Kästchen
+        an und ergänzt die E-Mail um eine Zeile: dass Ihr Browser das Kästchen als angekreuzt
+        gemeldet hat, und den Zeitpunkt, zu dem unser Server das Formular erhalten hat.
       </p>
       <p>
         Zum Schutz vor Spam löst Ihr Browser beim Ausfüllen des Formulars eine kleine Rechenaufgabe
@@ -1084,9 +1086,10 @@ const germanHref = computed(
         Your details are not stored by our web server in a database, but sent as an email via our
         own mail server to our mailbox. We operate the mail server ourselves. Transmission from the
         web server to the mail server is encrypted. The email contains your name, your email address
-        and your message, but neither your IP address nor any details about your browser. Whether
-        you ticked the consent box is checked by your browser before sending; this information is
-        not transmitted to our server.
+        and your message, but neither your IP address nor any details about your browser. Your
+        browser also sends whether you ticked the consent box. Our server only accepts the form with
+        the box ticked and adds one line to the email: that your browser reported the box as ticked,
+        and the time our server received the form.
       </p>
       <p>
         To protect against spam, your browser solves a small computational task (a so-called proof

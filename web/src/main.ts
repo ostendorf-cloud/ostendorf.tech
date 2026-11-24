@@ -1,10 +1,9 @@
 import { createSSRApp } from 'vue'
 import { createWebHistory } from 'vue-router'
-import { useTheme } from '@ostendorf-cloud/govue'
+import { createGovueI18n, useTheme } from '@ostendorf-cloud/govue'
 
 import App from './App.vue'
 import { createAppI18n, detectPreferredLocale, isLocale } from './i18n'
-import { createSiteGovueI18n } from './i18n/govue'
 import { DEFAULT_MODE, STORAGE_KEY, THEME_NAME } from './lib/theme'
 import { attachLocaleSync, createAppRouter } from './router'
 import './styles.css'
@@ -15,8 +14,8 @@ import './styles.css'
 // prerendered <head>'s own blocking boot script's job (see
 // web/scripts/prerender.ts), not this call's: that script runs before
 // first paint, this call only once the deferred bundle has loaded. This
-// call brings govue's reactive theme state, which the toggle and
-// cycleMode operate on, in line with what the boot script already wrote
+// call brings govue's reactive theme state, which the header's theme
+// switch operates on, in line with what the boot script already wrote
 // into the DOM, using the same storage key so both read the same choice.
 useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE, storageKey: STORAGE_KEY })
 
@@ -35,9 +34,9 @@ app.use(i18n)
 // govue's language layer shares the site's own vue-i18n instance: it adds
 // the govue catalogues (the footer's legal link labels, the legal page
 // shell) and tells those components the active language. The route's own
-// :locale still decides the locale, see attachLocaleSync. The site's own
-// German contact form texts ("Sie") are merged over govue's.
-app.use(createSiteGovueI18n({ i18n, locale: initialLocale }))
+// :locale still decides the locale, see attachLocaleSync. The site says
+// "Sie", so govue's formal German catalogue is loaded under de.
+app.use(createGovueI18n({ i18n, locale: initialLocale, formality: 'formal' }))
 
 // router.isReady() resolves after the initial navigation, including the
 // async route components above, which is what the hydration this app

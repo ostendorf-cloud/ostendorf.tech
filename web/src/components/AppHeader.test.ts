@@ -1,10 +1,11 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { render } from '@testing-library/vue'
+import { render, screen, within } from '@testing-library/vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { createAppI18n } from '../i18n'
+import { createGovueI18n } from '@ostendorf-cloud/govue'
 import { HEADER_HEIGHT_PROPERTY } from '../lib/headerHeight'
 import AppHeader from './AppHeader.vue'
 import WordMark from './WordMark.vue'
@@ -13,15 +14,168 @@ function source(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf-8')
 }
 
-async function renderHeader() {
+async function renderHeader(path = '/de') {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/:locale', name: 'home', component: { template: '<div />' } }],
+    routes: [
+      { path: '/:locale', name: 'home', component: { template: '<div />' } },
+      { path: '/:locale/imprint', name: 'imprint', component: { template: '<div />' } },
+    ],
   })
-  await router.push('/de')
+  await router.push(path)
   await router.isReady()
-  return render(AppHeader, { global: { plugins: [createAppI18n('de'), router] } })
+  const locale = path.startsWith('/en') ? 'en' : 'de'
+  const i18n = createAppI18n(locale)
+  const view = render(AppHeader, {
+    global: { plugins: [i18n, router, createGovueI18n({ i18n, locale, formality: 'formal' })] },
+  })
+  return { ...view, router }
 }
+
+describe('AppHeader on govue header', () => {
+  it('puts the navigation at the end, next to the actions', async () => {
+    await renderHeader()
+    const nav = screen.getByRole('navigation', { name: 'Hauptmenü' })
+    expect(nav.closest('[class*="justify-end"]')).not.toBeNull()
+  })
+
+  it('lies over the hero on the home page only, transparent before a scroll', async () => {
+    const home = await renderHeader('/de')
+    const header = home.container.querySelector('header')
+    expect(header?.dataset.overlay).toBe('true')
+    expect(header?.dataset.state).toBe('transparent')
+    home.unmount()
+
+    const imprint = await renderHeader('/de/imprint')
+    const solid = imprint.container.querySelector('header')
+    expect(solid?.dataset.overlay).toBeUndefined()
+    expect(solid?.dataset.state).toBe('solid')
+  })
+
+  it('makes the contact link the one call to action', async () => {
+    const { container } = await renderHeader()
+    const links = Array.from(
+      screen.getByRole('navigation', { name: 'Hauptmenü' }).querySelectorAll('li a'),
+    )
+    const contact = links.find((a) => a.getAttribute('href') === '/de#contact')
+    expect(contact).toBeDefined()
+    expect(contact?.className).toMatch(/bg-accent-strong/)
+    const ctas = links.filter((a) => /bg-accent-strong/.test(a.className))
+    expect(ctas).toHaveLength(1)
+    expect(container.innerHTML).not.toMatch(/ThemeToggle/)
+  })
+
+  it('offers each language as a link to the same page from 1024px, with hreflang', async () => {
+    const { container } = await renderHeader('/de/imprint')
+    const group = within(wide(container, 'group')).getByRole('group', { name: /Sprache/ })
+    const links = Array.from(group.querySelectorAll('a'))
+    expect(links.map((a) => [a.getAttribute('hreflang'), a.getAttribute('href')])).toEqual([
+      ['de', '/de/imprint'],
+      ['en', '/en/imprint'],
+    ])
+    expect(links[0].getAttribute('aria-current')).toBe('true')
+  })
+
+  it('hands a language click to the router instead of reloading', async () => {
+    const { container, router } = await renderHeader('/de/imprint')
+    const english = within(narrow(container, 'group')).getByRole('link', { name: 'English' })
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+    english.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    await router.isReady()
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.fullPath).toBe('/en/imprint')
+    })
+  })
+
+  it('shows the compact theme switch with three named modes from 1024px', async () => {
+    const { container } = await renderHeader()
+    const group = within(wide(container, 'radiogroup')).getByRole('radiogroup')
+    const options = Array.from(group.querySelectorAll('[role="radio"], button'))
+    expect(options).toHaveLength(3)
+    expect(group.querySelectorAll('svg').length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+/** The wrapper of one width: govue's narrow setup puts each part twice in
+ *  the markup and the stylesheet hides one. jsdom loads no Tailwind, so the
+ *  wrapper's classes are what decides which part a width shows. */
+type Part = 'group' | 'radiogroup' | 'button'
+
+const HOLDS: Record<Part, string> = {
+  group: '[role="group"]',
+  radiogroup: '[role="radiogroup"]',
+  button: 'button[data-mode]:not([role])',
+}
+
+function wrapper(container: Element, classes: string, part: Part): HTMLElement {
+  const found = Array.from(container.querySelectorAll<HTMLElement>('header span')).filter(
+    (span) => span.className.trim() === classes && span.querySelector(HOLDS[part]) !== null,
+  )
+  expect(found, `${classes} around ${part}`).toHaveLength(1)
+  return found[0]
+}
+
+const narrow = (container: Element, part: Part) => wrapper(container, 'contents lg:hidden', part)
+const wide = (container: Element, part: Part) => wrapper(container, 'hidden lg:contents', part)
+
+describe.each([
+  {
+    locale: 'de',
+    path: '/de/imprint',
+    other: ['en', 'English', '/en/imprint'],
+    current: ['de', 'Deutsch', '/de/imprint'],
+    cycle: /^Darstellung: (Dem System folgen|Heller Modus|Dunkler Modus)\. Als Nächstes: /,
+  },
+  {
+    locale: 'en',
+    path: '/en/imprint',
+    other: ['de', 'Deutsch', '/de/imprint'],
+    current: ['en', 'English', '/en/imprint'],
+    cycle: /^Theme: (Follow the system|Light mode|Dark mode)\. Next: /,
+  },
+])('AppHeader narrow setup, $locale', ({ path, other, current, cycle }) => {
+  it('below 1024px shows only the link to the other language', async () => {
+    const { container } = await renderHeader(path)
+    const links = Array.from(narrow(container, 'group').querySelectorAll('a'))
+    expect(
+      links.map((a) => [a.getAttribute('hreflang'), a.textContent?.trim(), a.getAttribute('href')]),
+    ).toEqual([other])
+    expect(links[0].getAttribute('lang')).toBe(other[0])
+    expect(links[0].getAttribute('aria-current')).toBeNull()
+  })
+
+  it('below 1024px shows the one cycle theme button and no radio group', async () => {
+    const { container } = await renderHeader(path)
+    const part = narrow(container, 'button')
+    expect(part.querySelector('[role="radiogroup"]')).toBeNull()
+    const buttons = Array.from(part.querySelectorAll('button'))
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0].getAttribute('type')).toBe('button')
+    expect(buttons[0].getAttribute('aria-label')).toMatch(cycle)
+  })
+
+  it('from 1024px shows both languages and the compact switch', async () => {
+    const { container } = await renderHeader(path)
+    const links = Array.from(wide(container, 'group').querySelectorAll('a'))
+    const pairs = links.map((a) => [
+      a.getAttribute('hreflang'),
+      a.textContent?.trim(),
+      a.getAttribute('href'),
+    ])
+    expect(pairs).toHaveLength(2)
+    expect(pairs).toContainEqual(other)
+    expect(pairs).toContainEqual(current)
+    expect(wide(container, 'radiogroup').querySelectorAll('[role="radio"]')).toHaveLength(3)
+  })
+
+  it('has exactly one theme control and one language control per width', async () => {
+    const { container } = await renderHeader(path)
+    expect(container.querySelectorAll('[role="radiogroup"]')).toHaveLength(1)
+    expect(container.querySelectorAll('button[data-mode]:not([role])')).toHaveLength(1)
+    expect(container.querySelectorAll('[role="group"]')).toHaveLength(2)
+  })
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -86,8 +240,67 @@ describe('anchor offset', () => {
     expect(stylesheet).toMatch(/scroll-padding-top:\s*calc\(var\(--header-height\)/)
   })
 
-  it('has a phone fallback for the moment before the script has measured', () => {
-    expect(stylesheet).toMatch(/width < 30rem[\s\S]*--header-height:\s*6\.75rem/)
+  // The prerender fallback has to equal what trackHeaderHeight measures, or
+  // the hero's top padding jumps when the script runs. jsdom has no layout,
+  // so the expected heights are derived from govue's header classes, read
+  // from the installed package, and compared with the stylesheet's values.
+  const govue = (name: string) =>
+    readFileSync(join(process.cwd(), `node_modules/@ostendorf-cloud/govue/src/${name}`), 'utf-8')
+  const REM = 16
+  const BORDER = 1 // border-b
+  const ROW_PADDING = 8 // py-2, above and below, below 480px only
+  const ROW_GAP = 4 // gap-y-1
+  const TARGET = 44 // min-h-11 and size-11
+
+  /** px of a fallback value: a rem or px length, or a calc() sum of them. */
+  function pixels(value: string, spacingHeader: number): number {
+    const inner = value.trim().replace(/^calc\((.*)\)$/, '$1')
+    return inner.split('+').reduce((sum, term) => {
+      const part = term.trim()
+      if (part === 'var(--spacing-header)') return sum + spacingHeader
+      const length = /^([\d.]+)(rem|px)$/.exec(part)
+      if (!length) throw new Error(`unexpected term ${part}`)
+      return sum + Number(length[1]) * (length[2] === 'rem' ? REM : 1)
+    }, 0)
+  }
+
+  function fallback(css: string, phone: boolean): string {
+    const block = phone
+      ? /@media \(width < 480px\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1]
+      : /^:root\s*\{([^}]*)\}/m.exec(css)?.[1]
+    const value = /--header-height:\s*([^;]+);/.exec(block ?? '')?.[1]
+    expect(value, phone ? 'below 480px' : 'from 480px').toBeDefined()
+    return value ?? ''
+  }
+
+  const spacingHeader = (): number => {
+    const value = /--spacing-header:\s*([\d.]+)rem;/.exec(govue('styles/base.css'))?.[1]
+    expect(value).toBeDefined()
+    return Number(value) * REM
+  }
+
+  it('reads govue header classes the fallback is derived from', () => {
+    const header = govue('components/GovueHeader.vue')
+    for (const cls of ['border-b', 'py-2', 'gap-y-1', 'min-[480px]:h-header', 'min-[480px]:py-0']) {
+      expect(header, cls).toContain(cls)
+    }
+    expect(header).toMatch(/order-1 flex min-h-11/)
+    expect(govue('components/GovueNav.vue')).toMatch(/inline-flex min-h-11[^"]*sm:hidden/)
+    expect(govue('components/GovueThemeSwitch.vue')).toMatch(/inline-flex size-11/)
+    expect(govue('components/GovueLanguageSwitch.vue')).toMatch(/inline-flex min-h-11/)
+    expect(spacingHeader()).toBe(56)
+  })
+
+  it('falls back to one row of 57px from 480px', () => {
+    const expected = spacingHeader() + BORDER
+    expect(expected).toBe(57)
+    expect(pixels(fallback(stylesheet, false), spacingHeader())).toBe(expected)
+  })
+
+  it('falls back to two rows of 109px below 480px', () => {
+    const expected = ROW_PADDING + TARGET + ROW_GAP + TARGET + ROW_PADDING + BORDER
+    expect(expected).toBe(109)
+    expect(pixels(fallback(stylesheet, true), spacingHeader())).toBe(expected)
   })
 
   it('leaves no per section scroll margin guess behind', () => {

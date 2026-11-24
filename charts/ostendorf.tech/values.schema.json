@@ -2,7 +2,45 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ostendorf-tech",
   "type": "object",
-  "required": ["image", "service", "existingSecret", "feed"],
+  "required": ["image", "service", "existingSecret", "feed", "frontend"],
+  "definitions": {
+    "labelMap": {
+      "type": "object",
+      "description": "A map of labels, rendered as a matchLabels block.",
+      "additionalProperties": { "type": "string" }
+    },
+    "selectorPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespaceSelector": { "$ref": "#/definitions/labelMap" },
+        "podSelector": { "$ref": "#/definitions/labelMap" }
+      }
+    },
+    "dns": {
+      "type": "object",
+      "description": "Destination scope for the DNS egress rule, in addition to its port restriction. Same shape and per key merge behaviour as feed.networkPolicy.dns; null both selectors for a port only rule.",
+      "properties": {
+        "namespaceSelector": { "type": "object" },
+        "podSelector": { "type": "object" }
+      }
+    },
+    "podNetworkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "ingressController": {
+          "$ref": "#/definitions/selectorPair",
+          "description": "Who may reach the http port. namespaceSelector is required when enabled; enforced by a template fail guard, not minProperties, matching this chart's existing pattern for a value with no usable default."
+        },
+        "metrics": {
+          "$ref": "#/definitions/selectorPair",
+          "description": "Optional: who may reach the admin port. Both empty renders no rule."
+        },
+        "dns": { "$ref": "#/definitions/dns" }
+      }
+    }
+  },
   "properties": {
     "replicaCount": { "type": "integer", "minimum": 0 },
     "image": {
@@ -77,7 +115,7 @@
     "goMemLimit": {
       "type": "string",
       "pattern": "^([0-9]+(B|KiB|MiB|GiB|TiB)?)?$",
-      "description": "GOMEMLIMIT of the website container, below resources.limits.memory. A whole number with an optional B, KiB, MiB, GiB or TiB suffix. Empty renders none."
+      "description": "GOMEMLIMIT of the API container, below resources.limits.memory. A whole number with an optional B, KiB, MiB, GiB or TiB suffix. Empty renders none."
     },
     "startupProbe": { "type": "object" },
     "livenessProbe": { "type": "object" },
@@ -85,6 +123,96 @@
     "nodeSelector": { "type": "object" },
     "tolerations": { "type": "array" },
     "affinity": { "type": "object" },
+    "networkPolicy": {
+      "description": "The API's NetworkPolicy.",
+      "allOf": [
+        { "$ref": "#/definitions/podNetworkPolicy" },
+        {
+          "properties": {
+            "smtp": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cidr": {
+                  "type": "string",
+                  "description": "CIDR of the SMTP server. Required when networkPolicy.enabled and config.smtpHost are set; enforced by a template fail guard."
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "frontend": {
+      "type": "object",
+      "required": ["image", "service"],
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 0 },
+        "image": {
+          "type": "object",
+          "required": ["repository"],
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "tag": { "type": "string" },
+            "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+          }
+        },
+        "serviceAccount": {
+          "type": "object",
+          "properties": {
+            "create": { "type": "boolean" },
+            "annotations": { "type": "object" },
+            "name": { "type": "string" }
+          }
+        },
+        "podAnnotations": { "type": "object" },
+        "podLabels": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "securityContext": { "type": "object" },
+        "service": {
+          "type": "object",
+          "required": ["type", "port", "adminPort"],
+          "properties": {
+            "type": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "adminPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        },
+        "networkPolicy": {
+          "description": "The frontend's NetworkPolicy.",
+          "allOf": [
+            { "$ref": "#/definitions/podNetworkPolicy" },
+            {
+              "properties": {
+                "umami": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "Egress to Umami. A cidr, a namespaceSelector or a podSelector is required when enabled and config.umamiUrl is set; enforced by a template fail guard.",
+                  "properties": {
+                    "cidr": { "type": "string" },
+                    "namespaceSelector": { "$ref": "#/definitions/labelMap" },
+                    "podSelector": { "$ref": "#/definitions/labelMap" },
+                    "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "resources": { "type": "object" },
+        "goMemLimit": {
+          "type": "string",
+          "pattern": "^([0-9]+(B|KiB|MiB|GiB|TiB)?)?$",
+          "description": "GOMEMLIMIT of the frontend container, below frontend.resources.limits.memory. A whole number with an optional B, KiB, MiB, GiB or TiB suffix. Empty renders none."
+        },
+        "startupProbe": { "type": "object" },
+        "livenessProbe": { "type": "object" },
+        "readinessProbe": { "type": "object" },
+        "nodeSelector": { "type": "object" },
+        "tolerations": { "type": "array" },
+        "affinity": { "type": "object" }
+      }
+    },
     "config": {
       "type": "object",
       "properties": {
@@ -120,6 +248,15 @@
           "type": "string",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})?$",
           "description": "UUID of the website in Umami (UMAMI_WEBSITE_ID)."
+        },
+        "umamiTimeout": {
+          "type": "string",
+          "description": "Optional UMAMI_TIMEOUT of the frontend, a Go duration. Empty leaves govue's default."
+        },
+        "umamiQueueSize": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Optional UMAMI_QUEUE_SIZE of the frontend. 0 leaves govue's default."
         }
       }
     },

@@ -1,0 +1,141 @@
+# The frontend: the static pages, served with govue's frontend package. It holds
+# no secret, so this Deployment never references a Secret, neither as a
+# secretKeyRef nor as a volume. The contact form and the feed live in the API
+# (templates/deployment.yaml). All three images share one version tag and are
+# deployed together.
+#
+# This chart never sets FRONTEND_DEV_API_PROXY: that variable points the
+# frontend at a development API and must never exist in a cluster.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ostendorf-tech.frontend.fullname" . }}
+  labels:
+    {{- include "ostendorf-tech.frontend.labels" . | nindent 4 }}
+spec:
+  {{- include "ostendorf-tech.checkGoMemLimit" (list "frontend.goMemLimit" .Values.frontend.goMemLimit "frontend.resources.limits.memory" (dig "limits" "memory" "" (.Values.frontend.resources | default dict))) }}
+  # No replica guard, unlike the API: the frontend keeps no per process state
+  # that a second pod could double, it serves the same static pages from
+  # every pod. 0 pauses the workload the same way it does for the others.
+  replicas: {{ .Values.frontend.replicaCount }}
+  # RollingUpdate, unlike the API's Recreate: two frontend pods briefly
+  # coexisting during a rollout is harmless, and it keeps the site up.
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "ostendorf-tech.frontend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ostendorf-tech.frontend.labels" . | nindent 8 }}
+        {{- with .Values.frontend.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.frontend.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ostendorf-tech.frontend.serviceAccountName" . }}
+      # The frontend makes no Kubernetes API calls of its own; see
+      # templates/serviceaccount-frontend.yaml.
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.frontend.podSecurityContext | nindent 8 }}
+      containers:
+        - name: frontend
+          securityContext:
+            {{- toYaml .Values.frontend.securityContext | nindent 12 }}
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.service.port }}
+              protocol: TCP
+            - name: admin
+              containerPort: {{ .Values.frontend.service.adminPort }}
+              protocol: TCP
+          env:
+            {{- with .Values.frontend.goMemLimit }}
+            - name: GOMEMLIMIT
+              value: {{ . | quote }}
+            {{- end }}
+            # Read from the shared top level config block, the same values the
+            # API reads, so the two never disagree about the site's address.
+            - name: LISTEN_ADDR
+              value: {{ .Values.config.listenAddr | quote }}
+            - name: ADMIN_ADDR
+              value: {{ .Values.config.adminListenAddr | quote }}
+            - name: SITE_URL
+              value: {{ .Values.config.siteUrl | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            {{- if .Values.config.trustedProxies }}
+            - name: TRUSTED_PROXIES
+              value: {{ .Values.config.trustedProxies | quote }}
+            {{- end }}
+            - name: ALLOW_PLAIN_HTTP
+              value: {{ .Values.config.allowPlainHttp | quote }}
+            - name: RATE_LIMIT_BURST
+              value: {{ .Values.config.rateLimitBurst | quote }}
+            - name: RATE_LIMIT_PER
+              value: {{ .Values.config.rateLimitPer | quote }}
+            # Page views are counted here, where the pages are served.
+            {{- if .Values.config.umamiUrl }}
+            - name: UMAMI_URL
+              value: {{ .Values.config.umamiUrl | quote }}
+            {{- end }}
+            {{- if .Values.config.umamiWebsiteId }}
+            - name: UMAMI_WEBSITE_ID
+              value: {{ .Values.config.umamiWebsiteId | quote }}
+            {{- end }}
+            {{- if .Values.config.umamiTimeout }}
+            - name: UMAMI_TIMEOUT
+              value: {{ .Values.config.umamiTimeout | quote }}
+            {{- end }}
+            {{- if .Values.config.umamiQueueSize }}
+            - name: UMAMI_QUEUE_SIZE
+              value: {{ .Values.config.umamiQueueSize | quote }}
+            {{- end }}
+          {{- if .Values.frontend.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: admin
+            initialDelaySeconds: {{ .Values.frontend.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.frontend.startupProbe.failureThreshold }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: admin
+            initialDelaySeconds: {{ .Values.frontend.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.livenessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.frontend.livenessProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: admin
+            initialDelaySeconds: {{ .Values.frontend.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.readinessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.frontend.readinessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+      {{- with .Values.frontend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

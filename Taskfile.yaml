@@ -17,8 +17,8 @@ tasks:
     cmds:
       - golangci-lint config verify
 
-  # Both targets typecheck cmd/website, whose go:embed patterns fail on an empty
-  # dist/ or prerendered/, so the frontend has to exist before either one runs.
+  # Both targets typecheck cmd/frontend, whose go:embed pattern fails on an empty
+  # dist/, so the frontend has to exist before either one runs.
   lint:vet:
     desc: Go vet
     deps: [web:build, prerender]
@@ -104,17 +104,21 @@ tasks:
       - helm unittest charts/ostendorf.tech
 
   build:
-    desc: Compile the website binary
+    desc: Compile the frontend binary, which embeds the build
     deps: [web:build, prerender]
     cmds:
-      - go build -o bin/website ./cmd/website
+      - go build -o bin/frontend ./cmd/frontend
 
-  # No web:build/prerender dependency, unlike build above: cmd/feed embeds
-  # nothing (see internal/feed and internal/feedconfig, neither of which
-  # has a go:embed directive), so building it never needs the frontend at
-  # all. Kept as its own target rather than folded into build, so this
-  # stays true: building the feed binary would otherwise always pay for
-  # the Vue build it does not need, every time.
+  # No web:build/prerender dependency, unlike build above: cmd/api and
+  # cmd/feed embed nothing, so building them never needs the frontend. Kept
+  # as their own targets rather than folded into build, so this stays true:
+  # building either binary would otherwise always pay for the Vue build it
+  # does not need.
+  build:api:
+    desc: Compile the API binary
+    cmds:
+      - go build -o bin/api ./cmd/api
+
   build:feed:
     desc: Compile the feed binary
     cmds:
@@ -135,7 +139,7 @@ tasks:
     desc: Route table conformance, the prerendered output against internal/routes' embedded table
     deps: [web:build, prerender]
     cmds:
-      - go test -race -count=1 -run TestPrerenderedOutputMatchesRouteTable ./cmd/website/...
+      - go test -race -count=1 -run TestPrerenderedOutputMatchesRouteTable ./cmd/frontend/...
 
   check:build-once:
     desc: Every target that needs the frontend starts web:build and prerender exactly once
@@ -181,10 +185,10 @@ tasks:
 
   # run: once, because prerender depends on this task and so do lint:vet, build and
   # test:go directly: Task starts the same task once per path in a dependency graph
-  # unless it is told otherwise, and two vite builds on cmd/website/dist at once make
+  # unless it is told otherwise, and two vite builds on cmd/frontend/dist at once make
   # vite:prepare-out-dir fail with ENOTEMPTY. scripts/check-build-once.sh asserts it.
   web:build:
-    desc: Build the SPA bundle into cmd/website/dist
+    desc: Build the SPA bundle into cmd/frontend/dist
     dir: web
     run: once
     deps: [web:deps]
@@ -199,7 +203,7 @@ tasks:
       - pnpm run format
 
   prerender:
-    desc: Render every route of every locale to static HTML into cmd/website/prerendered
+    desc: Render every route of every locale to static HTML into cmd/frontend/dist
     dir: web
     run: once
     deps: [web:build]
@@ -254,6 +258,7 @@ tasks:
       - task: web:build
       - task: prerender
       - task: build
+      - task: build:api
       - task: build:feed
       - task: test:go
       - task: check:govue-version

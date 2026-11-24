@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Validates charts/ostendorf.tech: a must-succeed set for its default values and every
 # documented non-default combination, and a must-fail set proving every
-# templates/deployment.yaml, templates/deployment-feed.yaml and templates/httproute.yaml
-# fail/required guard actually rejects the values it is meant to reject, plus the
+# templates/deployment.yaml (the API's), templates/deployment-frontend.yaml,
+# templates/deployment-feed.yaml, templates/httproute.yaml and the three NetworkPolicy
+# templates' fail/required guard actually rejects the values it is meant to reject, plus the
 # values.schema.json refusals of the feed's OpenBao auth values (a plain token value
 # above all), of its postCount and postsPerRequest ranges and of the goMemLimit form,
 # and the guard that keeps each goMemLimit below its memory limit. Shared by
@@ -62,7 +63,6 @@ baseline="existingSecret.name=ostendorf-tech-secrets"
 # required parentRefs fields set.
 ingress_valid="config.trustedProxies=10.0.0.0/8,ingress.enabled=true,ingress.className=nginx"
 ingress_valid="${ingress_valid},ingress.hosts[0].host=ostendorf.tech"
-ingress_valid="${ingress_valid},ingress.hosts[0].paths[0].path=/,ingress.hosts[0].paths[0].pathType=Prefix"
 httproute_valid="httpRoute.enabled=true,httpRoute.hostnames[0]=ostendorf.tech"
 httproute_valid="${httproute_valid},httpRoute.parentRefs.name=shared-gateway,httpRoute.parentRefs.namespace=gateway-system"
 
@@ -88,6 +88,28 @@ contact_valid="config.smtpHost=mail.ostendorf.cloud,config.smtpPort=587"
 contact_valid="${contact_valid},existingSecret.challengeKeyKey=CHALLENGE_KEY"
 contact_valid="${contact_valid},existingSecret.smtpUsernameKey=SMTP_USERNAME,existingSecret.smtpPasswordKey=SMTP_PASSWORD"
 
+# The NetworkPolicies of the API and the frontend: both default to disabled because each
+# needs the ingress controller's namespace, which has no usable default. This combination
+# enables both with that selector, an optional metrics selector, an SMTP CIDR for the
+# API, Umami with its egress target for the frontend, and the feed so that the API's egress
+# to the feed pods renders too.
+np_valid="networkPolicy.enabled=true,networkPolicy.ingressController.namespaceSelector.kubernetes\.io/metadata\.name=ingress-nginx"
+np_valid="${np_valid},networkPolicy.ingressController.podSelector.app\.kubernetes\.io/name=ingress-nginx"
+np_valid="${np_valid},networkPolicy.metrics.namespaceSelector.kubernetes\.io/metadata\.name=monitoring"
+np_valid="${np_valid},networkPolicy.smtp.cidr=192.0.2.10/32,config.smtpHost=mail.ostendorf.cloud"
+np_valid="${np_valid},frontend.networkPolicy.enabled=true"
+np_valid="${np_valid},frontend.networkPolicy.ingressController.namespaceSelector.kubernetes\.io/metadata\.name=ingress-nginx"
+np_valid="${np_valid},frontend.networkPolicy.metrics.podSelector.app\.kubernetes\.io/name=prometheus"
+np_valid="${np_valid},config.umamiUrl=http://umami.umami.svc.cluster.local:3000,config.umamiWebsiteId=0f1e2d3c-4b5a-4968-8776-655443322110"
+np_valid="${np_valid},frontend.networkPolicy.umami.namespaceSelector.kubernetes\.io/metadata\.name=umami,frontend.networkPolicy.umami.port=3000"
+np_valid="${np_valid},${feed_valid}"
+
+# The frontend with every optional value set: more than one replica, Umami with its
+# optional timeout and queue size, a custom image tag.
+frontend_valid="frontend.replicaCount=3,frontend.image.tag=v0.1.0,config.umamiUrl=https://umami.ostendorf.cloud"
+frontend_valid="${frontend_valid},config.umamiWebsiteId=0f1e2d3c-4b5a-4968-8776-655443322110"
+frontend_valid="${frontend_valid},config.umamiTimeout=2s,config.umamiQueueSize=100,frontend.goMemLimit=80MiB"
+
 names=(
   "default values"
   "ingress enabled"
@@ -96,6 +118,10 @@ names=(
   "feed enabled with the token auth method"
   "feed enabled with a custom secret path and key names"
   "contact form configured"
+  "frontend with every optional value set"
+  "API and frontend NetworkPolicies enabled"
+  "API and frontend NetworkPolicies enabled behind an ingress"
+  "API and frontend NetworkPolicies enabled behind an httpRoute"
 )
 
 # Each entry is one combination's --set arguments, matching the corresponding
@@ -109,6 +135,10 @@ sets=(
   "${baseline},${feed_token_valid}"
   "${baseline},${feed_secret_valid}"
   "${baseline},${contact_valid}"
+  "${baseline},${frontend_valid}"
+  "${baseline},${np_valid}"
+  "${baseline},${np_valid},${ingress_valid}"
+  "${baseline},${np_valid},${httproute_valid}"
 )
 
 # kubeconform's default schema location carries no Gateway API schemas. This second
@@ -174,6 +204,15 @@ if [ "$mode" = "lint" ]; then
     "feed.goMemLimit not in Go's form"
     "config.allowPlainHttp true with an https config.siteUrl"
     "config.allowPlainHttp true with an upper case HTTPS config.siteUrl"
+    "frontend.goMemLimit at the frontend's memory limit"
+    "frontend.goMemLimit not in Go's form"
+    "frontend.networkPolicy.umami.port out of range"
+    "config.umamiQueueSize negative"
+    "networkPolicy.enabled true without an ingress controller namespaceSelector"
+    "frontend.networkPolicy.enabled true without an ingress controller namespaceSelector"
+    "networkPolicy.enabled true with config.smtpHost set and no networkPolicy.smtp.cidr"
+    "frontend.networkPolicy.enabled true with config.umamiUrl set and no Umami egress target"
+    "existingSecret.challengeKeyPreviousKey set without challengeKeyKey"
   )
 
   fail_sets=(
@@ -202,6 +241,15 @@ if [ "$mode" = "lint" ]; then
     "${baseline},${feed_valid},feed.goMemLimit=144M"
     "${baseline},config.allowPlainHttp=true,config.siteUrl=https://ostendorf.tech"
     "${baseline},config.allowPlainHttp=true,config.siteUrl=HTTPS://ostendorf.tech"
+    "${baseline},frontend.goMemLimit=96MiB"
+    "${baseline},frontend.goMemLimit=86M"
+    "${baseline},frontend.networkPolicy.umami.port=0"
+    "${baseline},config.umamiQueueSize=-1"
+    "${baseline},networkPolicy.enabled=true"
+    "${baseline},frontend.networkPolicy.enabled=true"
+    "${baseline},${np_valid},networkPolicy.smtp.cidr="
+    "${baseline},${np_valid},frontend.networkPolicy.umami.namespaceSelector=null"
+    "${baseline},existingSecret.challengeKeyPreviousKey=CHALLENGE_KEY_PREVIOUS"
   )
 
   fail_messages=(
@@ -230,6 +278,15 @@ if [ "$mode" = "lint" ]; then
     "at '/feed/goMemLimit'"
     "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
     "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
+    "frontend.goMemLimit must be below frontend.resources.limits.memory"
+    "at '/frontend/goMemLimit'"
+    "at '/frontend/networkPolicy/umami/port': minimum"
+    "at '/config/umamiQueueSize': minimum"
+    "networkPolicy.ingressController.namespaceSelector is required when networkPolicy.enabled is true"
+    "frontend.networkPolicy.ingressController.namespaceSelector is required when frontend.networkPolicy.enabled is true"
+    "networkPolicy.smtp.cidr is required when networkPolicy.enabled and config.smtpHost are set"
+    "frontend.networkPolicy.umami needs a cidr, a namespaceSelector or a podSelector when frontend.networkPolicy.enabled and config.umamiUrl are set"
+    "existingSecret.challengeKeyPreviousKey needs existingSecret.challengeKeyKey"
   )
 
   for i in "${!fail_names[@]}"; do

@@ -1,6 +1,5 @@
-// Package embedfs guards the directory lookups cmd/website and
-// internal/webapp both run against a go:embed filesystem, so the one
-// check lives in one place instead of being copied at each call site.
+// Package embedfs guards the directory lookup cmd/frontend runs against
+// its go:embed filesystem, so a missing build fails at startup.
 package embedfs
 
 import (

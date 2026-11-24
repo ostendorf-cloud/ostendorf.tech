@@ -158,19 +158,19 @@ describe('the vtech theme', () => {
 })
 
 /*
- * The header. Its ground is --header-bg, the page background at a declared
- * alpha, and what scrolls under it shows through the blur. White and black
- * are the two worst cases in each mode (a white page, or the dark hero under
- * a light header), so the text roles the header paints, the links, the
- * language switch's accent text and the muted text, are measured over both.
+ * The header. Its ground is govue's --color-header-bg, the page background
+ * at a declared alpha, and what scrolls under it shows through the blur.
+ * White and black are the two worst cases in each mode (a white page, or
+ * the dark hero under a light header), so the text roles the header paints,
+ * the links, the current language's accent text and the muted text, are
+ * measured over both.
  */
 const HEADER_TEXT_ROLES = ['text', 'text-muted', 'accent-text']
 const headerAlpha = (() => {
-  const match = /--header-bg:\s*color-mix\(in srgb, var\(--color-bg\) (\d+)%, transparent\)/.exec(
-    css,
-  )
+  const match =
+    /--color-header-bg:\s*color-mix\(in srgb, var\(--color-bg\) (\d+)%, transparent\)/.exec(css)
   if (!match) {
-    throw new Error('contrast: vtech.css declares no --header-bg over --color-bg')
+    throw new Error('contrast: vtech.css declares no --color-header-bg over --color-bg')
   }
   return Number(match[1]) / 100
 })()
@@ -325,6 +325,11 @@ describe('the band cards', () => {
  */
 const WORST_CASE_BEHIND_SCRIM = 0xff
 
+/** The darkest 1% of web/src/assets/hero-1280.jpg after the light photo
+ *  grade, measured once; see "in light mode" below. The light hero and the
+ *  overlay header over it are both measured against it. */
+const DARKEST_PERCENT_OF_PHOTO = [13, 4, 52]
+
 /** Every role the hero paints on the scrim, with the ratio WCAG 2.2 AA
  *  asks of it. The headline is clamped to at least 2.3rem at 850 weight,
  *  which is large text, so its gradient's two ends carry the 3:1 large
@@ -438,7 +443,6 @@ describe('the hero scrim', () => {
       Number(new RegExp(`--${name}:\\s*([0-9.]+)\\s*;`).exec(bareCss)?.[1])
     const value = (name: string) => new RegExp(`--${name}:\\s*([^;]+);`).exec(bareCss)?.[1].trim()
     const alphaLight = number('hero-scrim-alpha-light')
-    const DARKEST_PERCENT_OF_PHOTO = [13, 4, 52]
 
     function over(top: string, alpha: number, behind: number[]): string {
       const scrim = Number.parseInt(top.slice(1), 16)
@@ -532,4 +536,73 @@ describe('the hero scrim', () => {
   // real regression, the alpha or a token moving the wrong way; whether
   // the alpha is more generous than it strictly has to be is not worth
   // breaking an unrelated change over.
+})
+
+/*
+ * The overlay header over the hero, an exception to govue's documented
+ * bound. govue promises its shipped themes a hero luminance of at most 0.05
+ * behind a transparent header, and computes a theme's own bound from the
+ * dark text, text-muted and focus roles (maxBackdropLuminance). This hero
+ * does not meet either in dark mode: its brightest possible ground, the
+ * scrim over a white stage light, is about 0.0638, and the bound with
+ * text-muted is about 0.0637. The hero is not changed for it. The guard here
+ * is the site's own bound over the roles the header really paints on that
+ * ground: text (brand, nav, the other language) at 4.5:1 and the focus ring
+ * at 3:1. text-muted is not painted by any header part, which the last test
+ * checks in govue's component sources. The call to action and the current
+ * language have a ground of their own.
+ *
+ * In light mode the hero is a pale ground, so src/styles.css gives the
+ * transparent header the light roles and the navy focus ring. They are
+ * measured over the same darkest 1% of the photograph the light hero's own
+ * navy text is measured over.
+ */
+describe('the overlay header over the hero', () => {
+  const bound = (role: string, minimum: number) => (luminance(dark[role]) + 0.05) / minimum - 0.05
+  const darkGround = heroGround(dark.bg, hero.alpha, WORST_CASE_BEHIND_SCRIM)
+  const groundLuminance = luminance(darkGround)
+
+  it('keeps the painted roles in dark mode within the site bound', () => {
+    const siteBound = Math.min(bound('text', TEXT_MINIMUM), bound('focus', NON_TEXT_MINIMUM))
+    expect(groundLuminance).toBeLessThanOrEqual(siteBound)
+  })
+
+  it('records the exception to govue: above 0.05 and above the text-muted bound', () => {
+    expect(groundLuminance).toBeCloseTo(0.0638, 4)
+    expect(groundLuminance).toBeGreaterThan(0.05)
+    expect(groundLuminance).toBeGreaterThan(bound('text-muted', TEXT_MINIMUM))
+  })
+
+  it('gives the transparent header the light roles in light mode', () => {
+    const styles = readFileSync(join(process.cwd(), 'src/styles.css'), 'utf-8')
+    const rule =
+      /header\[data-overlay='true'\]\[data-state='transparent'\]\s*\{\s*color-scheme: light;\s*--color-focus: var\(--color-text\);/g
+    expect(styles.match(rule)).toHaveLength(2)
+    expect(styles).toMatch(/:root\[data-mode='light'\] header\[data-overlay='true'\]/)
+    expect(styles).toMatch(/prefers-color-scheme: light\)\s*\{\s*:root:not\(\[data-mode\]\) header/)
+  })
+
+  it('carries the light header text and focus over the pale hero', () => {
+    const alphaLight = Number(/--hero-scrim-alpha-light:\s*([0-9.]+)\s*;/.exec(bareCss)?.[1])
+    const behind = DARKEST_PERCENT_OF_PHOTO
+    const scrim = Number.parseInt(light.bg.slice(1), 16)
+    const ground = `#${[(scrim >> 16) & 0xff, (scrim >> 8) & 0xff, scrim & 0xff]
+      .map((c, i) => Math.round(alphaLight * c + (1 - alphaLight) * behind[i]))
+      .map((c) => c.toString(16).padStart(2, '0'))
+      .join('')}`
+    expect(ratio(light.text, ground)).toBeGreaterThanOrEqual(TEXT_MINIMUM)
+    // The focus ring is the navy text colour there, see src/styles.css.
+    expect(ratio(light.text, ground)).toBeGreaterThanOrEqual(NON_TEXT_MINIMUM)
+    // The light focus violet would not hold, which is why it is replaced.
+    expect(ratio(light.focus, ground)).toBeLessThan(NON_TEXT_MINIMUM)
+  })
+
+  it('paints no text-muted in any header part', () => {
+    const govue = join(process.cwd(), 'node_modules/@ostendorf-cloud/govue/src/components')
+    for (const name of ['GovueHeader', 'GovueNav', 'GovueLanguageSwitch', 'GovueThemeSwitch']) {
+      expect(readFileSync(join(govue, `${name}.vue`), 'utf-8'), name).not.toMatch(/text-muted/)
+    }
+    const header = readFileSync(join(process.cwd(), 'src/components/AppHeader.vue'), 'utf-8')
+    expect(header).not.toMatch(/text-muted/)
+  })
 })

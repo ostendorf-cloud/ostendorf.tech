@@ -19,8 +19,8 @@ var envRead = regexp.MustCompile(`(?:loader\.(\w+)|resolved)\("([A-Z][A-Z0-9_]*)
 // govueEnv lists the variables govue's analytics.LoadConfig and mail.LoadConfig read on
 // the website's behalf. They never appear as a literal in this repository's own Go code,
 // so a govue upgrade that adds or renames one shows up here as a compile error or a
-// failed test. mail.LoadConfig reads SMTP_PASSWORD through a _FILE twin, SMTP_USERNAME
-// without one.
+// failed test. mail.LoadConfig reads SMTP_USERNAME and SMTP_PASSWORD through a _FILE
+// twin each.
 var govueEnv = []string{
 	analytics.EnvURL,
 	analytics.EnvWebsiteID,
@@ -29,6 +29,7 @@ var govueEnv = []string{
 	mail.EnvHost,
 	mail.EnvPort,
 	mail.EnvUsername,
+	mail.EnvUsername + "_FILE",
 	mail.EnvPassword,
 	mail.EnvPassword + "_FILE",
 }
@@ -55,7 +56,7 @@ func TestEnvExampleDocumentsEveryVariable(t *testing.T) {
 
 	type variable struct{ name, source string }
 	var vars []variable
-	for _, src := range []string{"../config/config.go", "../feedconfig/config.go"} {
+	for _, src := range []string{"../config/config.go", "../frontendconfig/config.go", "../feedconfig/config.go"} {
 		code, err := os.ReadFile(src)
 		if err != nil {
 			t.Fatal(err)

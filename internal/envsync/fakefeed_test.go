@@ -39,15 +39,15 @@ func TestComposeFakeFeed(t *testing.T) {
 	if fake.Build.Target != "fakefeed" {
 		t.Errorf("fakefeed builds target %q, want fakefeed", fake.Build.Target)
 	}
-	if got := services["website"].Profiles; len(got) != 0 {
-		t.Errorf("website has profiles %v, want none: it must start with a plain compose up", got)
+	if got := services["api"].Profiles; len(got) != 0 {
+		t.Errorf("api has profiles %v, want none: it must start with a plain compose up", got)
 	}
 
-	// Without the profile the website gets no feed URL: the section stays off.
-	website := services["website"]
+	// Without the profile the API gets no feed URL: the section stays off.
+	website := services["api"]
 	raw, ok := website.Environment["FEED_SERVICE_URL"]
 	if !ok {
-		t.Fatal("docker-compose.yaml does not pass FEED_SERVICE_URL to the website")
+		t.Fatal("docker-compose.yaml does not pass FEED_SERVICE_URL to the api")
 	}
 	if got, err := expand(raw, map[string]string{}); err != nil || got != "" {
 		t.Errorf("FEED_SERVICE_URL without .env = %q, %v; want empty", got, err)
@@ -147,18 +147,18 @@ func closure(stages []stage, target string) []stage {
 
 // TestFakeFeedNotInProductionImages proves neither production target evaluates a
 // stage that mentions the fake, that the fake has a target of its own, and that
-// "website" stays the last stage a bare build resolves to.
+// "frontend" stays the last stage a bare build resolves to.
 func TestFakeFeedNotInProductionImages(t *testing.T) {
 	t.Parallel()
 
 	stages := parseStages(t)
-	if len(stages) == 0 || stages[len(stages)-1].name != "website" {
-		t.Fatal("the last Dockerfile stage must be website, what a build without --target resolves to")
+	if len(stages) == 0 || stages[len(stages)-1].name != "frontend" {
+		t.Fatal("the last Dockerfile stage must be frontend, what a build without --target resolves to")
 	}
 	if !slices.ContainsFunc(stages, func(s stage) bool { return s.name == "fakefeed" }) {
 		t.Fatal("the Dockerfile has no fakefeed target")
 	}
-	for _, target := range []string{"website", "feed"} {
+	for _, target := range []string{"frontend", "api", "feed"} {
 		got := closure(stages, target)
 		if len(got) < 2 {
 			t.Fatalf("target %s resolved to %d stages: the parser no longer understands the Dockerfile", target, len(got))

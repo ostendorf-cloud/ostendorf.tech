@@ -2,12 +2,17 @@
  * Renders every route of every locale to static HTML, so a crawler and a
  * browser's first paint both get real markup instead of an empty <div
  * id="app">. Run through "task prerender", after "task web:build" has
- * written the SPA bundle and its manifest into cmd/website/dist.
+ * written the SPA bundle and its manifest into cmd/frontend/dist.
  *
- * The Go service embeds the files this script writes into
- * cmd/website/prerendered and serves them directly; the SPA bundle this
- * same page loads then hydrates over the server-rendered markup rather
- * than replacing it, through createSSRApp on both sides.
+ * The pages, the 404 page per language and sitemap.xml are written into
+ * that same directory, the layout govue's frontend server reads: Vite's
+ * dist with the prerender written into it. cmd/frontend embeds it. The SPA
+ * bundle this same page loads then hydrates over the server-rendered markup
+ * rather than replacing it, through createSSRApp on both sides.
+ *
+ * The head carries no favicon link, no theme-color tag and no theme boot
+ * script: govue's frontend server injects all three at startup and refuses
+ * a page that carries one of them already.
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -16,13 +21,12 @@ import { fileURLToPath } from 'node:url'
 import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { createMemoryHistory } from 'vue-router'
-import { sitemapXml, useTheme } from '@ostendorf-cloud/govue'
+import { createGovueI18n, sitemapXml, useTheme } from '@ostendorf-cloud/govue'
 
 import App from '../src/App.vue'
 import { createAppI18n, SUPPORTED_LOCALES, type Locale } from '../src/i18n'
-import { createSiteGovueI18n } from '../src/i18n/govue'
 import { HERO_SIZES } from '../src/lib/heroImage'
-import { iconLinks, socialImageMeta } from '../src/lib/icons'
+import { socialImageMeta } from '../src/lib/icons'
 import { siteRouteDefs } from '../src/lib/legal'
 import { routeTable } from '../src/lib/routeTable'
 import {
@@ -38,24 +42,19 @@ import {
   type PageRoute,
 } from '../src/lib/seo'
 import { DEFAULT_MODE, STORAGE_KEY, THEME_NAME } from '../src/lib/theme'
-import { themeColors } from '../src/lib/themeColor'
 import { attachLocaleSync, createAppRouter, NOT_FOUND_ROUTE_NAME } from '../src/router'
-// Inlined into this script's own bundle at build time, so the theme's
-// colours reach the <head> without a second copy of them living here and
-// without a path to the stylesheet that has to survive the SSR build's
-// output directory.
-import vtechCss from '../src/theme/vtech.css?raw'
-import { themeBootElement } from './themeBoot'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const distDir = join(here, '../../cmd/website/dist')
-const outDir = join(here, '../../cmd/website/prerendered')
+// Vite's build and the prerender share one directory, govue's frontend
+// build layout.
+const distDir = join(here, '../../cmd/frontend/dist')
+const outDir = distDir
 
 // The same call main.ts makes, for the same two values, before anything
 // is rendered. useTheme holds one shared state per process and the header
-// reads it to draw the theme toggle, so without this the toggle would be
-// prerendered as the sun with "switch to light mode" on it and then flip
-// to the moon the moment the bundle hydrated. There is no document here,
+// reads it to draw the theme switch, so without this the switch would be
+// prerendered on "system" and then jump to "dark" the moment the bundle
+// hydrated. There is no document here,
 // so the attribute writing half of useTheme does nothing;
 // renderDocument below writes those attributes itself.
 useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE, storageKey: STORAGE_KEY })
@@ -64,8 +63,9 @@ useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE, storageKey: STORAGE_KEY })
  *  list, pairing each entry's name with the router route and the SEO
  *  route it names (the same string serves both now that PageRoute is a
  *  plain string), plus the one page the table itself does not carry:
- *  the 404 page, which answers no route and so is not part of the table
- *  internal/webapp's sitemap and mux registration read either. */
+ *  the 404 page, which answers no route and so is not part of the
+ *  sitemap either. govue's frontend server serves it as <code>/404.html
+ *  for every unknown path. */
 function loadPages(): Array<{ routerName: string; seoRoute: PageRoute; file: string }> {
   const pages = routeTable.map((entry) => ({
     routerName: entry.name,
@@ -94,78 +94,6 @@ interface Assets {
  *  is built separately from the bundle and would otherwise hash them a
  *  second time, under different names. */
 const HERO_VARIANT = /^src\/assets\/hero-(\d+)\.avif$/
-
-/** The browser chrome around the page, read out of the theme's own
- *  --color-bg at the mode the document itself ships in.
- *
- *  One meta, with no media query. There used to be two, one per
- *  prefers-color-scheme, because the page followed the visitor's own
- *  colour scheme and a single value would have framed a near-white page
- *  in near-black. The document now pins its mode (see renderDocument
- *  below), so the system setting no longer says anything about what this
- *  page is painted in, and a pair keyed on it would be wrong for exactly
- *  the visitor it used to be right for: someone on a light system reading
- *  a dark page.
- *
- *  That is no longer the whole story, though: a visitor who has stored a
- *  light or system preference is no longer left to keep this chrome
- *  colour as their one correction, the way the comment above used to
- *  read. themeBootScript below corrects data-mode before first paint, and
- *  the same stored preference means this static meta can be wrong too, so
- *  it corrects this tag's content as well, right after writing it. A
- *  resolved-light outcome needs the light colour; a resolved-dark one
- *  needs no correction, since this default already is the dark colour.
- *  themeColorValues keeps both ends in scope for that reason, rather than
- *  the single value DEFAULT_MODE picks for the attribute path below. */
-const themeColorValues = themeColors(vtechCss)
-const themeColorMeta = `<meta name="theme-color" content="${themeColorValues[DEFAULT_MODE]}">`
-
-/** themeBootScript is a small, blocking inline script written into every
- *  prerendered <head>, before the stylesheet <link>, so a returning
- *  visitor who stored a light or system preference is not shown a dark
- *  flash: the prerendered markup above always pins data-mode="dark" (see
- *  renderDocument), and the only thing that used to correct that for such
- *  a visitor was main.ts's own useTheme call, which runs only once the
- *  deferred bundle has loaded, strictly after first paint. This script
- *  runs before the stylesheet applies instead, which is also why it has
- *  to sit before the <link rel="stylesheet"> in renderHead rather than
- *  after it or deferred.
- *
- *  It reads localStorage under STORAGE_KEY, the exact key useTheme reads
- *  and writes, rather than a second guess at it: see that constant's own
- *  comment for why three places have to agree on it on purpose. Reading
- *  it the same way useTheme's own restore() does (JSON.parse of
- *  {theme, mode}, mode one of "light"/"dark"/"system") means this script
- *  resolves the exact same choice useTheme would, before useTheme ever
- *  runs.
- *
- *  Every failure mode leaves the prerendered dark default untouched: no
- *  stored value, storage unavailable or throwing, malformed JSON, and an
- *  unrecognised mode value are all caught and ignored, and the whole
- *  script is wrapped in its own try/catch besides, so nothing it does can
- *  ever break the page it runs on.
- *
- *  Resolving "system" needs prefers-color-scheme itself, since there is
- *  no document.documentElement data-mode to read it back from reliably
- *  before this script has run; once resolved, a light outcome also
- *  corrects the theme-color meta above to themeColorValues.light, folding
- *  what would otherwise be a second, separate fix (the same visitor's
- *  stored light preference leaving the chrome colour wrong too) into this
- *  one mechanism.
- *
- *  Its text is one constant (THEME_BOOT_TEXT in themeBoot.ts) with nothing
- *  filled in. The two values it needs, STORAGE_KEY and the light theme
- *  colour, are written as the data-storage-key and data-theme-color-light
- *  attributes of the same script element, and the script reads them from
- *  there at run time. Both attributes are the same on every page, so the
- *  text stays byte identical everywhere:
- *  internal/webapp/themeboot.go computes one CSP script-src 'sha256-'
- *  source from whichever prerendered page it finds this script on first,
- *  since this site's CSP carries no 'unsafe-inline' for script-src and
- *  this static HTML has no per-response nonce to carry. The id="theme-boot"
- *  attribute is what that Go code locates the script by; the attributes
- *  are not part of the hashed text. */
-const themeBootScript = themeBootElement(STORAGE_KEY, themeColorValues.light)
 
 function heroSrcset(manifest: Record<string, ManifestEntry>): string {
   const variants = Object.entries(manifest)
@@ -237,9 +165,9 @@ async function renderBody(locale: Locale, routerName: string): Promise<string> {
   app.use(router)
   app.use(i18n)
   // The same language layer main.ts installs, so the footer's legal links
-  // and the legal page shell render in this page's language, with the
-  // site's own German contact form texts.
-  app.use(createSiteGovueI18n({ i18n, locale }))
+  // and the legal page shell render in this page's language, with govue's
+  // formal German, the same as in the browser.
+  app.use(createGovueI18n({ i18n, locale, formality: 'formal' }))
 
   await router.push({ name: routerName, params: { locale } })
   await router.isReady()
@@ -287,9 +215,6 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(meta.description)}">
     ${ogUrl}${socialImageMeta(SITE_URL, escapeHtml(t('common.socialImageAlt'))).join('\n    ')}
-    ${iconLinks().join('\n    ')}
-    ${themeColorMeta}
-    ${themeBootScript}
     ${heroPreload}${styleLinks}
     <script type="module" src="/${assets.script}" defer></script>`
 }
@@ -304,13 +229,8 @@ function renderHead(locale: Locale, route: PageRoute, assets: Assets): string {
  *  bundle loaded and then watch it turn dark. Both values come from
  *  src/lib/theme.ts, the same module main.ts starts useTheme from.
  *
- *  That pinned default is not the only word on the matter any more,
- *  though: a visitor who stored a light or system preference would
- *  otherwise see this dark default flash before main.ts's deferred
- *  useTheme call corrected it. themeBootScript, written into the <head>
- *  by renderHead, corrects data-mode (and the theme-color meta) before
- *  this markup is ever painted, so this function's own pinned default
- *  stays the fail-safe starting point rather than the whole story. */
+ *  govue's theme boot script, which its frontend server injects into the
+ *  head, then applies a stored choice before the first paint. */
 function renderDocument(locale: Locale, head: string, body: string): string {
   return `<!doctype html>
 <html lang="${locale}" data-theme="${THEME_NAME}" data-mode="${DEFAULT_MODE}">
@@ -349,12 +269,11 @@ async function main(): Promise<void> {
     }
   }
 
-  // The input of govue-check-legal, which reads sitemap.xml next to the
-  // locale directories. It is govue's own sitemap of the same public routes.
-  // The one the server answers at /sitemap.xml is built in Go from the
-  // configured SITE_URL (internal/webapp/sitemap.go) and is not this file;
-  // cmd/website's TestRuntimeSitemapMatchesPrerenderedSitemap proves the
-  // two list the same paths.
+  // govue's sitemap of the public routes, next to the locale directories.
+  // govue-check-legal reads it, and govue's frontend server serves it as
+  // built, registers one page per loc and writes robots.txt from its origin.
+  // The origin is SITE_URL at build time (VITE_SITE_URL), so the image
+  // carries one production origin.
   const sitemap = join(outDir, 'sitemap.xml')
   await writeFile(sitemap, sitemapXml(siteRouteDefs, SITE_URL), 'utf-8')
   console.log(`wrote ${sitemap}`)

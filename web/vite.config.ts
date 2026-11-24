@@ -2,12 +2,23 @@ import { fileURLToPath, URL } from 'node:url'
 
 import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vitest/config'
+import { loadEnv } from 'vite'
+import { defineConfig, type ViteUserConfig } from 'vitest/config'
 
-// cmd/website embeds dist/ with a go:embed directive that resolves next to
+import { resolveSiteUrl } from './src/lib/siteUrl'
+
+// cmd/frontend embeds dist/ with a go:embed directive that resolves next to
 // the Go source file, which is why the build writes there directly rather
 // than into web/dist and leaving a copy step for the Taskfile to do.
-export default defineConfig({
+//
+// A VITE_SITE_URL that is set but empty fails here, before anything is
+// built: the pages, the sitemap and robots.txt would carry no origin.
+export default defineConfig(({ mode }) => {
+  resolveSiteUrl(loadEnv(mode, process.cwd(), 'VITE_').VITE_SITE_URL)
+  return config
+})
+
+const config = {
   plugins: [vue(), tailwindcss()],
   resolve: {
     alias: {
@@ -15,7 +26,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../cmd/website/dist',
+    outDir: '../cmd/frontend/dist',
     emptyOutDir: true,
     // The prerender script reads this to find the content hashed entry
     // script and its CSS, so it can write them into the HTML it generates
@@ -37,4 +48,4 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     css: false,
   },
-})
+} satisfies ViteUserConfig
