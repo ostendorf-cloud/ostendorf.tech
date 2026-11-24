@@ -299,6 +299,18 @@ pnpm/pnpm#12344, not backported to the pnpm 10 release line as far as this repos
 could establish). `check:govue-version` therefore also reads `web/pnpm-lock.yaml`
 directly and fails when that dependency's resolution carries no `path: /web`.
 
+## pnpm is pinned twice and moves once
+
+`mise.toml` pins pnpm for a local run and the Dockerfile's Node stage installs the same
+patch through corepack from its `ARG PNPM_VERSION`, so the image reads the lockfile with
+the pnpm that wrote it. Renovate's mise manager reads the first pin; a regex custom
+manager in `renovate.json` reads the argument under its `# renovate: datasource=npm
+depName=pnpm` comment, and the package rule with `groupName` `pnpm` puts both into one
+pull request with no manual step. `internal/envsync`'s `TestDockerfilePnpmMatchesMise`
+fails when the two differ or when the install line names a literal version, and
+`internal/depsync`'s `renovate_test.go` fails when the manager no longer extracts the
+argument or the group is gone.
+
 ## Verify before committing
 
 ```sh

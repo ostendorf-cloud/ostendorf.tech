@@ -4,9 +4,10 @@
 go = "1.27.4"
 task = "3"
 # The web/ package. pnpm is the package manager, so npm is never called directly.
-# pnpm is pinned to the patch, not the major: the Dockerfile's frontend stage installs
-# one literal version, and the lockfile that stage reads with --frozen-lockfile has to
-# have been written by the same one. A floating major silently drifts the two apart.
+# pnpm is pinned to the patch, not the major: the Dockerfile's Node stage installs one
+# version, its PNPM_VERSION argument, and the lockfile that stage reads with
+# --frozen-lockfile has to have been written by the same one. A floating major silently
+# drifts the two apart. Renovate moves both in one pull request (group "pnpm").
 #
 # Pinned to major 12, not 10: pnpm 10.34.7 never writes a git-hosted dependency's
 # "path" subdirectory field into the lockfile's resolution object, not only on an

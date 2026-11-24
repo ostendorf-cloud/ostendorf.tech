@@ -1,7 +1,23 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>ostendorf-cloud/workflows#v0"],
+  "customManagers": [
+    {
+      "description": "The Dockerfile's Node stage installs pnpm through corepack at the version of its PNPM_VERSION argument, which Renovate's Dockerfile manager does not read. This manager reads the argument under its renovate comment, so it moves with the mise.toml pin.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG PNPM_VERSION=(?<currentValue>\\S+)"
+      ]
+    }
+  ],
   "packageRules": [
+    {
+      "description": "pnpm is pinned twice, in mise.toml and in the Dockerfile's PNPM_VERSION. Both move in one pull request: internal/envsync's TestDockerfilePnpmMatchesMise fails when they differ, because the image must read the lockfile with the pnpm that wrote it.",
+      "matchPackageNames": ["pnpm"],
+      "matchManagers": ["mise", "custom.regex"],
+      "groupName": "pnpm"
+    },
     {
       "description": "TypeScript stays below 7 until typescript-eslint and vue-tsc support it: typescript-eslint rejects 7.0 at import and vue-tsc 3.x needs typescript/lib/tsc, which 7 no longer exports. Remove this rule when both release 7 support.",
       "matchPackageNames": ["typescript"],

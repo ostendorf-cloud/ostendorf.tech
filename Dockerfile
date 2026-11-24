@@ -40,7 +40,12 @@ WORKDIR /src/web
 # checked); corepack then installs the pinned pnpm version below, the
 # exact one mise.toml's "pnpm" tool resolves to, so the lockfile this
 # stage reads was written by the same pnpm a local "task setup" installs.
-RUN npm install -g corepack@0.36.0 && corepack enable && corepack prepare pnpm@12.21.0 --activate
+# Renovate updates PNPM_VERSION through the regex manager in renovate.json,
+# in the same pull request as the mise.toml pin (group "pnpm");
+# internal/envsync fails when the two differ.
+# renovate: datasource=npm depName=pnpm
+ARG PNPM_VERSION=12.21.0
+RUN npm install -g corepack@0.36.0 && corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile

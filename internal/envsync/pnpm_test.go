@@ -7,8 +7,11 @@ import (
 )
 
 var (
-	dockerfilePnpm = regexp.MustCompile(`corepack prepare pnpm@(\S+) --activate`)
-	misePnpm       = regexp.MustCompile(`(?m)^pnpm = "([^"]+)"`)
+	// dockerfilePnpm is the version argument Renovate updates; dockerfileCorepack
+	// is the one install line, which must take that argument and no literal.
+	dockerfilePnpm     = regexp.MustCompile(`(?m)^ARG PNPM_VERSION=(\S+)$`)
+	dockerfileCorepack = regexp.MustCompile(`corepack prepare (\S+) --activate`)
+	misePnpm           = regexp.MustCompile(`(?m)^pnpm = "([^"]+)"`)
 )
 
 // TestDockerfilePnpmMatchesMise fails when the Dockerfile's frontend stage installs a
@@ -28,7 +31,11 @@ func TestDockerfilePnpmMatchesMise(t *testing.T) {
 
 	d := dockerfilePnpm.FindStringSubmatch(string(docker))
 	if d == nil {
-		t.Fatal("Dockerfile has no 'corepack prepare pnpm@<version> --activate' line")
+		t.Fatal("Dockerfile has no 'ARG PNPM_VERSION=<version>' line")
+	}
+	installs := dockerfileCorepack.FindAllStringSubmatch(string(docker), -1)
+	if len(installs) != 1 || installs[0][1] != `"pnpm@${PNPM_VERSION}"` {
+		t.Fatalf(`Dockerfile must install pnpm once, as corepack prepare "pnpm@${PNPM_VERSION}" --activate, got %q`, installs)
 	}
 	m := misePnpm.FindStringSubmatch(string(mise))
 	if m == nil {
