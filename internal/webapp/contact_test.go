@@ -97,15 +97,29 @@ func fetchChallenge(t *testing.T, app *App, remoteAddr string) (pow.Solution, *h
 	return pow.Solution{}, nil
 }
 
-// submission is the body GovueContactForm posts: no consent field, it stays
-// in the browser.
+// submission is the body GovueContactForm posts with requireConsent: the
+// consent box ticked.
 func submission(t *testing.T, sol *pow.Solution) string {
+	t.Helper()
+	return submissionWith(t, sol, map[string]any{"consent": true})
+}
+
+// submissionWith is submission with fields replaced, or removed when the
+// value is nil.
+func submissionWith(t *testing.T, sol *pow.Solution, fields map[string]any) string {
 	t.Helper()
 	body := map[string]any{
 		"name":    "Erika Mustermann",
 		"email":   "erika@example.test",
 		"message": "Hallo,\nich brauche Technik.",
 		"website": "",
+	}
+	for k, v := range fields {
+		if v == nil {
+			delete(body, k)
+			continue
+		}
+		body[k] = v
 	}
 	if sol != nil {
 		body["pow"] = sol
@@ -135,14 +149,16 @@ func postContact(t *testing.T, app *App, remoteAddr, body string, mod func(*http
 // TestContactSendsTheSiteMailThroughTheRealChain proves the site mounts
 // govue's handlers with its own envelope, subject and body: one valid
 // challenge and submission sends exactly one mail, From and To are the
-// site's, the visitor is only in Reply-To, and the body is the site's text
-// without the consent timestamp the site's own builder used to add.
+// site's, the visitor is only in Reply-To, and the body is the site's intro,
+// govue's DefaultBody and one line on the consent box with the server's
+// receive time.
 func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	app, sender, clock := contactApp(t, nil)
 	const addr = "198.51.100.10:1234"
 
 	sol, _ := fetchChallenge(t, app, addr)
 	clock.Advance(5 * time.Second)
+	received := clock.Now().UTC().Format(time.RFC3339)
 	rec := postContact(t, app, addr, submission(t, &sol), nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("submit status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
@@ -165,17 +181,56 @@ func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	if m.Subject != "Kontaktanfrage von Erika Mustermann" {
 		t.Errorf("Subject = %q, want the site's subject", m.Subject)
 	}
-	const wantBody = "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n" +
+	wantBody := "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n" +
 		"Name: Erika Mustermann\n" +
-		"E-Mail: erika@example.test\n\n" +
-		"Nachricht:\nHallo,\nich brauche Technik.\n"
+		"Email: erika@example.test\n\n" +
+		"Hallo,\nich brauche Technik.\n" +
+		"\nEinwilligung: Kontrollkästchen laut Browser angehakt, Eingang beim Server " +
+		received + " (Angabe des Browsers, kein Nachweis)\n"
 	if m.Body != wantBody {
 		t.Errorf("Body = %q, want %q", m.Body, wantBody)
 	}
-	for _, gone := range []string{"Datenschutz", "Einverständnis", "erteilt am", "Uhr"} {
-		if strings.Contains(m.Body, gone) {
-			t.Errorf("Body contains %q, the consent timestamp is dropped", gone)
-		}
+	if n := strings.Count(m.Body, "Einwilligung"); n != 1 {
+		t.Errorf("Body names the consent %d times, want one line", n)
+	}
+}
+
+// TestContactRequiresTheConsentBox proves RequireConsent is on: a
+// submission without the box, or with it unticked, is a field error on
+// consent before the proof of work, and nothing is sent.
+func TestContactRequiresTheConsentBox(t *testing.T) {
+	for name, consent := range map[string]any{"missing": nil, "unticked": false} {
+		t.Run(name, func(t *testing.T) {
+			app, sender, clock := contactApp(t, nil)
+			const addr = "198.51.100.11:1234"
+			sol, _ := fetchChallenge(t, app, addr)
+			clock.Advance(5 * time.Second)
+
+			rec := postContact(t, app, addr, submissionWith(t, &sol, map[string]any{"consent": consent}), nil)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusBadRequest, rec.Body)
+			}
+			if !strings.Contains(rec.Body.String(), `"consent":"required"`) {
+				t.Errorf("body = %s, want the consent field error", rec.Body)
+			}
+			if n := len(sender.messages()); n != 0 {
+				t.Errorf("sent %d mails, want none", n)
+			}
+		})
+	}
+}
+
+// TestContactConsentLineStatesTheBox pins the wording for both states, so
+// the line never claims a ticked box the request did not carry.
+func TestContactConsentLineStatesTheBox(t *testing.T) {
+	at := time.Date(2026, 11, 24, 8, 30, 0, 0, time.UTC)
+	ticked := consentLine(contact.Request{Consent: true, Received: at})
+	if !strings.Contains(ticked, "laut Browser angehakt") || !strings.Contains(ticked, "2026-11-24T08:30:00Z") {
+		t.Errorf("ticked line = %q", ticked)
+	}
+	unticked := consentLine(contact.Request{Received: at})
+	if !strings.Contains(unticked, "nicht angehakt") {
+		t.Errorf("unticked line = %q", unticked)
 	}
 }
 

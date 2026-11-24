@@ -42,10 +42,15 @@ The global baseline already applies here and is not repeated below.
   `POST /api/v1/contact` behind the general rate limit. `internal/config` reads SMTP
   through govue's `mail.LoadConfig` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
   `SMTP_PASSWORD` or `SMTP_PASSWORD_FILE`) and only when `SMTP_HOST` is set. Without a key
-  or without `SMTP_HOST` both routes answer 503 `not_configured`. The mail body is German
-  and holds the name, the address and the message; the consent state never leaves the
-  browser. `internal/webapp/contact_test.go` proves the wiring through the real handler
-  chain with a fake `mail.Sender`.
+  or without `SMTP_HOST` both routes answer 503 `not_configured`. The handler runs with
+  `RequireConsent`: the form sends the consent box (`requireConsent` in `HomeView.vue`),
+  and a submission without a ticked box is a field error before the proof of work. The
+  mail body is a German intro line, govue's `contact.DefaultBody` (name, address,
+  message) and one line stating that the browser reported the box as ticked and the
+  server's receive time (`Request.Received`), a claim of the client, not a proof. The
+  privacy page says so in both languages; change it with the body.
+  `internal/webapp/contact_test.go` proves the wiring through the real handler chain with
+  a fake `mail.Sender`.
 - `internal/instagram` is the domain logic behind the home page's Impressionen section:
   a `Client` against Meta's Graph API, a `Feed` cache of the posts and their picture
   bytes, a `Syncer` that keeps `Feed` current, and a `TokenStore` that reads and writes
