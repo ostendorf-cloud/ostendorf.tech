@@ -200,23 +200,10 @@ func New(cfg config.Config, logger *slog.Logger, dist, prerendered fs.FS, opts .
 		logViewsStatus(logger, cfg, views)
 	}
 
+	// DefaultSecurity's policy carries worker-src 'self' since govue v0.8.0,
+	// which the contact form's proof of work Worker needs: it is a
+	// same-origin chunk under /assets/.
 	a.security = middleware.DefaultSecurity()
-	// DefaultSecurity's policy sets no worker-src, so a browser falls back
-	// to script-src 'self' for the contact form's proof of work Worker:
-	// govue's lib/pow.ts instantiates it from a same-origin module URL
-	// (new Worker(new URL('./pow.worker.ts', import.meta.url),
-	// {type: 'module'})), compiled by Vite into a same-origin chunk under
-	// /assets/, never a blob: URL (govue's web/example/consumer.build.test.ts
-	// proves that for a consumer build), and CSP Level 3
-	// (https://www.w3.org/TR/CSP3/#directive-worker-src) specifies exactly
-	// that fallback when worker-src is absent and script-src is present,
-	// supported by every browser this site targets. The fallback alone
-	// would already be enough to let the form submit. worker-src 'self' is
-	// set explicitly anyway: the cost is one directive, and it removes any
-	// future dependence on fallback behaviour if the bundler ever changes
-	// how this Worker is built, on a path where being wrong means the
-	// contact form never submits at all.
-	a.security.Policy.Add("worker-src", "'self'")
 	// The visitor's stored theme choice is corrected before first paint by a
 	// small inline script in the prerendered <head> (see
 	// web/scripts/prerender.ts and internal/webapp/themeboot.go), which this

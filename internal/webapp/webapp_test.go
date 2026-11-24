@@ -131,10 +131,10 @@ func TestAppDrainingFailsReadiness(t *testing.T) {
 }
 
 // TestAppSecurityPolicyAllowsTheProofOfWorkWorker proves worker-src 'self'
-// is actually on the response: govue's contact form Worker loads from a
-// same-origin module URL (see webapp.go's own comment on why this is set
-// explicitly rather than left to CSP's script-src fallback), and the
-// consequence of this header being wrong is that the form never submits.
+// is on the response exactly once, with no other source: govue's contact
+// form Worker loads from a same-origin module URL, and the consequence of
+// this header being wrong is that the form never submits. govue's default
+// policy carries the directive since v0.8.0, so the site adds nothing.
 func TestAppSecurityPolicyAllowsTheProofOfWorkWorker(t *testing.T) {
 	app := testApp(t)
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/de/", nil)
@@ -142,8 +142,14 @@ func TestAppSecurityPolicyAllowsTheProofOfWorkWorker(t *testing.T) {
 	app.Handler().ServeHTTP(rec, req)
 
 	csp := rec.Header().Get("Content-Security-Policy")
-	if !strings.Contains(csp, "worker-src 'self'") {
-		t.Errorf("Content-Security-Policy = %q, want it to contain worker-src 'self'", csp)
+	var worker []string
+	for _, directive := range strings.Split(csp, ";") {
+		if fields := strings.Fields(directive); len(fields) > 0 && fields[0] == "worker-src" {
+			worker = append(worker, strings.Join(fields[1:], " "))
+		}
+	}
+	if len(worker) != 1 || worker[0] != "'self'" {
+		t.Errorf("worker-src directives = %q in %q, want one with 'self' only", worker, csp)
 	}
 }
 
