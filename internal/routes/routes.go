@@ -5,7 +5,7 @@
 // web/src/lib/routeTable.ts, each build their own list from routes.json,
 // embedded here, instead of restating it: a page added to one side and not
 // the other is no longer possible, because there is only one list left to
-// edit. See AGENTS.md for how each side reads it, and cmd/website's own test
+// edit. See AGENTS.md for how each side reads it, and cmd/frontend's own test
 // for the check that the prerendered output this table describes actually
 // exists.
 package routes
@@ -30,7 +30,7 @@ type Route struct {
 	// empty.
 	Slug string `json:"slug"`
 	// File is the prerendered file that answers Slug, relative to one
-	// locale's own directory under cmd/website/prerendered.
+	// locale's own directory under cmd/frontend/dist.
 	File string `json:"file"`
 }
 

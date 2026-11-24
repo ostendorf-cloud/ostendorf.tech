@@ -6,26 +6,25 @@ The global baseline already applies here and is not repeated below.
 
 ## Layout
 
-- `cmd/website` wires the service: config, construction, shutdown. `embed.go` embeds
-  `dist/` (the built SPA, written by `task web:build`) and `prerendered/` (the static
-  HTML per route and locale, written by `task prerender`). Both directories sit under
-  `cmd/` rather than `internal/` because `go:embed` resolves relative to the file
-  holding the directive, the same reason old_simon-ostendorf.de gave for its own
-  `templates` and `static`.
-- `internal/config` loads and validates the website's own environment once, aggregated
-  into one error. Every secret-shaped variable also accepts a `_FILE` twin; see the root
-  `README.md`'s Configuration table. The website itself has no secret manager client and
-  no Instagram or Meta credential of its own any more: see `internal/instagram`'s own
-  bullet below for where both moved to.
-- `internal/routes` is the website's one route table: `routes.json`, checked in and
+- `cmd/frontend` wires the frontend image, `cmd/api` the API image, `cmd/feed` the feed
+  service; see their own bullets below. `cmd/frontend/embed.go` embeds `dist/`, the
+  built SPA with the prerender written into it (`task web:build`, then `task
+  prerender`). It sits under `cmd/` rather than `internal/` because `go:embed` resolves
+  relative to the file holding the directive.
+- `internal/config` loads and validates the API's environment once, aggregated into
+  one error, `internal/frontendconfig` the frontend's. Every secret-shaped variable of
+  the API also accepts a `_FILE` twin; the frontend reads no secret. See the root
+  `README.md`'s Configuration table. Neither has a secret manager client or an
+  Instagram or Meta credential: see `internal/instagram`'s own bullet below for where
+  both moved to.
+- `internal/routes` is the site's one route table: `routes.json`, checked in and
   embedded through `//go:embed`, lists every page as a name, a slug and the prerendered
-  file that answers it. `internal/webapp`, `web/scripts/prerender.ts`, and the frontend's
-  own `web/src/router/index.ts` and `web/src/lib/seo.ts`, through the shared
-  `web/src/lib/routeTable.ts`, each read this one file to build their own list instead
-  of restating it, so a page added to one side and not the other can no longer happen;
-  see `internal/webapp`'s own bullet below for what proves that in practice. `routes.go`'s
+  file that answers it. `web/scripts/prerender.ts`, `web/src/router/index.ts` and
+  `web/src/lib/seo.ts`, through the shared `web/src/lib/routeTable.ts`, each read this
+  one file instead of restating it, and `cmd/frontend`'s
+  `TestPrerenderedOutputMatchesRouteTable` checks the real build against it. `routes.go`'s
   `Parse` rejects a table with a missing name or file, or a repeated name, slug or file,
-  before any of the five consumers above ever sees it; `routeTable.ts`'s own
+  before any consumer ever sees it; `routeTable.ts`'s own
   `validateRouteTable` enforces the exact same three rules for the frontend, which reads
   `routes.json` through Vite's JSON import rather than through Go, so it has no Go
   validation to inherit. `internal/routes/testdata/{valid,invalid}` holds the fixtures
@@ -60,7 +59,7 @@ The global baseline already applies here and is not repeated below.
   through `internal/openbao`'s KV v2 API under optimistic concurrency
   (CAS), refreshing it against Meta once it passes `TokenRefreshAge` and treating a CAS
   mismatch as the other side's write winning rather than an error. None of this runs
-  inside the website any more: `cmd/feed` is the only binary that imports this package,
+  inside the frontend or the API: `cmd/feed` is the only binary that imports this package,
   the only one with an OpenBao client, and the only one that ever holds the access
   token, exclusively in memory, never logged and never returned in an error. Because a
   refreshed token is written back to OpenBao rather than kept only in memory, it survives
@@ -97,10 +96,10 @@ The global baseline already applies here and is not repeated below.
   JSON; the one plain string conversion is the request header. `Write` is a full-document
   overwrite guarded by the version `Read` last saw, so two replicas writing at once cannot
   silently clobber each other. `cmd/feed` is the only binary that constructs one of these:
-  the website has no OpenBao client at all. `internal/secrettest` holds the test helpers
+  the frontend and the API have no OpenBao client at all. `internal/secrettest` holds the test helpers
   that prove a secret stays out of every error in an unwrap tree and every formatted value.
-- `cmd/feed` wires the feed service: a second binary alongside `cmd/website`, with its
-  own configuration (`internal/feedconfig`) and its own chart entry
+- `cmd/feed` wires the feed service: a third binary alongside `cmd/frontend` and
+  `cmd/api`, with its own configuration (`internal/feedconfig`) and its own chart entry
   (`charts/ostendorf.tech/templates/deployment-feed.yaml` and friends).
   `OPENBAO_AUTH_METHOD` is `kubernetes` (default, in a cluster) or `token` (local tests,
   `OPENBAO_TOKEN` or its `OPENBAO_TOKEN_FILE` twin); the variables of the other method are
@@ -115,7 +114,7 @@ The global baseline already applies here and is not repeated below.
   set `GOMEMLIMIT` below each memory limit. `internal/feed`
   builds it: the background loop that keeps `internal/instagram`'s `Feed` current from
   Meta using the OpenBao-backed token above, and the internal-only HTTP surface the
-  website reads from, `GET /api/v1/posts` and `GET /api/v1/posts/{id}/image`, alongside
+  API reads from, `GET /api/v1/posts` and `GET /api/v1/posts/{id}/image`, alongside
   `/healthz` and `/readyz` on the one listener. `/healthz` always answers 200 while the
   process is up; `/readyz` answers 503 until one full sync cycle has obtained a usable
   token and completed a call to Meta, and then stays 200 even through a later transient
@@ -125,8 +124,8 @@ The global baseline already applies here and is not repeated below.
   OpenBao or Meta therefore sits at `0/1` ready, retrying, rather than crash-looping or
   serving stale or absent data as if nothing were wrong. Its HTTP surface authenticates
   no caller of its own; it relies on the chart's `NetworkPolicy` admitting only the
-  website's pods instead, see `charts/ostendorf.tech/README.md`.
-- `internal/feedclient` is the website's own client against the feed service above: a
+  API's pods instead, see `charts/ostendorf.tech/README.md`.
+- `internal/feedclient` is the API's own client against the feed service above: a
   `Client` for its two routes, a `Cache` of the posts and picture bytes it last got back,
   and a `Syncer` that polls the feed service on an interval (`FEED_REFRESH_INTERVAL`) and
   keeps that `Cache` current, the same caching `internal/instagram` itself used to do
@@ -140,63 +139,73 @@ The global baseline already applies here and is not repeated below.
   `internal/webapp/feed.go` is the one place this package is read from. Its
   `GET /api/v1/instagram` answers every cached post at once, and `InstagramFeed.vue` shows
   them in batches of 12 per click without a further request.
-- Page views are reported to Umami from the server by govue's `analytics` package; the
-  site has no analytics code of its own. `internal/config` reads it through
-  `analytics.LoadConfig` (`UMAMI_URL`, `UMAMI_WEBSITE_ID`, `UMAMI_TIMEOUT`,
-  `UMAMI_QUEUE_SIZE`), and `internal/webapp`'s `New` builds the client with the trusted
-  proxy resolver (`TRUSTED_PROXIES`, chart value `config.trustedProxies`, the same names
-  on every site), `FullIP` off and the `analytics_views_dropped_total` counter, and
-  `Close` (called by `cmd/website` after the servers stopped, within 5 seconds) sends
-  what is queued. The client's `Middleware` wraps the mux directly in `buildHandler`:
-  it reads the route pattern the mux sets, so no middleware that replaces the request
-  may sit between the two, and every counted page needs its own `ServeMux` pattern
-  (`registerRoutes`). Only a 200 HTML answer to a GET counts, so redirects, the legal
-  aliases, 404s, assets and the API count nothing. No page title is reported.
-  `internal/webapp/analytics_test.go` proves it through the real handler chain. What is
-  counted is stated in `web/src/views/PrivacyView.vue`; change that text whenever the
-  payload changes, which means a govue upgrade that touches the analytics privacy
-  checklist.
-- `internal/webapp` builds two HTTP handlers from govue's packages. `Handler` is the
-  public one: the security and access log middleware, the client IP resolver and the rate
-  limiter, in front of pages, assets, the API routes and govue's contact handlers. There
-  is no session manager and no CSRF protector: every other route answers GET only and
-  changes nothing, and the contact handlers check the origin themselves. `AdminHandler`
-  is the second, smaller one govue's admin listener serves: health, readiness and
-  metrics, reached only from inside the cluster, never through the chart's own Ingress.
-  `pages.go` is the catch-all document handler:
-  the locale redirect at `/`, trailing slash canonicalisation, and serving the matching
-  prerendered file or a locale's own 404 page. Every route except the home page is a
-  legal page and is served at govue's exact `/<code>/<page>` with no trailing slash
-  (`/de/imprint`, not `/de/imprint/`); the old trailing slash form and the former
-  `/<code>/agb/` path redirect with 301. `language.HandleLegal` (mounted in `webapp.go`
-  outside the route chain, with `Terms` on) adds `/imprint`, `/privacy`, `/terms` and the
-  German aliases `/impressum`, `/datenschutz`, `/datenschutzerklaerung`, `/agb`, which
-  answer 302 and are never counted as page views. `web/scripts/prerender.ts` also writes
-  a govue `sitemap.xml` into `prerendered/`, and `pnpm run prerender` ends with
-  `govue-check-legal --require-terms` over that directory, so a page without the footer
-  links or a missing legal page fails the build. The sitemap the server answers is the Go
-  one; `cmd/website`'s `TestRuntimeSitemapMatchesPrerenderedSitemap` keeps both on the
-  same paths. `pages.go`'s own `routeFiles` is built
-  from `internal/routes`' embedded table, not hand written, so the page handler, the
-  per-page mux registration and `sitemap.go`'s `/robots.txt`/`/sitemap.xml` (which reads
-  that same `routeFiles`/`locales`) all answer from one list. That a page added to
-  `routes.json` actually gets prerendered, rather than merely agreeing with Go's own
-  copy of a list that no longer exists, is what `cmd/website`'s
-  `TestPrerenderedOutputMatchesRouteTable` checks: it walks the real output `task
-  prerender` wrote and compares it against `internal/routes`, catching both a route with
-  no prerendered file and a prerendered file that answers no route. `task test:routes`
-  runs it, with its own CI job. `contact.go` mounts govue's stateless contact form (see
-  its own bullet above): no cookie, no session, no CSRF token. govue keeps the contact
-  form's per client limits, its global mail ceiling and its proof of work replay set in
-  the memory of one process, so the Deployment stays at one replica: a second replica,
-  or two pods briefly coexisting during an ordinary rolling update, has its own copy of
-  each, which doubles every budget, the mail ceiling included, and lets a solved
-  challenge be used once per pod. `charts/ostendorf.tech` enforces the single replica at
-  render time and runs the Deployment with `strategy.type: Recreate`, so a rollout never
-  lets two pods coexist either. Lifts only once all of them move to a shared store:
-  `pow.Config.Seen` is an interface that can take one, but `contact.Config`'s limiters
-  are `*ratelimit.Limiter`, a concrete in-memory type, so govue offers no shared limiter
-  in v0.8.0.
+- Page views are reported to Umami from the frontend server by govue's `analytics`
+  package, through `frontend.Config.Analytics`; the site has no analytics code of its
+  own. `internal/frontendconfig` reads it through `analytics.LoadConfig` (`UMAMI_URL`,
+  `UMAMI_WEBSITE_ID`, `UMAMI_TIMEOUT`, `UMAMI_QUEUE_SIZE`), and `cmd/frontend/site.go`
+  builds the client with the trusted proxy resolver (`TRUSTED_PROXIES`, chart value
+  `config.trustedProxies`), `FullIP` off and the host of `SITE_URL`. govue places the
+  counter around its mux, registers `analytics_views_dropped_total` and closes the
+  client after the listeners stopped. Only a page answered with 200, or revalidated
+  with 304, counts, by its pattern and without the query; redirects, the legal aliases,
+  404s, assets, public files, robots.txt and the sitemap count nothing. The API counts
+  nothing. `cmd/frontend/site_test.go` proves it through the real build. What is counted
+  is stated in `web/src/views/PrivacyView.vue`; change that text whenever the payload
+  changes, which means a govue upgrade that touches the analytics privacy checklist.
+- The site runs as three images, released under one tag and deployed together:
+  `ostendorf-tech-frontend` (`cmd/frontend`), `ostendorf-tech-api` (`cmd/api`) and
+  `ostendorf-tech-feed` (`cmd/feed`). The Ingress routes `/api` to the API and every
+  other path to the frontend, so the browser sees one origin: no CORS, `connect-src
+  'self'`, and the contact form's `SITE_URL` trusted origin as before.
+- `cmd/frontend` is govue's `frontend` package and nothing else of its own: it embeds
+  `cmd/frontend/dist`, Vite's build with the prerendered pages, the 404 page per
+  language and `sitemap.xml` written into it, and calls `frontend.New` and `Run`. govue
+  serves every `loc` of the sitemap at its exact path, the slash forms with 301, the
+  assets, the three favicon files and `og-image.png` (`PublicFiles`), robots.txt from the
+  sitemap's origin, the language redirect at `/`, and `language.HandleLegal`'s aliases
+  `/imprint`, `/privacy`, `/terms`, `/impressum`, `/datenschutz`,
+  `/datenschutzerklaerung` and `/agb`. `/de/agb` and `/en/agb`, with and without the
+  slash, answer 301 to the terms page through `Config.Redirects`. govue injects the
+  favicon links, one `theme-color` tag per mode (`ThemeColor` `#f6f5fd`,
+  `ThemeColorDark` `#07060f`, the two ends of `--color-bg`) and its theme boot script
+  with `themeboot.WithDefaultMode(themeboot.ModeDark)`, and adds the script's hash to
+  `script-src`; it refuses a page that carries any of them already. The page rate limit
+  keeps an HTML answer in the page's language. The frontend holds no secret
+  (`internal/frontendconfig` reads none) and serves no API: `/api/` answers 404, unless
+  `FRONTEND_DEV_API_PROXY` is set, the development switch that turns on
+  `Config.Development` and forwards `/api/` to the API container. Only
+  `docker-compose.yaml` sets it, the chart never. The sitemap and robots.txt carry the
+  origin the image was built with (`VITE_SITE_URL`, default `https://ostendorf.tech`),
+  so an image serves one production origin. `cmd/frontend/build_test.go` runs the real
+  prerender output: every route of `internal/routes` has a page and every page answers
+  a route (`TestPrerenderedOutputMatchesRouteTable`, `task test:routes`, its own CI
+  job), every page pins `data-mode="dark"`, the indexing tags, no head markup govue
+  writes, and govue's `favicon.CheckPages` over the served pages. `site_test.go` feeds
+  the real build to `frontend.New` and checks the headers, the redirects, the counting
+  and the dev proxy.
+- `cmd/api` and `internal/webapp` are the API: two HTTP handlers from govue's packages,
+  no embedded frontend. `Handler` is the public one: the security and access log
+  middleware, the client IP resolver and the rate limiter (govue's JSON answer), in front
+  of govue's contact handlers, `GET /api/v1/instagram` from the feed client and a JSON
+  404 for every other path. There is no session manager and no CSRF protector: every
+  other route answers GET only and changes nothing, and the contact handlers check the
+  origin themselves. `AdminHandler` serves health, readiness and metrics on the admin
+  listener, reached only from inside the cluster, never through the chart's Ingress.
+  `internal/headertest` holds the security headers the single image sent before the
+  split; the frontend's and the API's tests compare their answers against it, with
+  only the nonce and the boot script hash dropped from the policy. `contact.go` mounts
+  govue's stateless contact form (see its own bullet above): no cookie, no session, no
+  CSRF token. govue keeps the contact form's per client limits, its global mail ceiling
+  and its proof of work replay set in the memory of one process, so the API Deployment
+  stays at one replica: a second replica, or two pods briefly coexisting during an
+  ordinary rolling update, has its own copy of each, which doubles every budget, the
+  mail ceiling included, and lets a solved challenge be used once per pod.
+  `charts/ostendorf.tech` enforces the single replica at render time and runs the API
+  Deployment with `strategy.type: Recreate`, so a rollout never lets two pods coexist
+  either. The frontend has no such state and may run several replicas. Lifts only once
+  all of them move to a shared store: `pow.Config.Seen` is an interface that can take
+  one, but `contact.Config`'s limiters are `*ratelimit.Limiter`, a concrete in-memory
+  type, so govue offers no shared limiter in v0.9.0.
 - `web/` is the Vue SPA, consuming govue's Vue package as a pnpm git dependency. `web/src`
   holds the app. The contact section in `web/src/views/HomeView.vue` renders govue's
   `GovueContactForm` with a cookie free client (`createClient({ credentials: 'omit' })`),
@@ -224,48 +233,50 @@ The global baseline already applies here and is not repeated below.
   `internal/routes/routes.json` from; `web/scripts/prerender.ts`, `web/src/router/index.ts`
   (the Vue Router table) and `web/src/lib/seo.ts` (the `PageRoute` list and its slugs) all
   import it instead of restating the page list themselves.
-- `charts/ostendorf.tech/` is the Helm chart, for both the website's and the feed
-  service's own workloads. `scripts/validate-chart.sh` renders it for its default values
-  and every documented non-default combination, and for a must-fail set proving every
-  render-time `fail` and `required` guard actually rejects the values it is meant to
-  reject, shared by `task lint:helm` and `task validate:kubeconform` so CI and a local
-  run check the exact same combinations; see `charts/ostendorf.tech/README.md`'s own
-  "Verification" section. `Dockerfile` is the multi-stage build for both of their
-  container images, as two separate final stages, `website` and `feed`
-  (`docker build --target website` or `--target feed`) rather than two Dockerfiles, since
-  the two binaries share `go.mod`/`go.sum` and the pinned base image digests; see the
-  comment at the top of `Dockerfile` itself for why a build of one target never triggers
-  the other's own stages. `docker-compose.yaml` is a local development stack for the
-  website, plus one feed service of the owner's choice, never both: `fakefeed`
-  (`cmd/fakefeed`, standard library only) under the `feed` profile, sample posts with
-  generated pictures on the real feed service's routes, or `realfeed`, the real `cmd/feed`
-  (Dockerfile target `feed`, token method, `OPENBAO_TOKEN` only a pass-through from `.env`)
-  under the `realfeed` profile. `FEED_SERVICE_URL` in `.env` names the one the website
-  reads. `fakefeed` is a third `Dockerfile` target that neither `website` nor `feed`
-  depends on and no workflow builds; `internal/envsync` proves both, and that each
-  service's port agrees across the compose file, the program and `.env.example`.
+- `charts/ostendorf.tech/` is the Helm chart for all three parts: a Deployment, Service
+  and ServiceAccount each for the frontend, the API and the feed, the Ingress or
+  HTTPRoute (`/api` to the API, `/` to the frontend) and one NetworkPolicy per part; see
+  `charts/ostendorf.tech/README.md`. `scripts/validate-chart.sh` renders it for its
+  default values and every documented non-default combination, and for a must-fail set
+  proving every render-time `fail` and `required` guard actually rejects the values it
+  is meant to reject, shared by `task lint:helm` and `task validate:kubeconform`.
+  `Dockerfile` is the multi-stage build for all three images, as final stages
+  `frontend`, `api` and `feed` (`docker build --target <name>`), since the binaries share
+  `go.mod`/`go.sum` and the pinned base image digests; only `frontend` runs the Node
+  stage. `.github/workflows/publish.yaml` builds each image on a native amd64 and arm64
+  runner and merges one manifest list per image under the release tag.
+  `docker-compose.yaml` is a local development stack: `frontend` on the one published
+  port (`LISTEN_PORT`), forwarding `/api/` to `api` through `FRONTEND_DEV_API_PROXY`, so
+  the browser has one origin as in production, plus one feed service of the owner's
+  choice, never both: `fakefeed` (`cmd/fakefeed`, standard library only) under the
+  `feed` profile, sample posts with generated pictures on the real feed service's routes,
+  or `realfeed`, the real `cmd/feed` (token method, `OPENBAO_TOKEN` only a pass-through
+  from `.env`) under the `realfeed` profile. `FEED_SERVICE_URL` in `.env` names the one
+  the API reads. `fakefeed` is a fourth `Dockerfile` target that no published image
+  depends on and no workflow builds; `internal/envsync` proves both, that each service's
+  port agrees across the compose file, the program and `.env.example`, and that the dev
+  proxy points at the API.
 
 ## A build needs the frontend first
 
-`cmd/website` cannot compile against an empty `dist/` or `prerendered/` directory,
-because `go:embed` fails when its pattern matches no file at all. `dist/` and
-`prerendered/` are both gitignored, generated by `task web:build` and `task prerender`
-respectively.
+`cmd/frontend` cannot compile against an empty `dist/` directory, because `go:embed`
+fails when its pattern matches no file at all. `cmd/frontend/dist/` is gitignored,
+written by `task web:build` and completed by `task prerender`.
 
-`task build` and `task test:go` both declare that dependency, so running either one
-through Task always populates the frontend first. A bare `go build ./cmd/website` or
-`go test ./cmd/website/...` outside Task fails on a fresh checkout for that reason; run
-`task build` or `task test:go` instead, or `task web:build && task prerender` once by
-hand before reaching for the Go toolchain directly.
+`task build`, `task test:go`, `lint:vet` and `lint:golangci` declare that dependency, so
+running one through Task always populates the frontend first. A bare `go build
+./cmd/frontend` or `go test ./...` outside Task fails on a fresh checkout for that
+reason; run `task web:build && task prerender` once by hand before reaching for the Go
+toolchain directly.
 
 `web:build` and `prerender` carry `run: once`: several targets reach them by more than one
-path, and two vite builds on `cmd/website/dist` at once fail with `ENOTEMPTY`. Keep that
+path, and two vite builds on `cmd/frontend/dist` at once fail with `ENOTEMPTY`. Keep that
 when adding a target that needs the frontend; `task check:build-once` asserts one start of
 each per target through `task --dry`, and its target list is in `scripts/check-build-once.sh`.
 
-`cmd/feed` has no `go:embed` directive anywhere in its own tree and needs none of this:
-`task build:feed` declares no frontend dependency, on purpose, and `go build ./cmd/feed`
-compiles on a fresh checkout with no prior step at all.
+`cmd/api` and `cmd/feed` embed nothing and need none of this: `task build:api` and `task
+build:feed` declare no frontend dependency, on purpose, and `cmd/api`'s own test fails
+when it gains a `go:embed` directive.
 
 ## govue's two halves move together
 
@@ -359,10 +370,11 @@ width differs from the file's pixels.
 and `og-image.png` (1200x630, the mark and the white wordmark on that same colour) are
 generated from it and from `web/src/assets/logo-wordmark-dark.svg`, never hand edited. The
 file names are govue's favicon contract (its Go package `favicon`), plus `og-image.png`.
-Vite copies `web/public` to the root of `dist/`, `internal/webapp/public.go` serves the
-four files there and refuses to start without one, `web/src/lib/icons.ts` writes the links
-into every prerendered head, and `cmd/website/icons_test.go` runs govue's
-`favicon.CheckPages` over the real output. The command, needing ImageMagick from
+Vite copies `web/public` to the root of `dist/`. govue's frontend serves the three icon
+files and `og-image.png` (a `PublicFiles` entry) from there, refuses to start without
+one, and injects the icon links into every page itself; `web/src/lib/icons.ts` writes
+only the social preview image's tags. `cmd/frontend/build_test.go` runs govue's
+`favicon.CheckPages` over the pages as the server sends them. The command, needing ImageMagick from
 `mise.toml`, run again whenever the SVG or the wordmark changes:
 
 ```sh
@@ -415,8 +427,8 @@ squares with no plate, through the `photo` field in `web/src/data/bands.ts`.
 
 The home page's hero, Leistungen, Impressionen, Bands, Über mich and Kontakt sections,
 the imprint, privacy and AGB pages, crawling (`robots.txt`, `sitemap.xml`), the Instagram
-feed (split across the website and the feed service, see `internal/instagram`'s own
-bullet above), the Umami hookup, both container images and the Helm chart are
+feed (split across the API and the feed service, see `internal/instagram`'s own
+bullet above), the Umami hookup, the three container images and the Helm chart are
 implemented. Left out, tracked as later milestones:
 
 - The Impressionen section is rendered by the browser after the page loads, from
