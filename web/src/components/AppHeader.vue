@@ -18,7 +18,8 @@ import LogoMark from './LogoMark.vue'
 import WordMark from './WordMark.vue'
 
 // The header's height is not a constant: below 480px govue's header puts
-// the navigation on a second row. Measuring it once here keeps
+// the navigation on a second row (styles.css holds the prerender fallback
+// per breakpoint). Measuring it once here keeps
 // scroll-padding-top (styles.css) equal to what is really on screen.
 const header = ref<{ $el: HTMLElement } | null>(null)
 let stopTracking = (): void => {}
@@ -106,12 +107,23 @@ function navigate(href: string): boolean {
 
     <GovueNav :items="items" :aria-label="t('nav.main')" />
 
+    <!-- govue's narrow setup: below 1024px the one cycle button and only the
+         link to the other language, so brand and actions stay one row; from
+         1024px the compact switch and both languages. hidden is display:
+         none, so the variant of the other width leaves the accessibility
+         tree, and contents keeps the visible one a flex item of the row. -->
     <template #theme>
-      <GovueThemeSwitch compact />
+      <span class="contents lg:hidden"><GovueThemeSwitch cycle /></span>
+      <span class="hidden lg:contents"><GovueThemeSwitch compact /></span>
     </template>
 
     <template #actions>
-      <GovueLanguageSwitch :link-for="linkFor" :navigate="navigate" />
+      <span class="contents lg:hidden">
+        <GovueLanguageSwitch :link-for="linkFor" :navigate="navigate" others-only />
+      </span>
+      <span class="hidden lg:contents">
+        <GovueLanguageSwitch :link-for="linkFor" :navigate="navigate" />
+      </span>
     </template>
   </GovueHeader>
 </template>

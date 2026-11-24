@@ -156,16 +156,27 @@ body {
  * --header-height on the root element (src/lib/headerHeight.ts), and every
  * anchored heading lands below it through this one rule instead of a
  * per-section guess. The values here are only what applies before the
- * script has run, a prerendered page for instance.
+ * script has run, a prerendered page for instance, and they equal what the
+ * script measures, so the hero's top padding does not move when it runs.
+ * They are read from govue's GovueHeader classes, not measured in a browser:
+ *
+ * - from 480px: one row of h-header (--spacing-header, 56px) plus the 1px
+ *   border-b the header keeps in every state, 57px.
+ * - below 480px: py-2 (8px above and below), the brand row of 44px (the
+ *   min-h-11 brand, the cycle button and the language link), gap-y-1 (4px),
+ *   the navigation row of 44px (govue's min-h-11 menu button) and the 1px
+ *   border, 109px.
+ *
+ * AppHeader.test.ts reads govue's classes and these two values.
  */
 :root {
-  --header-height: var(--spacing-header);
+  --header-height: calc(var(--spacing-header) + 1px);
   scroll-padding-top: calc(var(--header-height) + 1rem);
 }
 
 @media (width < 30rem) {
   :root {
-    --header-height: 6.75rem;
+    --header-height: calc(0.5rem + 2.75rem + 0.25rem + 2.75rem + 0.5rem + 1px);
   }
 }
 
