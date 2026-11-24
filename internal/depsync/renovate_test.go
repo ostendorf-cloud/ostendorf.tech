@@ -1,0 +1,114 @@
+package depsync
+
+import (
+	"encoding/json"
+	"os"
+	"regexp"
+	"slices"
+	"testing"
+)
+
+// renovateConfigPath is the repository's Renovate configuration, relative to this package.
+const renovateConfigPath = "../../renovate.json"
+
+// renovateConfig holds the parts of renovate.json this check reads.
+type renovateConfig struct {
+	CustomManagers []struct {
+		CustomType           string   `json:"customType"`
+		ManagerFilePatterns  []string `json:"managerFilePatterns"`
+		MatchStrings         []string `json:"matchStrings"`
+		DepNameTemplate      string   `json:"depNameTemplate"`
+		DatasourceTemplate   string   `json:"datasourceTemplate"`
+		CurrentValueTemplate string   `json:"currentValueTemplate"`
+	} `json:"customManagers"`
+	PackageRules []struct {
+		MatchPackageNames []string `json:"matchPackageNames"`
+		GroupName         string   `json:"groupName"`
+	} `json:"packageRules"`
+}
+
+func readRenovateConfig(t *testing.T) renovateConfig {
+	t.Helper()
+
+	raw, err := os.ReadFile(renovateConfigPath)
+	if err != nil {
+		t.Fatalf("read renovate.json: %v", err)
+	}
+
+	var cfg renovateConfig
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("parse renovate.json: %v", err)
+	}
+	return cfg
+}
+
+// TestRenovateGroupsGovueHalves fails when renovate.json no longer puts the Go module and
+// the npm package of govue into one group. Without the group Renovate raises the halves in
+// separate pull requests, and each fails check:govue-version.
+func TestRenovateGroupsGovueHalves(t *testing.T) {
+	t.Parallel()
+
+	cfg := readRenovateConfig(t)
+
+	var groups []string
+	for _, rule := range cfg.PackageRules {
+		if rule.GroupName == "" {
+			continue
+		}
+		if slices.Contains(rule.MatchPackageNames, goModulePath) &&
+			slices.Contains(rule.MatchPackageNames, "ostendorf-cloud/govue") {
+			groups = append(groups, rule.GroupName)
+		}
+	}
+
+	if len(groups) != 1 {
+		t.Fatalf("want exactly one packageRules group naming both %q and %q, got %d: %v",
+			goModulePath, "ostendorf-cloud/govue", len(groups), groups)
+	}
+}
+
+// TestRenovateManagerReadsGovueSpecifier fails when the custom manager's expression no
+// longer extracts the tag from web/package.json's real specifier. Renovate's own npm
+// manager skips that specifier ("unversioned-reference") because of the "&path:/web"
+// suffix, so this manager is the only way the npm half is ever updated.
+func TestRenovateManagerReadsGovueSpecifier(t *testing.T) {
+	t.Parallel()
+
+	cfg := readRenovateConfig(t)
+
+	raw, err := os.ReadFile(packageJSONPath)
+	if err != nil {
+		t.Fatalf("read web/package.json: %v", err)
+	}
+	wantTag, err := packageJSONGovueTag(t)
+	if err != nil {
+		t.Fatalf("resolve the tag in web/package.json: %v", err)
+	}
+
+	for _, manager := range cfg.CustomManagers {
+		if manager.CustomType != "regex" || manager.DepNameTemplate != "ostendorf-cloud/govue" {
+			continue
+		}
+		if manager.DatasourceTemplate != "github-tags" {
+			t.Fatalf("datasourceTemplate = %q, want github-tags", manager.DatasourceTemplate)
+		}
+		if !slices.Contains(manager.ManagerFilePatterns, "/^web/package\\.json$/") {
+			t.Fatalf("managerFilePatterns = %v, want web/package.json", manager.ManagerFilePatterns)
+		}
+		if len(manager.MatchStrings) != 1 {
+			t.Fatalf("want one matchStrings entry, got %d", len(manager.MatchStrings))
+		}
+
+		match := regexp.MustCompile(manager.MatchStrings[0]).FindSubmatch(raw)
+		if match == nil {
+			t.Fatalf("matchStrings %q finds nothing in web/package.json", manager.MatchStrings[0])
+		}
+		got := string(match[1])
+		if got != wantTag {
+			t.Fatalf("custom manager extracts tag %q, web/package.json pins %q", got, wantTag)
+		}
+		return
+	}
+
+	t.Fatal("renovate.json has no regex custom manager for ostendorf-cloud/govue")
+}
