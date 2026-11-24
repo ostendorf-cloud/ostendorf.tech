@@ -26,7 +26,7 @@ task = "3"
 # into an empty directory with a cold store: inspecting web/node_modules proves nothing,
 # because --frozen-lockfile leaves an already populated tree untouched.
 node = "26"
-pnpm = "12.21.0"
+pnpm = "12.23.0"
 # Pinned to the patch, not "2": a golangci-lint release is built against one Go patch and
 # cannot read the stdlib export data of a newer one, so the two versions move together.
 golangci-lint = "2.15.0"
