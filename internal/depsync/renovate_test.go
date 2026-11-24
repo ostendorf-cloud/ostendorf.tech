@@ -99,11 +99,16 @@ func TestRenovateManagerReadsGovueSpecifier(t *testing.T) {
 			t.Fatalf("want one matchStrings entry, got %d", len(manager.MatchStrings))
 		}
 
-		match := regexp.MustCompile(manager.MatchStrings[0]).FindSubmatch(raw)
+		re := regexp.MustCompile(manager.MatchStrings[0])
+		group := re.SubexpIndex("currentValue")
+		if group < 0 {
+			t.Fatalf("matchStrings %q has no named group currentValue", manager.MatchStrings[0])
+		}
+		match := re.FindSubmatch(raw)
 		if match == nil {
 			t.Fatalf("matchStrings %q finds nothing in web/package.json", manager.MatchStrings[0])
 		}
-		got := string(match[1])
+		got := string(match[group])
 		if got != wantTag {
 			t.Fatalf("custom manager extracts tag %q, web/package.json pins %q", got, wantTag)
 		}
