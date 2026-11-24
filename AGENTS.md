@@ -272,11 +272,14 @@ directly and fails when that dependency's resolution carries no `path: /web`.
 
 Renovate raises both halves in one pull request, group `govue` in `renovate.json`.
 Its own npm manager skips the `&path:/web` specifier (`unversioned-reference`), so a
-regex custom manager reads the tag from `web/package.json`. Renovate cannot regenerate
-`web/pnpm-lock.yaml` for a custom manager, and the self hosted runner allows no post
-upgrade commands. Manual step on every govue pull request: run
-`pnpm install --lockfile-only` in `web/` on the branch, check that the govue entry
-still carries `path: /web`, and push. The pull request body repeats this step.
+regex custom manager reads the tag from `web/package.json`. Renovate regenerates no lock
+file for a custom manager, so the shared preset `govue-lockfile` (extended in
+`renovate.json`) runs one fixed post upgrade command, `pnpm --dir web install
+--lockfile-only --ignore-scripts --ignore-pnpmfile`, and commits `web/pnpm-lock.yaml`.
+The `constraints.pnpm` value of the govue rule equals the pin in `mise.toml`: move both
+together. Check on every govue pull request that the lock file entry still carries
+`path: /web`: `task check:govue-version` fails when it does not. The command and its limits
+are described in the workflows repository, `docs/concepts/renovate-post-upgrade.md`.
 `internal/depsync/renovate_test.go` fails when the group or the manager goes missing.
 
 ## Verify before committing
