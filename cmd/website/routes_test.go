@@ -220,6 +220,20 @@ func TestPrerenderedThemeBootScriptIsByteIdenticalAcrossPages(t *testing.T) {
 			t.Errorf("%s has no <script id=\"theme-boot\"> tag", p)
 			return nil
 		}
+		_, fromTag, _ := strings.Cut(string(data), `<script id="theme-boot"`)
+		openTag, _, _ := strings.Cut(`<script id="theme-boot"`+fromTag, ">")
+		openTag += ">"
+		for _, want := range []string{
+			` data-storage-key="govue-theme"`,
+			` data-theme-color-light="#`,
+		} {
+			if !strings.Contains(openTag, want) {
+				t.Errorf("%s's theme-boot tag %q lacks %s", p, openTag, want)
+			}
+		}
+		if strings.Contains(script, "govue-theme") {
+			t.Errorf("%s's theme-boot text carries a filled in value", p)
+		}
 		pages++
 		if first == "" {
 			first, firstPath = script, p
@@ -243,13 +257,18 @@ func TestPrerenderedThemeBootScriptIsByteIdenticalAcrossPages(t *testing.T) {
 // plain cut, like openingHTMLTag above, over the same real build output
 // rather than a parse, since the exact bytes are what the CSP hash covers.
 func themeBootScriptOf(html string) (string, bool) {
-	const open = `<script id="theme-boot">`
+	const open = `<script id="theme-boot"`
 	const close = `</script>`
 	start := strings.Index(html, open)
 	if start == -1 {
 		return "", false
 	}
 	start += len(open)
+	tagEnd := strings.Index(html[start:], ">")
+	if tagEnd == -1 {
+		return "", false
+	}
+	start += tagEnd + 1
 	rest := html[start:]
 	end := strings.Index(rest, close)
 	if end == -1 {

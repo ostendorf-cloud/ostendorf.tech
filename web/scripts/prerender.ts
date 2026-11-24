@@ -45,6 +45,7 @@ import { attachLocaleSync, createAppRouter, NOT_FOUND_ROUTE_NAME } from '../src/
 // without a path to the stylesheet that has to survive the SSR build's
 // output directory.
 import vtechCss from '../src/theme/vtech.css?raw'
+import { themeBootElement } from './themeBoot'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const distDir = join(here, '../../cmd/website/dist')
@@ -152,14 +153,19 @@ const themeColorMeta = `<meta name="theme-color" content="${themeColorValues[DEF
  *  stored light preference leaving the chrome colour wrong too) into this
  *  one mechanism.
  *
- *  Its text has to stay byte identical on every page, with no per-page
- *  interpolation beyond the two constants below (the same on every page):
+ *  Its text is one constant (THEME_BOOT_TEXT in themeBoot.ts) with nothing
+ *  filled in. The two values it needs, STORAGE_KEY and the light theme
+ *  colour, are written as the data-storage-key and data-theme-color-light
+ *  attributes of the same script element, and the script reads them from
+ *  there at run time. Both attributes are the same on every page, so the
+ *  text stays byte identical everywhere:
  *  internal/webapp/themeboot.go computes one CSP script-src 'sha256-'
  *  source from whichever prerendered page it finds this script on first,
  *  since this site's CSP carries no 'unsafe-inline' for script-src and
  *  this static HTML has no per-response nonce to carry. The id="theme-boot"
- *  attribute is what that Go code locates the script by. */
-const themeBootScript = `<script id="theme-boot">(function(){try{var raw=localStorage.getItem(${JSON.stringify(STORAGE_KEY)});if(!raw){return}var stored=JSON.parse(raw);var mode=stored&&stored.mode;if(mode!=='light'&&mode!=='dark'&&mode!=='system'){return}var root=document.documentElement;var resolved=mode;if(mode==='system'){root.removeAttribute('data-mode');resolved=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}else{root.setAttribute('data-mode',mode)}if(resolved==='light'){var meta=document.querySelector('meta[name="theme-color"]');if(meta){meta.setAttribute('content',${JSON.stringify(themeColorValues.light)})}}}catch(e){}})();</script>`
+ *  attribute is what that Go code locates the script by; the attributes
+ *  are not part of the hashed text. */
+const themeBootScript = themeBootElement(STORAGE_KEY, themeColorValues.light)
 
 function heroSrcset(manifest: Record<string, ManifestEntry>): string {
   const variants = Object.entries(manifest)
