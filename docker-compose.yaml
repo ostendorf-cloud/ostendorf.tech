@@ -1,14 +1,15 @@
 services:
-  website:
+  # The pages, on the one browser origin of this stack. govue's frontend
+  # forwards /api/ to the api service below, so the browser talks to one
+  # origin as it does in production, where the Ingress routes /api.
+  frontend:
     build:
       context: .
       dockerfile: Dockerfile
-      # Dockerfile builds the final stages "website" and "feed", plus the
-      # development only "fakefeed" below; without this, a plain
-      # "docker build ." would still resolve to "website" since it is the
-      # last stage in the file, but naming it here keeps that from being
-      # implicit.
-      target: website
+      # Dockerfile builds the final stages "frontend", "api" and "feed", plus
+      # the development only "fakefeed" below; naming the target keeps it
+      # explicit.
+      target: frontend
     restart: unless-stopped
     environment:
       # ALLOW_PLAIN_HTTP: this compose file serves the site over plain
@@ -19,13 +20,40 @@ services:
       ALLOW_PLAIN_HTTP: "true"
       # LISTEN_PORT in .env is the one value that sets both the address the
       # container listens on and the host port published below, so the two
-      # cannot drift apart. Compose interpolation only knows ${VAR:-default},
-      # ${VAR-default}, ${VAR:?error}, ${VAR:+alternative} and their
-      # variants: it cannot cut the port out of an address like ":8123", so
-      # this file takes the port alone, not LISTEN_ADDR. A LISTEN_ADDR in
-      # .env is not forwarded and has no effect through this stack.
-      # internal/envsync checks that the two stay in step.
+      # cannot drift apart. Compose interpolation cannot cut the port out of
+      # an address like ":8123", so this file takes the port alone, not
+      # LISTEN_ADDR. internal/envsync checks that the two stay in step.
       LISTEN_ADDR: ":${LISTEN_PORT:-8080}"
+      SITE_URL: "http://localhost:${LISTEN_PORT:-8080}"
+      # The development switch: govue's frontend forwards /api/ to the api
+      # service. Only this stack sets it; the Helm chart never does. The
+      # port must be the one the api service listens on, internal/envsync
+      # checks that.
+      FRONTEND_DEV_API_PROXY: "http://api:8080"
+      # Page view counting is off unless both are set in .env or the shell.
+      # Empty values count as unset.
+      UMAMI_URL: "${UMAMI_URL:-}"
+      UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
+    ports:
+      # Loopback only. The admin listener (ADMIN_ADDR, 8081) is not published.
+      - "127.0.0.1:${LISTEN_PORT:-8080}:${LISTEN_PORT:-8080}"
+    depends_on:
+      - api
+
+  # The API: the contact form and the Impressionen feed. Not published to
+  # the host: the browser reaches it through the frontend's /api/.
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    environment:
+      ALLOW_PLAIN_HTTP: "true"
+      LISTEN_ADDR: ":8080"
+      # The browser's origin: the contact form trusts it, and its host is
+      # the audience of the proof of work challenge.
+      SITE_URL: "http://localhost:${LISTEN_PORT:-8080}"
       # The contact form answers 503 not_configured unless CHALLENGE_KEY and
       # SMTP_HOST are set in .env or the shell. Empty values count as unset.
       CHALLENGE_KEY: "${CHALLENGE_KEY:-}"
@@ -35,12 +63,8 @@ services:
       SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
       CONTACT_TO: "${CONTACT_TO:-}"
       CONTACT_FROM: "${CONTACT_FROM:-}"
-      # Page view counting is off unless both are set in .env or the shell.
-      # Empty values count as unset.
-      UMAMI_URL: "${UMAMI_URL:-}"
-      UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
       # Empty without a feed profile, which switches the Impressionen
-      # section off. The website talks to exactly one feed service, chosen by
+      # section off. The API talks to exactly one feed service, chosen by
       # this one variable together with the profile that starts it:
       #   --profile feed      FEED_SERVICE_URL=http://fakefeed:9081
       #   --profile realfeed  FEED_SERVICE_URL=http://realfeed:9081
@@ -49,16 +73,13 @@ services:
       # The ports must be the ones the services listen on below.
       # internal/envsync checks that.
       FEED_SERVICE_URL: "${FEED_SERVICE_URL:-}"
-    ports:
-      # Loopback only. The admin listener (ADMIN_ADDR, 8081) is not published.
-      - "127.0.0.1:${LISTEN_PORT:-8080}:${LISTEN_PORT:-8080}"
 
   # Development only: sample posts with generated pictures, no real Instagram
   # content. Not started by a plain "docker compose up", only with
   # "docker compose --profile feed up". The real feed service is the
-  # "realfeed" service below. Not published to the host: the website
-  # reaches it on the compose network at http://fakefeed:9081. The image is
-  # distroless, with no shell or curl, so there is no healthcheck.
+  # "realfeed" service below. Not published to the host: the API reaches it
+  # on the compose network at http://fakefeed:9081. The image is distroless,
+  # with no shell or curl, so there is no healthcheck.
   fakefeed:
     profiles: ["feed"]
     build:
@@ -76,7 +97,7 @@ services:
   # "feed") against an OpenBao the owner runs, with the token method. Started
   # only with "docker compose --profile realfeed up --build", instead of the
   # "feed" profile, never next to it. Set FEED_SERVICE_URL=http://realfeed:9081
-  # in .env so the website reads from it. Not published to the host. The image
+  # in .env so the API reads from it. Not published to the host. The image
   # is distroless, with no shell or curl, so there is no healthcheck: ask
   # /readyz from inside the network, or read the logs.
   # Every value is a pass-through from .env or the shell. OPENBAO_TOKEN is a

@@ -56,7 +56,7 @@ func TestEnvExampleDocumentsEveryVariable(t *testing.T) {
 
 	type variable struct{ name, source string }
 	var vars []variable
-	for _, src := range []string{"../config/config.go", "../feedconfig/config.go"} {
+	for _, src := range []string{"../config/config.go", "../frontendconfig/config.go", "../feedconfig/config.go"} {
 		code, err := os.ReadFile(src)
 		if err != nil {
 			t.Fatal(err)

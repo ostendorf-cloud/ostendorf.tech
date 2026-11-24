@@ -39,15 +39,15 @@ func TestComposeFakeFeed(t *testing.T) {
 	if fake.Build.Target != "fakefeed" {
 		t.Errorf("fakefeed builds target %q, want fakefeed", fake.Build.Target)
 	}
-	if got := services["website"].Profiles; len(got) != 0 {
-		t.Errorf("website has profiles %v, want none: it must start with a plain compose up", got)
+	if got := services["api"].Profiles; len(got) != 0 {
+		t.Errorf("api has profiles %v, want none: it must start with a plain compose up", got)
 	}
 
-	// Without the profile the website gets no feed URL: the section stays off.
-	website := services["website"]
+	// Without the profile the API gets no feed URL: the section stays off.
+	website := services["api"]
 	raw, ok := website.Environment["FEED_SERVICE_URL"]
 	if !ok {
-		t.Fatal("docker-compose.yaml does not pass FEED_SERVICE_URL to the website")
+		t.Fatal("docker-compose.yaml does not pass FEED_SERVICE_URL to the api")
 	}
 	if got, err := expand(raw, map[string]string{}); err != nil || got != "" {
 		t.Errorf("FEED_SERVICE_URL without .env = %q, %v; want empty", got, err)
