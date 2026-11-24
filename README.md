@@ -127,8 +127,8 @@ reports the route pattern of a page answered with 200 or revalidated with 304 (n
 the path or a query string), the origin of the referrer, the browser language, the user
 agent and the client address shortened to its /24 (IPv4) or /48 (IPv6). It leaves out
 Do Not Track, Global Privacy Control, prefetch, bots, private client addresses,
-redirects, errors, assets, public files, the sitemap, robots.txt and the API. Behind a proxy it needs
-`TRUSTED_PROXIES`: without it every request comes from the proxy's private
+redirects, errors, assets, public files, the sitemap, robots.txt and the API. Behind a
+proxy it needs `TRUSTED_PROXIES`: without it every request comes from the proxy's private
 address and nothing is counted (the startup log says so). The variable names did not
 change when the site moved to govue's package, so an existing deployment keeps working.
 Two things are stricter than before: plain `http` is accepted only for localhost or a
@@ -155,9 +155,10 @@ throttle, which answers 429.
 Set `CHALLENGE_KEY_PREVIOUS` to the key `CHALLENGE_KEY` previously held, in the same change that
 moves `CHALLENGE_KEY` to the new one. A challenge issued just before the rotation, and still
 sitting unsolved in a visitor's browser, verifies against either key; govue's `pow` signs new
-challenges with `CHALLENGE_KEY` only. Remove `CHALLENGE_KEY_PREVIOUS` again once the challenge TTL (10
-minutes) has safely passed. Leaving it unset, as before, means rotating `CHALLENGE_KEY` invalidates
-every challenge already issued the moment the new key takes effect.
+challenges with `CHALLENGE_KEY` only. Remove `CHALLENGE_KEY_PREVIOUS` again once the challenge
+TTL (10 minutes) has safely passed. Leaving it unset, as before, means rotating
+`CHALLENGE_KEY` invalidates every challenge already issued the moment the new key takes
+effect.
 
 `CHALLENGE_KEY_PREVIOUS` is for a planned rotation only. Never set it to a leaked key to keep that
 key verifying a little longer: a leaked `CHALLENGE_KEY` is dropped at once, with nothing put in

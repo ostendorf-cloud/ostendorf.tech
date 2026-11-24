@@ -45,14 +45,12 @@ The global baseline already applies here and is not repeated below.
   or without `SMTP_HOST` both routes answer 503 `not_configured`. The handler runs with
   `RequireConsent`: the form sends the consent box (`requireConsent` in `HomeView.vue`),
   and a submission without a ticked box is a field error before the proof of work. The
-  mail body is a German intro line, govue's `contact.DefaultBody` (name, address,
-  message) and one line stating that the browser reported the box as ticked and the
-  server's receive time (`Request.Received`), a claim of the client, not a proof.
-  `DefaultBody` takes its labels from `Request.Language`, the page language
-  `GovueContactForm` sends: `E-Mail:` and `Nachricht:` from a German page, so that mail
-  is German throughout, and the English labels from an English page or without a
-  language. The privacy page says what the mail holds in both languages; change it with
-  the body.
+  mail body is a German intro line, govue's body with its German labels
+  (`contact.LabelsFor("de").Body`: name, `E-Mail:`, `Nachricht:`) and one line stating
+  that the browser reported the box as ticked and the server's receive time
+  (`Request.Received`), a claim of the client, not a proof. Every mail goes to the
+  German owner, so it is German throughout, whatever page language the form sends. The
+  privacy page says what the mail holds in both languages. Change it with the body.
   `internal/webapp/contact_test.go` proves the wiring through the real handler chain with
   a fake `mail.Sender`.
 - `internal/instagram` is the domain logic behind the home page's Impressionen section:
@@ -231,7 +229,7 @@ The global baseline already applies here and is not repeated below.
   accessibility tree. Below 480 px govue's header has two rows, the brand row and the
   navigation row, which the owner accepted. `web/src/styles.css` holds the prerender
   fallback of `--header-height` per breakpoint, 57 px from 480 px and 109 px below,
-  read from govue's header classes; `AppHeader.test.ts` derives both from those classes
+  read from govue's header classes. `AppHeader.test.ts` derives both from those classes
   and fails when the stylesheet or govue moves. Its translucent ground is govue's
   `--color-header-bg` and `--header-backdrop` tokens in `web/src/theme/vtech.css`. On the
   home page it is govue's `overlay` header, transparent over the hero until the page
