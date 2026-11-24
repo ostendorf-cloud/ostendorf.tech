@@ -174,7 +174,7 @@ body {
   scroll-padding-top: calc(var(--header-height) + 1rem);
 }
 
-@media (width < 30rem) {
+@media (width < 480px) {
   :root {
     --header-height: calc(0.5rem + 2.75rem + 0.25rem + 2.75rem + 0.5rem + 1px);
   }

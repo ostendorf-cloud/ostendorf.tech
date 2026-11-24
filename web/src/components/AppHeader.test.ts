@@ -266,7 +266,7 @@ describe('anchor offset', () => {
 
   function fallback(css: string, phone: boolean): string {
     const block = phone
-      ? /@media \(width < 30rem\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1]
+      ? /@media \(width < 480px\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1]
       : /^:root\s*\{([^}]*)\}/m.exec(css)?.[1]
     const value = /--header-height:\s*([^;]+);/.exec(block ?? '')?.[1]
     expect(value, phone ? 'below 480px' : 'from 480px').toBeDefined()

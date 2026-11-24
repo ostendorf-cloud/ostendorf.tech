@@ -108,7 +108,7 @@ function navigate(href: string): boolean {
     <GovueNav :items="items" :aria-label="t('nav.main')" />
 
     <!-- govue's narrow setup: below 1024px the one cycle button and only the
-         link to the other language, so brand and actions stay one row; from
+         link to the other language, so brand and actions stay one row. From
          1024px the compact switch and both languages. hidden is display:
          none, so the variant of the other width leaves the accessibility
          tree, and contents keeps the visible one a flex item of the row. -->
