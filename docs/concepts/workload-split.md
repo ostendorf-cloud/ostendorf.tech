@@ -1,6 +1,10 @@
 # Splitting the website into frontend, backend and feed workloads
 
-Status: proposal, not decided. Tracked in issue #104. The owner decides.
+Status: implemented, see ADR 0001 and pull request 153. Tracked in issue #104.
+
+The text below is the intent as written before the split. It is not updated. The decision and
+the answers to its open questions are in
+[ADR 0001](../adr/0001-split-the-website-into-three-images.md).
 
 ## Problem
 
