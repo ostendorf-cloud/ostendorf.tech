@@ -155,7 +155,16 @@ func TestLoadPostCountZeroIsAccepted(t *testing.T) {
 func TestLoadRefusesPostsPerRequestOutOfRangeWithoutTheValue(t *testing.T) {
 	t.Parallel()
 
-	for _, raw := range []string{"0", "101", "-7", "987654321", "fifty"} {
+	// A plain number is made of hex digits, so %#v can print it by chance
+	// inside a pointer address such as (*errors.joinError)(0x1e8f55101210).
+	// Those values only prove the refusal and the name. The signed values
+	// carry a "+" or "-", which no address holds, and a long digit run, so
+	// asserting their absence from the error is deterministic. They refuse
+	// for the same reason as their unsigned twins: out of range.
+	for _, raw := range []string{
+		"0", "101", "-7", "987654321", "fifty",
+		"+101", "-1000000007", "+2000000011",
+	} {
 		t.Run(raw, func(t *testing.T) {
 			t.Parallel()
 
@@ -166,9 +175,7 @@ func TestLoadRefusesPostsPerRequestOutOfRangeWithoutTheValue(t *testing.T) {
 			if !strings.Contains(err.Error(), "POSTS_PER_REQUEST") {
 				t.Errorf("Load() error does not name POSTS_PER_REQUEST")
 			}
-			if len(raw) > 2 {
-				// One and two digit values are too short to search for
-				// without matching the bounds the message names.
+			if !secrettest.ChanceProne(raw) {
 				secrettest.AssertHidden(t, err, raw)
 			}
 		})
