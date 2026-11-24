@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ostendorf-cloud/ostendorf.tech/internal/secrettest"
 )
 
 // env builds a getenv function from a map, so a test can set exactly the
@@ -75,8 +77,13 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.APIVersion != DefaultAPIVersion {
 		t.Errorf("APIVersion = %q, want %q", cfg.APIVersion, DefaultAPIVersion)
 	}
-	if cfg.PostCount != DefaultPostCount {
-		t.Errorf("PostCount = %d, want %d", cfg.PostCount, DefaultPostCount)
+	// Spelled out rather than read back from the constants, so a changed
+	// default fails here.
+	if cfg.PostCount != 200 {
+		t.Errorf("PostCount = %d, want 200", cfg.PostCount)
+	}
+	if cfg.PostsPerRequest != 50 {
+		t.Errorf("PostsPerRequest = %d, want 50", cfg.PostsPerRequest)
 	}
 }
 
@@ -92,6 +99,7 @@ func TestLoadOverrides(t *testing.T) {
 		"TOKEN_REFRESH_AGE":   "14d",
 		"API_VERSION":         "v24.0",
 		"POST_COUNT":          "8",
+		"POSTS_PER_REQUEST":   "100",
 	})))
 	if err != nil {
 		t.Fatalf("Load() returned an unexpected error: %v", err)
@@ -119,6 +127,51 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.PostCount != 8 {
 		t.Errorf("PostCount = %d, want 8", cfg.PostCount)
+	}
+	if cfg.PostsPerRequest != 100 {
+		t.Errorf("PostsPerRequest = %d, want 100", cfg.PostsPerRequest)
+	}
+}
+
+// TestLoadPostCountZeroIsAccepted proves POST_COUNT=0, the maximum of
+// 10000 posts, is accepted rather than refused, and POSTS_PER_REQUEST=1
+// with it: 10000 posts at one per request stay within the client's page
+// bound, see internal/instagram's TestMediaZeroMeansTheMaximumAtOnePostPerRequest.
+func TestLoadPostCountZeroIsAccepted(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := Load(env(requiredValues(map[string]string{"POST_COUNT": "0", "POSTS_PER_REQUEST": "1"})))
+	if err != nil {
+		t.Fatalf("Load() returned an unexpected error: %v", err)
+	}
+	if cfg.PostCount != 0 || cfg.PostsPerRequest != 1 {
+		t.Errorf("PostCount, PostsPerRequest = %d, %d; want 0, 1", cfg.PostCount, cfg.PostsPerRequest)
+	}
+}
+
+// TestLoadRefusesPostsPerRequestOutOfRangeWithoutTheValue proves a value
+// outside 1 to 100 is a startup error that names the variable and never
+// quotes the value, over the whole unwrap tree.
+func TestLoadRefusesPostsPerRequestOutOfRangeWithoutTheValue(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{"0", "101", "-7", "987654321", "fifty"} {
+		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := Load(env(requiredValues(map[string]string{"POSTS_PER_REQUEST": raw})))
+			if err == nil {
+				t.Fatal("Load() = nil error, want one naming POSTS_PER_REQUEST")
+			}
+			if !strings.Contains(err.Error(), "POSTS_PER_REQUEST") {
+				t.Errorf("Load() error does not name POSTS_PER_REQUEST")
+			}
+			if len(raw) > 2 {
+				// One and two digit values are too short to search for
+				// without matching the bounds the message names.
+				secrettest.AssertHidden(t, err, raw)
+			}
+		})
 	}
 }
 
@@ -210,13 +263,21 @@ func TestLoadRejectsEachInvalidField(t *testing.T) {
 			env:  map[string]string{"TOKEN_REFRESH_AGE": "60d"},
 			want: "TOKEN_REFRESH_AGE",
 		},
-		"post count of zero": {
-			env:  map[string]string{"POST_COUNT": "0"},
+		"negative post count": {
+			env:  map[string]string{"POST_COUNT": "-1"},
 			want: "POST_COUNT",
 		},
-		"post count above the API maximum": {
-			env:  map[string]string{"POST_COUNT": "500"},
+		"post count above the ceiling": {
+			env:  map[string]string{"POST_COUNT": "10001"},
 			want: "POST_COUNT",
+		},
+		"posts per request of zero": {
+			env:  map[string]string{"POSTS_PER_REQUEST": "0"},
+			want: "POSTS_PER_REQUEST",
+		},
+		"posts per request above the API maximum": {
+			env:  map[string]string{"POSTS_PER_REQUEST": "101"},
+			want: "POSTS_PER_REQUEST",
 		},
 	}
 

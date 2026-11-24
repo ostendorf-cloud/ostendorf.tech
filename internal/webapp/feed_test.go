@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/ostendorf-cloud/ostendorf.tech/internal/feedclient"
@@ -87,6 +88,31 @@ func TestInstagramFeedListsPosts(t *testing.T) {
 		if len(post) != 3 {
 			t.Errorf("post %d carries %v, want exactly id, alt and permalink", i, post)
 		}
+	}
+}
+
+// TestInstagramFeedListsEveryCachedPost proves the browser gets every post
+// of the cache in one answer: the section shows them in batches without a
+// further request per click.
+func TestInstagramFeedListsEveryCachedPost(t *testing.T) {
+	app := testApp(t)
+	const n = 250
+	posts := make([]*feedclient.CachedPost, 0, n)
+	for i := range n {
+		posts = append(posts, &feedclient.CachedPost{ID: strconv.Itoa(i), Permalink: "https://www.instagram.com/p/A/", Alt: "Bild", Image: jpeg, ContentType: "image/jpeg", ETag: `"abc"`})
+	}
+	app.feedCache.Set(posts)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/instagram", nil)
+	rec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(rec, req)
+
+	feed := decodeFeed(t, rec.Body.Bytes())
+	if len(feed.Posts) != n {
+		t.Fatalf("posts = %d, want all %d", len(feed.Posts), n)
+	}
+	if feed.Posts[n-1].ID != strconv.Itoa(n-1) {
+		t.Errorf("last post = %s, want %d", feed.Posts[n-1].ID, n-1)
 	}
 }
 

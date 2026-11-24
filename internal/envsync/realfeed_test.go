@@ -45,6 +45,10 @@ func TestComposeRealFeed(t *testing.T) {
 	for name, given := range map[string]map[string]string{
 		"empty .env": {},
 		"token set":  {"OPENBAO_ADDR": "http://host.containers.internal:8200", "OPENBAO_TOKEN": "s.test"},
+		"paging set": {
+			"OPENBAO_ADDR": "http://host.containers.internal:8200", "OPENBAO_TOKEN": "s.test",
+			"POST_COUNT": "0", "POSTS_PER_REQUEST": "100",
+		},
 	} {
 		env := map[string]string{}
 		for k, v := range real.Environment {
@@ -64,6 +68,13 @@ func TestComposeRealFeed(t *testing.T) {
 				t.Errorf("feedconfig.Load rejects compose's environment: %v", err)
 			} else if cfg.ListenAddr != real.Environment["LISTEN_ADDR"] {
 				t.Errorf("feed listens on %q, compose says %q", cfg.ListenAddr, real.Environment["LISTEN_ADDR"])
+			}
+		case "paging set":
+			// Both paging values reach the feed service from .env.
+			if err != nil {
+				t.Errorf("feedconfig.Load rejects compose's environment with paging values: %v", err)
+			} else if cfg.PostCount != 0 || cfg.PostsPerRequest != 100 {
+				t.Errorf("POST_COUNT, POSTS_PER_REQUEST arrive as %d, %d; want 0, 100 from .env", cfg.PostCount, cfg.PostsPerRequest)
 			}
 		default:
 			if err == nil {

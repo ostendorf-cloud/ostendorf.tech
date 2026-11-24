@@ -68,7 +68,8 @@ services:
     restart: unless-stopped
     environment:
       LISTEN_ADDR: ":9081"
-      # Number of sample posts, 1 to 100. Empty means the default, 20.
+      # Number of sample posts, 0 to 200. Empty or 0 means the whole sample
+      # account, 40 posts.
       POST_COUNT: "${POST_COUNT:-}"
 
   # Development only: the real feed service (cmd/feed, Dockerfile target
@@ -105,4 +106,5 @@ services:
       TOKEN_REFRESH_AGE: "${TOKEN_REFRESH_AGE:-}"
       API_VERSION: "${API_VERSION:-}"
       POST_COUNT: "${POST_COUNT:-}"
+      POSTS_PER_REQUEST: "${POSTS_PER_REQUEST:-}"
       LOG_LEVEL: "${LOG_LEVEL:-}"

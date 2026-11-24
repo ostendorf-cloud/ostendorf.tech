@@ -10,6 +10,25 @@ set:
       openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
       openBaoRole: ostendorf-tech-feed
 tests:
+  - it: renders GOMEMLIMIT below the memory limit by default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            value: "144MiB"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 160Mi
+
+  - it: refuses a feed.goMemLimit at or above the memory limit
+    set:
+      feed:
+        goMemLimit: 1GiB
+    asserts:
+      - failedTemplate:
+          errorPattern: "feed.goMemLimit must be below feed.resources.limits.memory"
+
   - it: renders nothing when feed.enabled is false, the default
     set:
       feed:
@@ -163,7 +182,30 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: POST_COUNT
-            value: "20"
+            value: "200"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTS_PER_REQUEST
+            value: "50"
+
+  - it: passes postCount 0, the maximum, and a custom postsPerRequest through
+    set:
+      feed:
+        config:
+          postCount: 0
+          postsPerRequest: 100
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POST_COUNT
+            value: "0"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTS_PER_REQUEST
+            value: "100"
 
   - it: moves OPENBAO_JWT_FILE, the volume mount path and the projected source's path together when overridden
     set:

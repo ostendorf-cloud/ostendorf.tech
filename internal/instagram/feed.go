@@ -88,9 +88,13 @@ type Syncer struct {
 	Client *Client
 	// Tokens is asked for the token every cycle; required.
 	Tokens TokenSource
-	Count  int
-	Feed   *Feed
-	Logger *slog.Logger
+	// Count caps the posts of one cycle; zero means MaxPosts.
+	Count int
+	// PerRequest is how many posts one call to Meta asks for, 1 to
+	// MaxPostsPerRequest; zero means DefaultPostsPerRequest.
+	PerRequest int
+	Feed       *Feed
+	Logger     *slog.Logger
 }
 
 // Run syncs at start and then every interval until ctx ends. Errors are
@@ -127,8 +131,12 @@ func sleep(ctx context.Context, d time.Duration) bool {
 	}
 }
 
-// Sync runs one cycle: token, then media, then images.
+// Sync runs one cycle: token, then every page of media, then images. A
+// cycle that fails on any page changes nothing: the feed is replaced only
+// once every page was read, so a failing page 2 keeps the last good feed in
+// full rather than shrinking it to page 1.
 func (s *Syncer) Sync(ctx context.Context) error {
+	start := time.Now()
 	if s.Tokens == nil {
 		return errors.New("instagram: no token source configured")
 	}
@@ -136,10 +144,15 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	media, err := s.Client.Media(ctx, token, s.Count)
-	if err != nil {
-		return err
+	perRequest := s.PerRequest
+	if perRequest == 0 {
+		perRequest = DefaultPostsPerRequest
 	}
+	result, err := s.Client.Media(ctx, token, perRequest, s.Count)
+	if err != nil {
+		return fmt.Errorf("%w (after %d pages, %d posts)", err, result.Pages, len(result.Media))
+	}
+	media := result.Media
 
 	var posts []*Post
 	var failures int
@@ -173,7 +186,11 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		return fmt.Errorf("instagram: no usable posts among %d returned", len(media))
 	}
 	s.Feed.Set(posts)
-	s.Logger.Info("instagram feed updated", "posts", len(posts), "failed_images", failures)
+	s.Logger.Info("instagram feed updated",
+		"posts", len(posts),
+		"pages", result.Pages,
+		"failed_images", failures,
+		"duration", time.Since(start).Round(time.Millisecond).String())
 	return nil
 }
 

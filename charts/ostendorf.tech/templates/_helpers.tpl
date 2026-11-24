@@ -158,3 +158,30 @@ issue #24's plan), and no default here could ever name one that actually exists.
 {{- define "ostendorf-tech.feed.openBaoRole" -}}
 {{- required "feed.config.openBaoRole is required: set it to the OpenBao Kubernetes auth role the feed service logs in as. There is no default, since none could ever name a role that actually exists in your OpenBao installation." .Values.feed.config.openBaoRole -}}
 {{- end -}}
+
+{{/*
+GOMEMLIMIT must stay below the container's memory limit, or the Go runtime never
+collects early enough to keep the pod inside it. Called with a list: the value's
+name, the value, the memory limit's name and the memory limit. values.schema.json
+already checks the value's form (a whole number with an optional B, KiB, MiB, GiB or
+TiB suffix). The limit is compared when it is a whole number with an optional Ki, Mi,
+Gi, Ti, k, M, G or T suffix; another quantity form, a decimal for example, is not
+compared. An empty value or an empty limit renders nothing to check.
+*/}}
+{{- define "ostendorf-tech.checkGoMemLimit" -}}
+{{- $name := index . 0 -}}
+{{- $value := index . 1 | default "" | toString -}}
+{{- $limitName := index . 2 -}}
+{{- $limit := index . 3 | default "" | toString -}}
+{{- $goUnits := dict "" 1 "B" 1 "KiB" 1024 "MiB" 1048576 "GiB" 1073741824 "TiB" 1099511627776 -}}
+{{- $kubeUnits := dict "" 1 "Ki" 1024 "Mi" 1048576 "Gi" 1073741824 "Ti" 1099511627776 "k" 1000 "M" 1000000 "G" 1000000000 "T" 1000000000000 -}}
+{{- if and $value $limit (regexMatch "^[0-9]+(B|KiB|MiB|GiB|TiB)?$" $value) (regexMatch "^[0-9]+(Ki|Mi|Gi|Ti|k|M|G|T)?$" $limit) -}}
+{{- $valueDigits := regexFind "^[0-9]+" $value -}}
+{{- $valueBytes := mul ($valueDigits | int64) (get $goUnits (trimPrefix $valueDigits $value)) -}}
+{{- $limitDigits := regexFind "^[0-9]+" $limit -}}
+{{- $limitBytes := mul ($limitDigits | int64) (get $kubeUnits (trimPrefix $limitDigits $limit)) -}}
+{{- if ge $valueBytes $limitBytes -}}
+{{- fail (printf "%s must be below %s: GOMEMLIMIT is the heap size at which Go collects harder, so it has to leave room under the container's memory limit. About 90 percent of the limit is the default." $name $limitName) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}

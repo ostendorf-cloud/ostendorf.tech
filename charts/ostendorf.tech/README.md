@@ -278,6 +278,37 @@ The website reaches the feed service over `FEED_SERVICE_URL`, computed by
 for it: this value must always resolve to this exact release's own feed `Service`, in the same
 namespace, so there is no legitimate reason for an installer to point it elsewhere.
 
+### Posts and memory
+
+The feed service collects the posts of the account. `feed.config.postCount` caps the number of
+posts, `0` means the maximum of 10000 (default `200`). It asks Meta for
+`feed.config.postsPerRequest` posts per request (default `50`, `1` to `100`) and follows Meta's
+paging cursor. The pages of one sync are fetched one after the other with a pause of 500 ms
+between them (`DefaultPagePause` in `internal/instagram/client.go`). Redirects are not followed.
+A 3xx, a 429 or any other 4xx from Meta ends the sync, and the last good feed stays until a
+sync reads every page.
+
+Every post is held in memory with its picture, in the feed pod and again in the website pod:
+
+```text
+live heap      ≈ base + posts × average picture size
+posts          = postCount, or 10000 with postCount 0
+picture size   ≈ 100 to 300 KiB for Instagram's 1080 px JPEGs, at most 4 MiB each
+peak per sync  ≈ previous feed + newly downloaded pictures
+without a GOMEMLIMIT the heap can grow to about 2 × live heap before a collection
+```
+
+`goMemLimit` and `feed.goMemLimit` set `GOMEMLIMIT` next to each memory limit, at about
+90 percent of it by default (`172MiB` for `192Mi`, `144MiB` for `160Mi`). Go then collects
+before the heap reaches the limit instead of at twice the live heap. The chart refuses a value
+at or above the memory limit, and `values.schema.json` refuses a value Go cannot read. Change
+both together.
+
+The default 200 posts take about 20 to 60 MiB of live heap in each pod, which the default
+`resources`, `feed.resources` and both `goMemLimit` values cover. Raise all of them before
+raising `postCount`: 1000 posts take about 100 to 300 MiB in each pod. The website keeps at most
+10000 posts whatever the feed service sends.
+
 ## NetworkPolicy
 
 `feed.networkPolicy.enabled` defaults to `true`, but only takes effect once `feed.enabled` is
@@ -399,6 +430,7 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `httpRoute.parentRefs.namespace` | Namespace the `Gateway` lives in. Required when `httpRoute.enabled` is true; see "External routing" above for why this has no same-namespace fallback | `""` |
 | `httpRoute.parentRefs.sectionName` | Specific listener on the `Gateway` to attach to, when it exposes more than one | `""` |
 | `resources` | Pod resource requests/limits | see `values.yaml` |
+| `goMemLimit` | `GOMEMLIMIT` of the website, below `resources.limits.memory`; empty renders none, see "Posts and memory" | `172MiB` |
 | `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
 | `config.listenAddr` | Address the public listener binds (`LISTEN_ADDR`); must match `service.port` | `:8080` |
 | `config.logLevel` | `debug`, `info`, `warn` or `error` (`LOG_LEVEL`) | `info` |
@@ -435,7 +467,9 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `feed.config.syncInterval` | How often the feed is reloaded from Meta, `1m` to `24h` | `1h` |
 | `feed.config.tokenRefreshAge` | Token age after which a refresh is tried, `24h` to `50d` | `7d` |
 | `feed.config.apiVersion` | Graph API version calls are made against | `v23.0` |
-| `feed.config.postCount` | Posts asked for per sync, `1` to `100` | `20` |
+| `feed.config.postCount` | Caps the number of posts one sync collects, `0` means the maximum of `10000`; each costs its picture in memory, see "Posts and memory" | `200` |
+| `feed.config.postsPerRequest` | Posts one request to Meta asks for, `1` to `100` | `50` |
+| `feed.goMemLimit` | `GOMEMLIMIT` of the feed service, below `feed.resources.limits.memory`; empty renders none, see "Posts and memory" | `144MiB` |
 | `feed.serviceAccountToken.audience` | Audience of the projected token. Empty uses the API server's default | `""` |
 | `feed.serviceAccountToken.expirationSeconds` | Lifetime of the projected token | `3600` |
 | `feed.networkPolicy.enabled` | Create a `NetworkPolicy` restricting the feed service's traffic, once `feed.enabled` is also true; see "NetworkPolicy" above | `true` |

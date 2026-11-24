@@ -181,7 +181,9 @@ compose" below for the real one.
 The `fakefeed` service (`cmd/fakefeed`) serves generated sample posts and pictures on the
 same routes as the real feed service, never real Instagram content. It publishes no host
 port: the website reaches it on the compose network. `POST_COUNT` in `.env` sets how many
-sample posts there are, 20 by default. The fake is its own `fakefeed` target in the
+sample posts there are, 0 to 200, and empty or 0 means its whole sample account of 40. The
+real feed service reads the same variable as a cap, see below. The fake is its own `fakefeed`
+target in the
 `Dockerfile`; no production target depends on it and no workflow builds or publishes it.
 The fake needs no OpenBao.
 
@@ -244,8 +246,14 @@ podman compose --profile realfeed up --build
   `http://host.containers.internal:8200` with Podman and `http://host.docker.internal:8200`
   with Docker.
 - Compose also forwards `OPENBAO_SECRET_KEY_ACCESS_TOKEN`, `OPENBAO_SECRET_KEY_REFRESHED_AT`,
-  `SYNC_INTERVAL`, `TOKEN_REFRESH_AGE`, `API_VERSION`, `POST_COUNT` and `LOG_LEVEL`. Empty
-  means the service's own default.
+  `SYNC_INTERVAL`, `TOKEN_REFRESH_AGE`, `API_VERSION`, `POST_COUNT`, `POSTS_PER_REQUEST` and
+  `LOG_LEVEL`. Empty means the service's own default.
+- `POST_COUNT` caps the number of posts, 0 means the maximum of 10000. The default is 200.
+  `POSTS_PER_REQUEST` is how many posts one request to Meta asks for, default 50, `1` to
+  `100`. Each post costs its picture in memory, in the feed service and again in the
+  website: see "Posts and memory" in `charts/ostendorf.tech/README.md`, which also covers
+  the chart's `GOMEMLIMIT`.
+- The feed service follows no redirect from Meta or from a picture host.
 - `OPENBAO_TOKEN_FILE` is not forwarded: a bind mount of a file that may be absent cannot be
   optional in compose.
 - The token never goes into `docker-compose.yaml`. It is only read from `.env` or the shell.

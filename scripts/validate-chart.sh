@@ -4,7 +4,8 @@
 # templates/deployment.yaml, templates/deployment-feed.yaml and templates/httproute.yaml
 # fail/required guard actually rejects the values it is meant to reject, plus the
 # values.schema.json refusals of the feed's OpenBao auth values (a plain token value
-# above all). Shared by
+# above all), of its postCount and postsPerRequest ranges and of the goMemLimit form,
+# and the guard that keeps each goMemLimit below its memory limit. Shared by
 # task lint:helm and task validate:kubeconform so CI and a local run check the exact same
 # succeed combinations. Every combination, succeed and fail alike, also carries the
 # baseline below: existingSecret.name has no usable default and is enforced by a
@@ -164,6 +165,13 @@ if [ "$mode" = "lint" ]; then
     "feed token given as a plain value"
     "feed removed tokenPath value"
     "feed secret key name with a slash"
+    "feed postsPerRequest above Meta's maximum"
+    "feed postsPerRequest of zero"
+    "feed negative postCount"
+    "feed postCount above the maximum"
+    "goMemLimit at the website's memory limit"
+    "feed.goMemLimit above the feed's memory limit"
+    "feed.goMemLimit not in Go's form"
     "config.allowPlainHttp true with an https config.siteUrl"
     "config.allowPlainHttp true with an upper case HTTPS config.siteUrl"
   )
@@ -185,6 +193,13 @@ if [ "$mode" = "lint" ]; then
     "${baseline},${feed_token_valid},feed.openBaoToken.value=not-a-real-token"
     "${baseline},${feed_valid},feed.config.tokenPath=old/data/path"
     "${baseline},${feed_valid},feed.config.openBaoSecretKeyAccessToken=ig/token"
+    "${baseline},${feed_valid},feed.config.postsPerRequest=101"
+    "${baseline},${feed_valid},feed.config.postsPerRequest=0"
+    "${baseline},${feed_valid},feed.config.postCount=-1"
+    "${baseline},${feed_valid},feed.config.postCount=10001"
+    "${baseline},goMemLimit=192MiB"
+    "${baseline},${feed_valid},feed.goMemLimit=200MiB"
+    "${baseline},${feed_valid},feed.goMemLimit=144M"
     "${baseline},config.allowPlainHttp=true,config.siteUrl=https://ostendorf.tech"
     "${baseline},config.allowPlainHttp=true,config.siteUrl=HTTPS://ostendorf.tech"
   )
@@ -206,6 +221,13 @@ if [ "$mode" = "lint" ]; then
     "at '/feed/openBaoToken': additional properties 'value' not allowed"
     "at '/feed/config/tokenPath': false schema"
     "at '/feed/config/openBaoSecretKeyAccessToken'"
+    "at '/feed/config/postsPerRequest': maximum"
+    "at '/feed/config/postsPerRequest': minimum"
+    "at '/feed/config/postCount': minimum"
+    "at '/feed/config/postCount': maximum"
+    "goMemLimit must be below resources.limits.memory"
+    "feed.goMemLimit must be below feed.resources.limits.memory"
+    "at '/feed/goMemLimit'"
     "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
     "config.allowPlainHttp must not be true when config.siteUrl is https: it turns HSTS off, which a site served over https must keep. Set it only for a plain http development run, or serve the site over plain http."
   )

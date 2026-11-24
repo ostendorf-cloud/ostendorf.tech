@@ -13,6 +13,37 @@ set:
   existingSecret:
     name: ostendorf-tech-secrets
 tests:
+  - it: renders GOMEMLIMIT below the memory limit by default
+    template: templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            value: "172MiB"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 192Mi
+
+  - it: renders no GOMEMLIMIT when goMemLimit is empty
+    template: templates/deployment.yaml
+    set:
+      goMemLimit: ""
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          any: true
+          content:
+            name: GOMEMLIMIT
+
+  - it: refuses a goMemLimit at or above the memory limit
+    template: templates/deployment.yaml
+    set:
+      goMemLimit: 192MiB
+    asserts:
+      - failedTemplate:
+          errorPattern: "goMemLimit must be below resources.limits.memory"
+
   - it: renders exactly one replica
     template: templates/deployment.yaml
     asserts:

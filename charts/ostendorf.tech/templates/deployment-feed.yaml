@@ -1,5 +1,6 @@
 {{- if .Values.feed.enabled -}}
 {{- $kubernetes := eq (include "ostendorf-tech.feed.openBaoAuthMethod" .) "kubernetes" -}}
+{{- include "ostendorf-tech.checkGoMemLimit" (list "feed.goMemLimit" .Values.feed.goMemLimit "feed.resources.limits.memory" (dig "limits" "memory" "" (.Values.feed.resources | default dict))) -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -57,6 +58,10 @@ spec:
               containerPort: {{ .Values.feed.service.port }}
               protocol: TCP
           env:
+            {{- with .Values.feed.goMemLimit }}
+            - name: GOMEMLIMIT
+              value: {{ . | quote }}
+            {{- end }}
             - name: LISTEN_ADDR
               value: {{ .Values.feed.config.listenAddr | quote }}
             - name: LOG_LEVEL
@@ -95,6 +100,8 @@ spec:
               value: {{ .Values.feed.config.apiVersion | quote }}
             - name: POST_COUNT
               value: {{ .Values.feed.config.postCount | quote }}
+            - name: POSTS_PER_REQUEST
+              value: {{ .Values.feed.config.postsPerRequest | quote }}
           {{- if $kubernetes }}
           volumeMounts:
             - name: openbao-token

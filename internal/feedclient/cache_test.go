@@ -156,17 +156,20 @@ func TestSyncEmptyStaysEmpty(t *testing.T) {
 
 // TestSyncCapsPostCount proves the website bounds how many posts one cycle
 // ever processes on its own, independent of what the feed service sends:
-// internal/feedconfig already caps POST_COUNT to 100, but a buggy or
+// internal/feedconfig already caps POST_COUNT to 10000, but a buggy or
 // compromised feed service ignoring that ceiling must not be able to drive
 // this process into downloading and holding images for far more posts than
-// that, inside a single-replica, Recreate-strategy pod.
+// that, inside a single-replica, Recreate-strategy pod. The alt texts have
+// the full 150 runes, so the list is also far larger than one MiB, the
+// bound the website read the list with before it took every post.
 func TestSyncCapsPostCount(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeFeedService()
 	const sent = maxPosts + 50
+	alt := strings.Repeat("ä", 150)
 	for i := range sent {
-		f.posts = append(f.posts, Post{ID: fmt.Sprintf("%d", i), Alt: "a", Permalink: "https://www.instagram.com/p/A/"})
+		f.posts = append(f.posts, Post{ID: fmt.Sprintf("%d", i), Alt: alt, Permalink: "https://www.instagram.com/p/A/"})
 	}
 	s := newSyncer(f, io.Discard)
 

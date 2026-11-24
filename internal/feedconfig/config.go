@@ -59,9 +59,13 @@ const (
 	// DefaultAPIVersion reads internal/instagram's own pinned version
 	// rather than repeating it, so the two can never drift.
 	DefaultAPIVersion = instagram.DefaultVersion
-	// DefaultPostCount is how many posts the feed asks Meta for; the old
-	// site asked for the same 20.
-	DefaultPostCount = 20
+	// DefaultPostCount caps how many posts one sync collects across all
+	// pages; 0 means the maximum of 10000 (instagram.MaxPosts). Every post
+	// held costs the bytes of its picture,
+	// see the chart's README for the memory this takes.
+	DefaultPostCount = 200
+	// DefaultPostsPerRequest is how many posts one call to Meta asks for.
+	DefaultPostsPerRequest = instagram.DefaultPostsPerRequest
 )
 
 // Sync interval and token refresh age bounds, the range SYNC_INTERVAL and
@@ -74,8 +78,12 @@ const (
 	maxSyncInterval    = 24 * time.Hour
 	minTokenRefreshAge = 24 * time.Hour
 	maxTokenRefreshAge = 50 * 24 * time.Hour
-	minPostCount       = 1
-	maxPostCount       = 100
+	// POST_COUNT is 0 (the maximum) or at most maxPostCount, the same bound
+	// internal/feedclient applies to the list the website reads.
+	minPostCount       = 0
+	maxPostCount       = instagram.MaxPosts
+	minPostsPerRequest = 1
+	maxPostsPerRequest = instagram.MaxPostsPerRequest
 )
 
 // Config is the feed service's whole configuration, read once in main.
@@ -117,8 +125,12 @@ type Config struct {
 	// APIVersion pins the Graph API version calls are made against; see
 	// internal/instagram.DefaultVersion.
 	APIVersion string
-	// PostCount is how many posts are asked for per sync.
+	// PostCount caps the posts one sync collects across all pages; 0 means
+	// the maximum of 10000.
 	PostCount int
+	// PostsPerRequest is how many posts one call to Meta asks for, 1 to
+	// instagram.MaxPostsPerRequest.
+	PostsPerRequest int
 }
 
 // Load reads every setting from the environment through getenv and
@@ -136,6 +148,7 @@ func Load(getenv func(string) string) (Config, error) {
 		TokenRefreshAge:   loader.Duration("TOKEN_REFRESH_AGE", DefaultTokenRefreshAge, minTokenRefreshAge, maxTokenRefreshAge),
 		APIVersion:        loader.String("API_VERSION", DefaultAPIVersion),
 		PostCount:         loader.Int("POST_COUNT", DefaultPostCount, minPostCount, maxPostCount),
+		PostsPerRequest:   loader.Int("POSTS_PER_REQUEST", DefaultPostsPerRequest, minPostsPerRequest, maxPostsPerRequest),
 	}
 
 	var problems []error

@@ -61,7 +61,23 @@ The global baseline already applies here and is not repeated below.
   a restart: the manual rotation this needed before Meta's 60-day expiry is gone, not
   merely less frequent. Ported from old_simon-ostendorf.de's `internal/instagram`, with
   the same one change as before this split: where a refreshed token is stored, OpenBao
-  rather than nowhere.
+  rather than nowhere. `Client.Media` pages through every post of the account: it asks for
+  `POSTS_PER_REQUEST` posts per request and sends the `after` cursor of each answer back
+  as a query parameter on its own `BaseURL`, until Meta's answer has no `paging.next` or
+  the `POST_COUNT` cap is reached. Only the presence of `paging.next` is read, never its
+  URL, so an answer cannot send the client or the token to another host. Redirects are not
+  followed either: every Graph API and picture request goes through `Client.do`, which
+  returns a 3xx as `ErrRedirect`, so the picture host list holds for the one URL requested.
+  `POST_COUNT` 0 means `MaxPosts`, 10000, and the page bound is also 10000, enough for
+  10000 posts at one post per request. The cursor is checked for length and characters and
+  never logged; a repeated cursor, a 429, any other 4xx and a cycle past the page bound end
+  the cycle with an error kind (`ErrCursorLoop`, `ErrRateLimited`, `ErrRefused`,
+  `ErrTooManyPages`). Pages are fetched one after the other
+  with `DefaultPagePause` (500 ms) between them. `Syncer` replaces the `Feed` only once
+  every page was read, and logs posts, pages, failed images and the duration per cycle.
+  `paging_test.go` and `bounds_test.go` prove all of it against a fake media edge,
+  including a second server in `paging.next` or behind a redirect that must receive no
+  request.
 - `internal/openbao` is a small, standard library only HTTP client against OpenBao's KV v2
   API, ported from old_simon-ostendorf.de's own `internal/openbao`. It logs in through a
   `Login` interface that returns the token and its lease. `Kubernetes` is the method for a
@@ -86,7 +102,11 @@ The global baseline already applies here and is not repeated below.
   static token. `OPENBAO_SECRET_PATH` is the KV v2 data path of the secret, and
   `OPENBAO_SECRET_KEY_ACCESS_TOKEN` and `OPENBAO_SECRET_KEY_REFRESHED_AT` (defaults
   `access_token` and `refreshed_at`) name the two keys inside it; a refresh rewrites only
-  those two and keeps every other key. `internal/feed`
+  those two and keeps every other key. `POST_COUNT` caps the number of posts, 0 means the
+  maximum of 10000 (default 200), and `POSTS_PER_REQUEST` sets the page size (default 50,
+  1 to 100); every post costs its picture in memory, see "Posts and memory" in
+  `charts/ostendorf.tech/README.md`, where the chart's `goMemLimit` and `feed.goMemLimit`
+  set `GOMEMLIMIT` below each memory limit. `internal/feed`
   builds it: the background loop that keeps `internal/instagram`'s `Feed` current from
   Meta using the OpenBao-backed token above, and the internal-only HTTP surface the
   website reads from, `GET /api/v1/posts` and `GET /api/v1/posts/{id}/image`, alongside
@@ -109,8 +129,11 @@ The global baseline already applies here and is not repeated below.
   so an unreachable or slow feed service can never hang a page; an empty `Cache`, whether
   from an unreachable feed service, an unset `FEED_SERVICE_URL`, or a feed service with
   nothing to show, renders no Impressionen section at all, exactly as an absent token did
-  before this split.
-  `internal/webapp/feed.go` is the one place this package is read from.
+  before this split. It takes at most 10000 posts and 16 MiB of post list per cycle, the
+  same ceiling as `POST_COUNT`, whatever the feed service sends.
+  `internal/webapp/feed.go` is the one place this package is read from. Its
+  `GET /api/v1/instagram` answers every cached post at once, and `InstagramFeed.vue` shows
+  them in batches of 12 per click without a further request.
 - Page views are reported to Umami from the server by govue's `analytics` package; the
   site has no analytics code of its own. `internal/config` reads it through
   `analytics.LoadConfig` (`UMAMI_URL`, `UMAMI_WEBSITE_ID`, `UMAMI_TIMEOUT`,

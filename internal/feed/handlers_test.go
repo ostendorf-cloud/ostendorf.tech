@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/ostendorf-cloud/govue/health"
@@ -78,6 +79,31 @@ func TestHandlePostsWithPosts(t *testing.T) {
 	}
 	if resp.Posts[1] != (post{ID: "2", Alt: "second post", Permalink: "https://www.instagram.com/p/B/"}) {
 		t.Errorf("posts[1] = %#v", resp.Posts[1])
+	}
+}
+
+// TestHandlePostsListsEveryPost proves the route answers every post of the
+// feed, in order, not a first page of them: the feed now holds every post
+// of the account up to POST_COUNT, far more than the 100 it once could.
+func TestHandlePostsListsEveryPost(t *testing.T) {
+	t.Parallel()
+
+	const n = 250
+	posts := make([]*instagram.Post, 0, n)
+	for i := range n {
+		posts = append(posts, &instagram.Post{ID: strconv.Itoa(i), Alt: "post", Permalink: "https://www.instagram.com/p/A/", Image: []byte("a"), ContentType: "image/jpeg", ETag: `"a"`})
+	}
+	f := &instagram.Feed{}
+	f.Set(posts)
+	rec := httptest.NewRecorder()
+	newTestApp(f).handler.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/posts", nil))
+
+	resp := decodePosts(t, rec.Body.Bytes())
+	if len(resp.Posts) != n {
+		t.Fatalf("posts = %d, want all %d", len(resp.Posts), n)
+	}
+	if resp.Posts[0].ID != "0" || resp.Posts[n-1].ID != strconv.Itoa(n-1) {
+		t.Errorf("posts run %s..%s, want 0..%d in feed order", resp.Posts[0].ID, resp.Posts[n-1].ID, n-1)
 	}
 }
 

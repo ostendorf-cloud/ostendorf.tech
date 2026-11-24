@@ -177,10 +177,11 @@ func TestParsePostCount(t *testing.T) {
 		wantErr bool
 	}{
 		{"", defaultPostCount, false},
+		{"0", defaultPostCount, false},
 		{"1", 1, false},
-		{"100", 100, false},
-		{"0", 0, true},
-		{"101", 0, true},
+		{"200", 200, false},
+		{"-1", 0, true},
+		{"201", 0, true},
 		{"many", 0, true},
 	}
 	for _, tc := range cases {
