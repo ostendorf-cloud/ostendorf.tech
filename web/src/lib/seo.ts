@@ -1,10 +1,11 @@
 import type { Locale } from '../i18n'
 import { SUPPORTED_LOCALES } from '../i18n'
 import { routeTable } from './routeTable'
+import { resolveSiteUrl } from './siteUrl'
 
 /** The site's canonical origin. Overridable through VITE_SITE_URL for a
- *  staging build; the default matches the Go service's own default. */
-export const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'https://ostendorf.tech'
+ *  staging build; set but empty fails, see siteUrl.ts. */
+export const SITE_URL = resolveSiteUrl(import.meta.env.VITE_SITE_URL)
 
 /** NOT_FOUND is the 404 page's own pseudo route: it answers no path of
  *  its own, so it is deliberately not part of internal/routes' table

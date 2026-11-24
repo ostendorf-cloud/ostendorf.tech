@@ -325,6 +325,11 @@ describe('the band cards', () => {
  */
 const WORST_CASE_BEHIND_SCRIM = 0xff
 
+/** The darkest 1% of web/src/assets/hero-1280.jpg after the light photo
+ *  grade, measured once; see "in light mode" below. The light hero and the
+ *  overlay header over it are both measured against it. */
+const DARKEST_PERCENT_OF_PHOTO = [13, 4, 52]
+
 /** Every role the hero paints on the scrim, with the ratio WCAG 2.2 AA
  *  asks of it. The headline is clamped to at least 2.3rem at 850 weight,
  *  which is large text, so its gradient's two ends carry the 3:1 large
@@ -438,7 +443,6 @@ describe('the hero scrim', () => {
       Number(new RegExp(`--${name}:\\s*([0-9.]+)\\s*;`).exec(bareCss)?.[1])
     const value = (name: string) => new RegExp(`--${name}:\\s*([^;]+);`).exec(bareCss)?.[1].trim()
     const alphaLight = number('hero-scrim-alpha-light')
-    const DARKEST_PERCENT_OF_PHOTO = [13, 4, 52]
 
     function over(top: string, alpha: number, behind: number[]): string {
       const scrim = Number.parseInt(top.slice(1), 16)
@@ -580,7 +584,7 @@ describe('the overlay header over the hero', () => {
 
   it('carries the light header text and focus over the pale hero', () => {
     const alphaLight = Number(/--hero-scrim-alpha-light:\s*([0-9.]+)\s*;/.exec(bareCss)?.[1])
-    const behind = [13, 4, 52]
+    const behind = DARKEST_PERCENT_OF_PHOTO
     const scrim = Number.parseInt(light.bg.slice(1), 16)
     const ground = `#${[(scrim >> 16) & 0xff, (scrim >> 8) & 0xff, scrim & 0xff]
       .map((c, i) => Math.round(alphaLight * c + (1 - alphaLight) * behind[i]))
