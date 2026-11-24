@@ -130,11 +130,13 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: CHALLENGE_KEY
+            name: CHALLENGE_KEY_FILE
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: CHALLENGE_KEY_PREVIOUS
+            name: CHALLENGE_KEY_PREVIOUS_FILE
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
@@ -290,6 +292,13 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].image
           value: ghcr.io/ostendorf-cloud/ostendorf-tech-api:0.1.0
+
+  - it: names its container api, as the frontend's and the feed's are named after their part
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: api
 
   - it: renders a ClusterIP Service by default, named after the API
     template: templates/service.yaml

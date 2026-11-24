@@ -126,3 +126,17 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: carries the release labels, not one part's, since it routes to both
+    template: templates/ingress.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/part-of"]
+          value: ostendorf-tech
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
+      - notExists:
+          path: metadata.labels["app.kubernetes.io/component"]
+      - notExists:
+          path: metadata.labels["app.kubernetes.io/name"]

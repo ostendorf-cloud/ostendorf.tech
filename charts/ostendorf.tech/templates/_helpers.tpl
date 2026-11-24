@@ -40,6 +40,19 @@ all of them instead of just their own.
 */}}
 
 {{/*
+Release labels of an object that belongs to no single part, the Ingress and
+the HTTPRoute, which route to the frontend and the API alike: the release and
+the site, no part's name and no component.
+*/}}
+{{- define "ostendorf-tech.release.labels" -}}
+helm.sh/chart: {{ include "ostendorf-tech.chart" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/part-of: {{ include "ostendorf-tech.name" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}
+
+{{/*
 API fullname: the release's own fullname with "-api" appended. This is the
 workload the chart's top level values (replicaCount, image, resources, probes)
 configure, the former single website Deployment.

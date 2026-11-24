@@ -26,6 +26,8 @@ values files keep working. Breaking changes of the split:
   `<release>-ostendorf-tech-api`. Their selector labels use
   `app.kubernetes.io/name: ostendorf-tech-api`.
 - `ingress.hosts[].paths` is gone: the routing is fixed, see "External routing".
+- `feed.image.repository` now defaults to `ghcr.io/ostendorf-cloud/ostendorf-tech-feed`, not
+  `ghcr.io/ostendorf-cloud/ostendorf.tech-feed`, the name the three images share.
 - The API no longer reads `UMAMI_*`: the frontend counts page views.
 
 `config` is shared. The frontend and the API read the same site address, listen addresses,
@@ -96,8 +98,8 @@ by name.
 
 | Env var | `values.yaml` key | Default key in the Secret | Required |
 | --- | --- | --- | --- |
-| `CHALLENGE_KEY` | `existingSecret.challengeKeyKey` | unset (omitted) | No |
-| `CHALLENGE_KEY_PREVIOUS` | `existingSecret.challengeKeyPreviousKey` | unset (omitted) | No |
+| `CHALLENGE_KEY_FILE` | `existingSecret.challengeKeyKey` | unset (omitted) | No |
+| `CHALLENGE_KEY_PREVIOUS_FILE` | `existingSecret.challengeKeyPreviousKey` | unset (omitted) | No |
 | `SMTP_USERNAME_FILE` | `existingSecret.smtpUsernameKey` | unset (omitted) | No |
 | `SMTP_PASSWORD_FILE` | `existingSecret.smtpPasswordKey` | unset (omitted) | No |
 
@@ -105,11 +107,12 @@ Every key left unset omits the corresponding environment variable entirely, rath
 referencing a key that may not exist in your `Secret`. `config.smtpHost` is empty by
 default, so a default install answers 503 `not_configured` on both contact routes, and every
 other page keeps working. The contact form needs `CHALLENGE_KEY`, `config.smtpHost` and, for a
-server with SMTP AUTH, both credentials. The two SMTP keys are mounted read only from the
-`Secret` as files under `/run/secrets/smtp`, mode `0440` for the pod's `fsGroup`, and the
-website reads them through govue's `SMTP_USERNAME_FILE` and `SMTP_PASSWORD_FILE`, so neither
-value is in the container's environment. They go together: one without the other stops the
-website at startup. With `config.smtpHost` set and neither
+server with SMTP AUTH, both credentials. Every key is mounted read only from the `Secret` as
+a file, mode `0440` for the pod's `fsGroup`: the challenge keys under `/run/secrets/challenge`
+(`current`, `previous`), the SMTP keys under `/run/secrets/smtp`. The API reads them through
+their `_FILE` twins, so no secret value is in the container's environment. The previous
+challenge key without the current one fails the render. The SMTP keys go together: one
+without the other stops the API at startup. With `config.smtpHost` set and neither
 credential, govue sends without SMTP AUTH, which a submission server that requires it
 refuses. The website holds no CSRF key and no session any more: the contact form is govue's
 stateless one.

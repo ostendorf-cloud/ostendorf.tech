@@ -212,6 +212,7 @@ if [ "$mode" = "lint" ]; then
     "frontend.networkPolicy.enabled true without an ingress controller namespaceSelector"
     "networkPolicy.enabled true with config.smtpHost set and no networkPolicy.smtp.cidr"
     "frontend.networkPolicy.enabled true with config.umamiUrl set and no Umami egress target"
+    "existingSecret.challengeKeyPreviousKey set without challengeKeyKey"
   )
 
   fail_sets=(
@@ -248,6 +249,7 @@ if [ "$mode" = "lint" ]; then
     "${baseline},frontend.networkPolicy.enabled=true"
     "${baseline},${np_valid},networkPolicy.smtp.cidr="
     "${baseline},${np_valid},frontend.networkPolicy.umami.namespaceSelector=null"
+    "${baseline},existingSecret.challengeKeyPreviousKey=CHALLENGE_KEY_PREVIOUS"
   )
 
   fail_messages=(
@@ -284,6 +286,7 @@ if [ "$mode" = "lint" ]; then
     "frontend.networkPolicy.ingressController.namespaceSelector is required when frontend.networkPolicy.enabled is true"
     "networkPolicy.smtp.cidr is required when networkPolicy.enabled and config.smtpHost are set"
     "frontend.networkPolicy.umami needs a cidr, a namespaceSelector or a podSelector when frontend.networkPolicy.enabled and config.umamiUrl are set"
+    "existingSecret.challengeKeyPreviousKey needs existingSecret.challengeKeyKey"
   )
 
   for i in "${!fail_names[@]}"; do

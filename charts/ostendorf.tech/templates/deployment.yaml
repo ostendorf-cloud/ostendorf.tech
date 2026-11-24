@@ -38,6 +38,9 @@ spec:
   the name is required even while every key below is left unset.
   */}}
   {{- $_ := include "ostendorf-tech.existingSecretName" . }}
+  {{- if and .Values.existingSecret.challengeKeyPreviousKey (not .Values.existingSecret.challengeKeyKey) }}
+  {{ fail "existingSecret.challengeKeyPreviousKey needs existingSecret.challengeKeyKey: the previous key only verifies during a rotation, and the API refuses to start with it alone, since a retired key would then issue challenges again." }}
+  {{- end }}
   {{- if and .Values.ingress.enabled (not .Values.config.trustedProxies) }}
   {{ fail "config.trustedProxies must be set when ingress.enabled is true: clientip.NewResolver with no trusted prefixes attributes every request to its TCP peer, which behind this chart's own Ingress is the ingress controller's pod IP. Every rate limiter then keys on that one address, collapsing the whole site's traffic into one shared bucket (roughly 20 page loads per minute site-wide, and five contact submissions blocking the form for every visitor for ContactRateLimitPer). Set it to the ingress controller's pod or Service CIDR; see README.md." }}
   {{- end }}
@@ -82,7 +85,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: api
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -155,23 +158,17 @@ spec:
             {{- end }}
             {{- /* No UMAMI_* here: the API counts no page views, the
                    frontend serves the pages and counts them. */}}
+            {{- /* The challenge keys and the SMTP credentials are files from
+                   Secret volumes, read through their _FILE twins, so no
+                   secret value is in the container's environment. */}}
             {{- if .Values.existingSecret.challengeKeyKey }}
-            - name: CHALLENGE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.challengeKeyKey }}
+            - name: CHALLENGE_KEY_FILE
+              value: /run/secrets/challenge/current
             {{- end }}
             {{- if .Values.existingSecret.challengeKeyPreviousKey }}
-            - name: CHALLENGE_KEY_PREVIOUS
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.challengeKeyPreviousKey }}
+            - name: CHALLENGE_KEY_PREVIOUS_FILE
+              value: /run/secrets/challenge/previous
             {{- end }}
-            {{- /* The SMTP credentials are files from a Secret volume, read
-                   through govue's _FILE twins, so neither value is in the
-                   container's environment. */}}
             {{- if .Values.existingSecret.smtpUsernameKey }}
             - name: SMTP_USERNAME_FILE
               value: /run/secrets/smtp/username
@@ -180,11 +177,18 @@ spec:
             - name: SMTP_PASSWORD_FILE
               value: /run/secrets/smtp/password
             {{- end }}
-          {{- if or .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
+          {{- if or .Values.existingSecret.challengeKeyKey .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
           volumeMounts:
+            {{- if .Values.existingSecret.challengeKeyKey }}
+            - name: challenge-keys
+              mountPath: /run/secrets/challenge
+              readOnly: true
+            {{- end }}
+            {{- if or .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
             - name: smtp-credentials
               mountPath: /run/secrets/smtp
               readOnly: true
+            {{- end }}
           {{- end }}
           {{- if .Values.startupProbe.enabled }}
           startupProbe:
@@ -211,8 +215,23 @@ spec:
             failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      {{- if or .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
+      {{- if or .Values.existingSecret.challengeKeyKey .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
       volumes:
+        {{- if .Values.existingSecret.challengeKeyKey }}
+        - name: challenge-keys
+          secret:
+            secretName: {{ include "ostendorf-tech.existingSecretName" . }}
+            # Readable by the pod's fsGroup only, the group the process runs in.
+            defaultMode: 0440
+            items:
+              - key: {{ .Values.existingSecret.challengeKeyKey }}
+                path: current
+              {{- with .Values.existingSecret.challengeKeyPreviousKey }}
+              - key: {{ . }}
+                path: previous
+              {{- end }}
+        {{- end }}
+        {{- if or .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
         - name: smtp-credentials
           secret:
             secretName: {{ include "ostendorf-tech.existingSecretName" . }}
@@ -227,6 +246,7 @@ spec:
               - key: {{ . }}
                 path: password
               {{- end }}
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

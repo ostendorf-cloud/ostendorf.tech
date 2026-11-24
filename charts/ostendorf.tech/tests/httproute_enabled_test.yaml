@@ -145,3 +145,14 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: carries the release labels, not one part's, since it routes to both
+    template: templates/httproute.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/part-of"]
+          value: ostendorf-tech
+      - notExists:
+          path: metadata.labels["app.kubernetes.io/component"]
+      - notExists:
+          path: metadata.labels["app.kubernetes.io/name"]
