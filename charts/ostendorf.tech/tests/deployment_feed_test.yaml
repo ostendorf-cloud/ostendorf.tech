@@ -10,6 +10,12 @@ set:
       openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
       openBaoRole: ostendorf-tech-feed
 tests:
+  - it: runs the published feed image of the release
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/ostendorf-cloud/ostendorf-tech-feed:0.1.0
+
   - it: renders GOMEMLIMIT below the memory limit by default
     asserts:
       - contains:

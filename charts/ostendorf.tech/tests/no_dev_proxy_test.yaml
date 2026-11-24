@@ -1,0 +1,116 @@
+suite: the chart never sets FRONTEND_DEV_API_PROXY
+# FRONTEND_DEV_API_PROXY points the frontend at a development API. It is for a
+# developer's machine only and must never reach a cluster, whatever the values.
+# Every combination below renders all three Deployments and asserts it is absent
+# from each of them.
+templates:
+  - templates/deployment-frontend.yaml
+  - templates/deployment.yaml
+  - templates/deployment-feed.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+tests:
+  - it: is absent with the default values
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FRONTEND_DEV_API_PROXY
+          any: true
+        template: templates/deployment-frontend.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FRONTEND_DEV_API_PROXY
+          any: true
+        template: templates/deployment.yaml
+
+  - it: is absent with the feed enabled, an Ingress, Umami and every NetworkPolicy
+    set:
+      config:
+        trustedProxies: 10.0.0.0/8
+        umamiUrl: http://umami.umami.svc.cluster.local
+        umamiWebsiteId: 0f1e2d3c-4b5a-4968-8776-655443322110
+        umamiTimeout: 2s
+        umamiQueueSize: 100
+        smtpHost: mail.example.test
+      existingSecret:
+        challengeKeyKey: CHALLENGE_KEY
+        smtpUsernameKey: SMTP_USERNAME
+        smtpPasswordKey: SMTP_PASSWORD
+      ingress:
+        enabled: true
+      feed:
+        enabled: true
+        config:
+          openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+          openBaoRole: ostendorf-tech-feed
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FRONTEND_DEV_API_PROXY
+          any: true
+        template: templates/deployment-frontend.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FRONTEND_DEV_API_PROXY
+          any: true
+        template: templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FRONTEND_DEV_API_PROXY
+          any: true
+        template: templates/deployment-feed.yaml
+
+  - it: is absent with an HTTPRoute, replicas above one and a non-default listen address
+    set:
+      httpRoute:
+        enabled: true
+        parentRefs:
+          name: shared-gateway
+          namespace: gateway-system
+      frontend:
+        replicaCount: 3
+      config:
+        listenAddr: ":9000"
+        adminListenAddr: ":9001"
+        siteUrl: http://localhost:9000
+        allowPlainHttp: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FRONTEND_DEV_API_PROXY
+          any: true
+        template: templates/deployment-frontend.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FRONTEND_DEV_API_PROXY
+          any: true
+        template: templates/deployment.yaml
+
+  - it: is absent even when a values key of that name is passed, which no template reads
+    set:
+      frontend:
+        env:
+          FRONTEND_DEV_API_PROXY: http://localhost:9999
+      config:
+        frontendDevApiProxy: http://localhost:9999
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FRONTEND_DEV_API_PROXY
+          any: true
+        template: templates/deployment-frontend.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: FRONTEND_DEV_API_PROXY
+          any: true
+        template: templates/deployment.yaml

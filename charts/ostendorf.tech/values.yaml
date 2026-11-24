@@ -1,8 +1,18 @@
 # Default values for ostendorf-tech.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
+#
+# The site is three workloads, deployed together from one release with one
+# version tag (the image tag of every part defaults to the chart's appVersion):
+#   frontend  the static pages, the `frontend:` block below
+#   api       the contact form, the top level values of this file
+#             (replicaCount, image, service, resources, goMemLimit, probes,
+#             networkPolicy, existingSecret) and the shared `config` block
+#   feed      the Instagram feed service, the `feed:` block below
+# `config` is shared: the frontend and the API read the same site address,
+# listen addresses, log level, trusted proxies and general rate limit from it.
 
-# Must stay at 1 or drop to 0; never go above 1. govue's contact form keeps
+# The API's replica count. Must stay at 1 or drop to 0; never go above 1. govue's contact form keeps
 # its per client rate limits, its global mail ceiling and its proof of work
 # replay set in the memory of one process. A second replica, or two pods
 # briefly coexisting during an ordinary rolling update, has its own copy of
@@ -21,7 +31,9 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/ostendorf-cloud/ostendorf.tech
+  # The API image. Breaking: this was ghcr.io/ostendorf-cloud/ostendorf.tech,
+  # the single website image, before the split.
+  repository: ghcr.io/ostendorf-cloud/ostendorf-tech-api
   # Defaults to .Chart.AppVersion when left empty.
   tag: ""
   pullPolicy: IfNotPresent
@@ -58,9 +70,10 @@ securityContext:
 
 service:
   type: ClusterIP
-  # Also used as the container port and for the probes: must match the port
+  # The API's Service. Also used as the container port: must match the port
   # encoded in config.listenAddr (default ":8080" for both). This is the
-  # only port the chart's own Ingress or HTTPRoute ever routes to.
+  # only API port the chart's own Ingress or HTTPRoute ever routes to (the
+  # /api path).
   port: 8080
   # govue's admin listener: health, readiness and metrics, never routed by
   # this chart's own Ingress or HTTPRoute (templates/ingress.yaml and
@@ -71,20 +84,22 @@ service:
   # both).
   adminPort: 8081
 
-# Ingress and httpRoute below are two ways to reach this chart's own Service
+# Ingress and httpRoute below are two ways to reach this chart's own Services
 # externally, chosen by their own enabled flag. Mutually exclusive (see
 # templates/deployment.yaml's own fail guard): an install never renders
 # both for the same hostname. Both default to false, so a default install
 # renders no external route at all until one of the two is chosen.
+#
+# The routing is fixed, for every host: /api goes to the API's Service,
+# everything else (/) to the frontend's Service, both on their http port. An
+# admin port is never routed. Breaking: hosts[].paths is gone, since a
+# values-driven path could send / to the API.
 ingress:
   enabled: false
   className: ""
   annotations: {}
   hosts:
     - host: ostendorf.tech
-      paths:
-        - path: /
-          pathType: Prefix
   tls: []
 
 # Gateway API alternative to ingress above; see that block's own comment for
@@ -103,11 +118,10 @@ httpRoute:
   # kubernetes-conventions.
   hostnames: []
   annotations: {}
-  # Routing is fixed to this chart's own Service on service.port: no
-  # values-driven way to add a second backend or a per-path rule, the same
-  # single-backend shape ingress.hosts already assumes. An HTTPRoute rule
-  # with no "matches" defaults to a "/" prefix match per the Gateway API
-  # spec, the same default an Ingress with one "/" path rule gives.
+  # Routing is fixed, the same as ingress above: a PathPrefix /api rule to the
+  # API's Service on service.port and a PathPrefix / rule to the frontend's
+  # Service on frontend.service.port. No values-driven way to add a backend or
+  # a per-path rule.
   parentRefs:
     # Name of the Gateway this HTTPRoute attaches to. Required when
     # httpRoute.enabled is true.
@@ -127,7 +141,7 @@ httpRoute:
 resources:
   requests:
     cpu: 50m
-    # The website holds a copy of every post's picture the feed service
+    # The API holds a copy of every post's picture the feed service
     # serves: feed.config.postCount times the picture size, about 100 to
     # 300 KiB per post, so the default 200 posts take about 20 to 60 MiB on
     # top of the server itself. See "Feed service" in the README.
@@ -138,7 +152,7 @@ resources:
     # limit stays in place as a safety net against a genuine leak.
     memory: 192Mi
 
-# GOMEMLIMIT of the website container: the heap size at which Go collects
+# GOMEMLIMIT of the API container: the heap size at which Go collects
 # harder. Without it the heap may grow to about twice the live heap before a
 # collection, which can pass resources.limits.memory during a sync. About 90
 # percent of that limit leaves room for the rest of the process. It must stay
@@ -170,8 +184,47 @@ nodeSelector: {}
 tolerations: []
 affinity: {}
 
-# Plain, non-secret configuration. See README.md's values table and the
-# repository root README.md's Configuration section for what each one does.
+# The API's NetworkPolicy; see templates/networkpolicy-api.yaml. Defaults to
+# false, unlike feed.networkPolicy.enabled: this policy cannot render without
+# networkPolicy.ingressController, the namespace of your ingress controller
+# or Gateway, which no default could name for every cluster, so enabling it
+# by default would fail every default render. Set it to true together with
+# that selector. The same goes for frontend.networkPolicy.enabled. This
+# object does nothing at all on a cluster whose CNI does not enforce
+# NetworkPolicy, with no error or warning either way. See README.md.
+networkPolicy:
+  enabled: false
+  # Who may reach the http port. namespaceSelector is required when enabled
+  # (a map of labels, rendered as matchLabels); the podSelector narrows it to
+  # the controller's pods and may stay empty, which admits every pod of that
+  # namespace. For example namespaceSelector
+  # {kubernetes.io/metadata.name: ingress-nginx}.
+  ingressController:
+    namespaceSelector: {}
+    podSelector: {}
+  # Optional: who may reach the admin port (health, readiness, metrics), for
+  # example a Prometheus. Both empty renders no rule: only the node's own
+  # kubelet probes reach the admin port then.
+  metrics:
+    namespaceSelector: {}
+    podSelector: {}
+  # DNS egress destination, kube-dns by default; the same defaults, the same
+  # per key merge behaviour and the same fallback (null both selectors, not
+  # {}) as feed.networkPolicy.dns below.
+  dns:
+    namespaceSelector:
+      kubernetes.io/metadata.name: kube-system
+    podSelector:
+      k8s-app: kube-dns
+  smtp:
+    # Required when enabled and config.smtpHost is set: the CIDR of the SMTP
+    # server, which receives egress on config.smtpPort. A mail server has no
+    # selector, and this chart cannot turn a host name into addresses.
+    cidr: ""
+
+# Plain, non-secret configuration, shared by the frontend and the API. See
+# README.md's values table and the repository root README.md's Configuration
+# section for what each one does.
 config:
   listenAddr: ":8080"
   # govue's admin listener (ADMIN_ADDR): health, readiness and metrics,
@@ -236,6 +289,12 @@ config:
   # (IPv4) or /48 (IPv6) before it is sent.
   umamiUrl: ""
   umamiWebsiteId: ""
+  # Optional, read by govue's analytics.LoadConfig in the frontend only (the
+  # API counts no page views). Empty or 0 renders nothing and govue's own
+  # default applies: UMAMI_TIMEOUT is a Go duration like "2s",
+  # UMAMI_QUEUE_SIZE a whole number of queued views.
+  umamiTimeout: ""
+  umamiQueueSize: 0
 
 # This chart never creates a Secret from plaintext values (see README.md).
 # Every secret-shaped setting is read from a Secret the installer already
@@ -265,8 +324,127 @@ existingSecret:
   smtpUsernameKey: ""
   smtpPasswordKey: ""
 
-# The feed service: a second, independent workload that reads the Instagram
-# Impressionen feed from Meta and serves it to the website, with its own
+# The frontend: the static pages, a Deployment, a Service, a ServiceAccount
+# and a NetworkPolicy of their own. It serves the pages with govue's frontend
+# package, holds no secret and references no Secret. It counts page views
+# (UMAMI_* from the shared config block). Always rendered. This chart never
+# sets FRONTEND_DEV_API_PROXY, the development only variable that points the
+# frontend at an API.
+frontend:
+  # Stateless: more than one replica is harmless, unlike the API's. The
+  # Deployment rolls (RollingUpdate).
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/ostendorf-cloud/ostendorf-tech-frontend
+    # Defaults to .Chart.AppVersion when left empty: the same tag as the API
+    # and the feed, all three are released and deployed together.
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+
+  podAnnotations: {}
+  podLabels: {}
+
+  # Matches the Dockerfile's distroless "nonroot" base image, uid/gid 65532,
+  # the same as the API's own podSecurityContext.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  service:
+    type: ClusterIP
+    # Container and Service port of the pages, the one port the Ingress or
+    # HTTPRoute routes the frontend on. Must match the port encoded in
+    # config.listenAddr (default ":8080"); the frontend reads the shared
+    # config block.
+    port: 8080
+    # Admin listener: health, readiness and metrics, never routed. Must match
+    # config.adminListenAddr (default ":8081").
+    adminPort: 8081
+
+  # The frontend's NetworkPolicy; see templates/networkpolicy-frontend.yaml.
+  # Defaults to false for the reason given at the API's networkPolicy above.
+  # Egress is DNS only, plus Umami while config.umamiUrl is set. That Umami
+  # rule deviates from "the frontend needs nothing beyond DNS": page view
+  # counting moved into the frontend.
+  networkPolicy:
+    enabled: false
+    # Same shape and meaning as networkPolicy.ingressController above.
+    ingressController:
+      namespaceSelector: {}
+      podSelector: {}
+    # Same as networkPolicy.metrics above.
+    metrics:
+      namespaceSelector: {}
+      podSelector: {}
+    dns:
+      namespaceSelector:
+        kubernetes.io/metadata.name: kube-system
+      podSelector:
+        k8s-app: kube-dns
+    # Egress to Umami, required (a cidr, a namespaceSelector or a podSelector)
+    # when enabled and config.umamiUrl is set, ignored otherwise. cidr is for
+    # a Umami outside the cluster, the selectors for one inside it (both
+    # given renders both destinations). port is the port umamiUrl names:
+    # 443 for https, 80 for plain http, or the Service's own.
+    umami:
+      cidr: ""
+      namespaceSelector: {}
+      podSelector: {}
+      port: 443
+
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      # No CPU limit, for the same reason as the API's resources comment.
+      memory: 96Mi
+
+  # GOMEMLIMIT of the frontend container, about 90 percent of
+  # frontend.resources.limits.memory; same rules as the API's goMemLimit.
+  goMemLimit: "86MiB"
+
+  startupProbe:
+    # Disabled by default: startup only loads the static pages and validates
+    # the configuration, neither of which is expected to be slow.
+    enabled: false
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    failureThreshold: 30
+
+  livenessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# The feed service: a third, independent workload that reads the Instagram
+# Impressionen feed from Meta and serves it to the API, with its own
 # Deployment, Service and ServiceAccount.
 feed:
   # Guards every object this workload renders: the Deployment, the Service,
@@ -292,12 +470,12 @@ feed:
   replicaCount: 1
 
   image:
-    # Different image name than the website's own (ghcr.io/ostendorf-cloud/
-    # ostendorf.tech): this is a separate binary (cmd/feed), built from the
-    # same root Dockerfile as a separate final stage ("docker build --target
-    # feed") and published by its own job in .github/workflows/publish.yaml,
-    # tagged from the same release as the website's own image.
-    repository: ghcr.io/ostendorf-cloud/ostendorf.tech-feed
+    # Different image name than the frontend's and the API's: this is a
+    # separate binary (cmd/feed), built from the same root Dockerfile as a
+    # separate final stage ("docker build --target feed") and published by
+    # the image-build matrix of .github/workflows/publish.yaml, tagged from
+    # the same release as the frontend's and the API's images.
+    repository: ghcr.io/ostendorf-cloud/ostendorf-tech-feed
     # Defaults to .Chart.AppVersion when left empty.
     tag: ""
     pullPolicy: IfNotPresent

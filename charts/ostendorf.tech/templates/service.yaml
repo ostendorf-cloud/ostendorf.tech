@@ -1,9 +1,10 @@
+# The API's Service (the file keeps its name from before the split).
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "ostendorf-tech.fullname" . }}
+  name: {{ include "ostendorf-tech.api.fullname" . }}
   labels:
-    {{- include "ostendorf-tech.labels" . | nindent 4 }}
+    {{- include "ostendorf-tech.api.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -16,4 +17,4 @@ spec:
       protocol: TCP
       name: admin
   selector:
-    {{- include "ostendorf-tech.selectorLabels" . | nindent 4 }}
+    {{- include "ostendorf-tech.api.selectorLabels" . | nindent 4 }}

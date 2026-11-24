@@ -71,12 +71,40 @@ tests:
           path: spec.hostnames[0]
           value: ostendorf.tech
 
-  - it: points its one rule at the chart's own Service and name
+  - it: routes the PathPrefix /api to the API's Service on its http port
     template: templates/httproute.yaml
     asserts:
       - equal:
-          path: spec.rules[0].backendRefs[0].name
-          value: RELEASE-NAME-ostendorf-tech
+          path: spec.rules[0]
+          value:
+            matches:
+              - path:
+                  type: PathPrefix
+                  value: /api
+            backendRefs:
+              - name: RELEASE-NAME-ostendorf-tech-api
+                port: 8080
+
+  - it: routes the PathPrefix / to the frontend's Service on its http port
+    template: templates/httproute.yaml
+    asserts:
+      - equal:
+          path: spec.rules[1]
+          value:
+            matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+            backendRefs:
+              - name: RELEASE-NAME-ostendorf-tech-frontend
+                port: 8080
+
+  - it: has exactly two rules
+    template: templates/httproute.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 2
 
   - it: never routes to the feed service's own Service
     template: templates/httproute.yaml
@@ -84,20 +112,27 @@ tests:
       - notEqual:
           path: spec.rules[0].backendRefs[0].name
           value: RELEASE-NAME-ostendorf-tech-feed
+      - notEqual:
+          path: spec.rules[1].backendRefs[0].name
+          value: RELEASE-NAME-ostendorf-tech-feed
 
-  - it: routes only the public port, never govue's admin listener, even when the two differ from their defaults
+  - it: routes only the public ports, never an admin listener, even when they differ from their defaults
     template: templates/httproute.yaml
     set:
       service:
         port: 9000
         adminPort: 9001
+      frontend:
+        service:
+          port: 9100
+          adminPort: 9101
     asserts:
       - equal:
           path: spec.rules[0].backendRefs[0].port
           value: 9000
-      - notEqual:
-          path: spec.rules[0].backendRefs[0].port
-          value: 9001
+      - equal:
+          path: spec.rules[1].backendRefs[0].port
+          value: 9100
 
   - it: carries no tls field, unlike the Ingress alternative
     template: templates/httproute.yaml

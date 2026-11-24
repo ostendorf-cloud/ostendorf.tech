@@ -3,6 +3,40 @@
 Installs [ostendorf.tech](https://github.com/ostendorf-cloud/ostendorf.tech) on a Kubernetes
 cluster.
 
+## Parts
+
+The site is three workloads, each with its own `Deployment`, `Service` and `ServiceAccount`:
+
+| Part | Image (`repository`) | What it does | Values |
+| --- | --- | --- | --- |
+| frontend | `ghcr.io/ostendorf-cloud/ostendorf-tech-frontend` | Serves the static pages with govue's `frontend` package, counts page views | `frontend.*` |
+| api | `ghcr.io/ostendorf-cloud/ostendorf-tech-api` | The contact form and the feed proxy | top level (`image`, `replicaCount`, `service`, `resources`, `goMemLimit`, probes, `networkPolicy`, `existingSecret`) |
+| feed | `ghcr.io/ostendorf-cloud/ostendorf-tech-feed` | Reads the Instagram feed from Meta | `feed.*` |
+
+All three images share one version tag, the chart's `appVersion`, and are deployed together:
+a release publishes all three, and `image.tag`, `frontend.image.tag` and `feed.image.tag`
+default to the same value. Set a tag on one part only for a short experiment, never in
+production.
+
+The top level values are the API's, the former single website `Deployment`, so existing
+values files keep working. Breaking changes of the split:
+
+- `image.repository` now defaults to the API image, not `ghcr.io/ostendorf-cloud/ostendorf.tech`.
+- The website `Deployment`, `Service` and `ServiceAccount` are now named
+  `<release>-ostendorf-tech-api`. Their selector labels use
+  `app.kubernetes.io/name: ostendorf-tech-api`.
+- `ingress.hosts[].paths` is gone: the routing is fixed, see "External routing".
+- The API no longer reads `UMAMI_*`: the frontend counts page views.
+
+`config` is shared. The frontend and the API read the same site address, listen addresses,
+log level, trusted proxies and general rate limit from it. The frontend never sets
+`FRONTEND_DEV_API_PROXY`: that variable points the frontend at a development API and is for a
+developer's machine only. No value can set it, and `tests/no_dev_proxy_test.yaml` asserts it is
+absent from every Deployment in every rendered combination.
+
+The frontend holds no secret. Its `Deployment` has no `secretKeyRef`, no `envFrom` and no
+volume, and `tests/deployment_frontend_test.yaml` asserts it.
+
 ## Prerequisites
 
 - Kubernetes 1.27 or newer.
@@ -101,6 +135,9 @@ openssl rand -hex 32
 
 ## Replicas
 
+The frontend is stateless: `frontend.replicaCount` defaults to 1, more is allowed, and its
+`Deployment` rolls (`RollingUpdate`). The rest of this section is about the API.
+
 `replicaCount` stays at 1. govue's contact form keeps its per client rate limits, its global
 mail ceiling and its proof of work replay set in the memory of one process. A second replica, or
 two pods briefly coexisting during an ordinary rolling update, has its own copy of each: every
@@ -121,8 +158,11 @@ so it raises no second-pod risk either.
 (`service.adminPort`/`config.adminListenAddr`, default `8081`), never on the public
 `service.port`: `templates/deployment.yaml`'s `startupProbe`, `livenessProbe` and
 `readinessProbe` all point at the `admin` container port, and `templates/ingress.yaml`
-only ever routes to `service.port`. A `ServiceMonitor` or `PodMonitor` (not part of this
-chart) can scrape `service.adminPort` directly, in-cluster.
+only ever routes to the http ports. A `ServiceMonitor` or `PodMonitor` (not part of this
+chart) can scrape `service.adminPort` directly, in-cluster. The frontend has the same
+contract on `frontend.service.adminPort`: `templates/deployment-frontend.yaml` probes
+`/healthz` (liveness, and startup when enabled) and `/readyz` (readiness) on its `admin`
+port.
 
 The feed service has a different, deliberate probe contract, served on its one port
 (`feed.service.port`): `/healthz` always passes while the process is up, and `/readyz` fails
@@ -138,19 +178,29 @@ readiness probe would report ready immediately and defeat the whole point of the
 
 ## External routing
 
-This chart reaches external traffic to its own `Service` two ways, chosen by
+This chart reaches external traffic to its `Service`s two ways, chosen by
 `ingress.enabled` and `httpRoute.enabled`. Both default to `false`: a default install creates
 neither, reachable only from inside the cluster, until one is deliberately turned on. They are
 mutually exclusive: turning both on fails the install or upgrade with a readable message
 naming which one to turn off, enforced once in `templates/deployment.yaml`, the one template
 that always renders regardless of which routing flag is set.
 
+The routing is fixed and the same for every host:
+
+| Path | Match | Backend | Port |
+| --- | --- | --- | --- |
+| `/api` | `Prefix` (`Ingress`), `PathPrefix` (`HTTPRoute`) | the API's `Service` | `service.port` (`http`) |
+| `/` | `Prefix` (`Ingress`), `PathPrefix` (`HTTPRoute`) | the frontend's `Service` | `frontend.service.port` (`http`) |
+
+The longest prefix wins, so `/api` reaches the API whatever the order. The admin ports are
+never routed, and the feed service is never reachable from outside.
+
 ### Ingress
 
-Set `ingress.enabled: true`. `ingress.hosts` names the host and path rules, and `ingress.tls`
-carries the certificate configuration directly on the `Ingress` object: this chart owns that
-configuration. `ingress.enabled: true` also requires `config.trustedProxies`; see
-"Installing" above for why.
+Set `ingress.enabled: true`. `ingress.hosts` names the hosts, each with the two routes above,
+and `ingress.tls` carries the certificate configuration directly on the `Ingress` object: this
+chart owns that configuration. `ingress.enabled: true` also requires `config.trustedProxies`;
+see "Installing" above for why.
 
 ### Gateway API HTTPRoute
 
@@ -172,11 +222,9 @@ Unlike `Ingress`, an `HTTPRoute` carries no `tls` field of its own. TLS terminat
 `httpRoute.hostnames` only has to match a hostname the listener itself already serves for
 traffic to reach this `HTTPRoute` at all.
 
-Routing itself is fixed to this chart's own `Service`, on `service.port`, never
-`service.adminPort`: no values-driven way to add a second backend or a per-path rule, the same
-single-backend assumption `ingress.hosts` already makes. An `HTTPRoute` rule with no `matches`
-defaults to a `/` prefix match per the Gateway API spec, the same default an `Ingress` with one
-`/` path rule gives, so this chart's `HTTPRoute` sets none explicitly.
+Routing itself is fixed to the two rules above, on the http ports, never an admin port: no
+values-driven way to add a backend or a per-path rule. The `HTTPRoute` has one rule per path,
+each with an explicit `PathPrefix` match.
 
 `httpRoute.hostnames` is a list because `HTTPRoute` itself accepts more than one hostname for
 the one set of rules above; this chart's own site is a single public domain, so it is set up
@@ -187,16 +235,16 @@ front to one hostname in practice, not resolved per request.
 The home page's Impressionen section is loaded from a second, independent workload: the feed
 service (`cmd/feed`), with its own `Deployment` (`templates/deployment-feed.yaml`), `Service`
 (`templates/service-feed.yaml`), `ServiceAccount` (`templates/serviceaccount-feed.yaml`) and
-`NetworkPolicy` (`templates/networkpolicy.yaml`), separate from the website's own. It needs its
+`NetworkPolicy` (`templates/networkpolicy.yaml`), separate from the API's own. It needs its
 own `ServiceAccount` because it authenticates to OpenBao through the Kubernetes auth method,
-using that `ServiceAccount`'s own projected token as the login credential; the website's
-`ServiceAccount` has no use for that identity and keeps `automountServiceAccountToken: false`
-either way.
+using that `ServiceAccount`'s own projected token as the login credential; the API's and the
+frontend's `ServiceAccount`s have no use for that identity and keep
+`automountServiceAccountToken: false` either way.
 
 `feed.enabled` guards all four of those objects and defaults to `false`. A feed pod needs a
 reachable OpenBao installation and a Meta access token already written into it by hand before it
 becomes ready at all; without either, it sits at `0/1` ready forever, which is otherwise the only
-thing a default install of this chart would produce. With `feed.enabled: false`, the website
+thing a default install of this chart would produce. With `feed.enabled: false`, the site
 works fully and simply renders no Impressionen section, exactly its existing behaviour for an
 unreachable or empty feed service. Turn it on only once OpenBao and that token are actually in
 place:
@@ -269,13 +317,13 @@ to the token written in by hand, and the site dies at Meta's 60-day expiry, the 
 this service exists to remove.
 
 The feed service's container image, `feed.image.repository` (default
-`ghcr.io/ostendorf-cloud/ostendorf.tech-feed`), is built from the same root `Dockerfile` as the
-website's own image, as a separate final stage (`docker build --target feed`) rather than a
-second Dockerfile, and published by the `feed-image` job in `.github/workflows/publish.yaml`
-alongside the website's own `image` job, both tagged from the same release so the two images and
-this chart's `Chart.yaml` `appVersion` stay in lock-step.
+`ghcr.io/ostendorf-cloud/ostendorf-tech-feed`), is built from the same root `Dockerfile` as the
+other two images, as a separate final stage (`docker build --target feed`) rather than a
+separate Dockerfile, and published by the `image-build` matrix in `.github/workflows/publish.yaml`
+alongside the frontend's and the API's image jobs, all tagged from the same release so the three
+images and this chart's `Chart.yaml` `appVersion` stay in lock-step.
 
-The website reaches the feed service over `FEED_SERVICE_URL`, computed by
+The API reaches the feed service over `FEED_SERVICE_URL`, computed by
 `templates/deployment.yaml` from the feed `Service`'s own name and `feed.service.port`
 (`http://<release>-ostendorf-tech-feed:<feed.service.port>` by default). There is no values key
 for it: this value must always resolve to this exact release's own feed `Service`, in the same
@@ -291,7 +339,7 @@ between them (`DefaultPagePause` in `internal/instagram/client.go`). Redirects a
 A 3xx, a 429 or any other 4xx from Meta ends the sync, and the last good feed stays until a
 sync reads every page.
 
-Every post is held in memory with its picture, in the feed pod and again in the website pod:
+Every post is held in memory with its picture, in the feed pod and again in the API pod:
 
 ```text
 live heap      ≈ base + posts × average picture size
@@ -309,22 +357,73 @@ both together.
 
 The default 200 posts take about 20 to 60 MiB of live heap in each pod, which the default
 `resources`, `feed.resources` and both `goMemLimit` values cover. Raise all of them before
-raising `postCount`: 1000 posts take about 100 to 300 MiB in each pod. The website keeps at most
+raising `postCount`: 1000 posts take about 100 to 300 MiB in each pod. The API keeps at most
 10000 posts whatever the feed service sends.
 
 ## NetworkPolicy
 
-`feed.networkPolicy.enabled` defaults to `true`, but only takes effect once `feed.enabled` is
-also `true`: this organisation's clusters enforce `NetworkPolicy`, and the goal is enforcement by
-the chart itself rather than by convention alone.
+Each part has its own `NetworkPolicy`, guarded by its own `enabled` value:
+
+| Part | `enabled` value | Default | Ingress from | Egress to |
+| --- | --- | --- | --- | --- |
+| frontend | `frontend.networkPolicy.enabled` | `false` | http port: the ingress controller (`frontend.networkPolicy.ingressController`); admin port: the optional `frontend.networkPolicy.metrics` selector | DNS (UDP and TCP 53); Umami (`frontend.networkPolicy.umami`, `port`) only while `config.umamiUrl` is set |
+| api | `networkPolicy.enabled` | `false` | http port: the ingress controller (`networkPolicy.ingressController`); admin port: the optional `networkPolicy.metrics` selector | DNS (UDP and TCP 53); SMTP (`networkPolicy.smtp.cidr`, port `config.smtpPort`) only while `config.smtpHost` is set; the feed pods on `feed.service.port` only while `feed.enabled` is set |
+| feed | `feed.networkPolicy.enabled` | `true`, takes effect once `feed.enabled` is true | the API's pods only, on `feed.service.port` | DNS; OpenBao; Meta on 443 (see below) |
+
+The frontend and the API default to `false`, the feed to `true`, for one reason: the two public
+parts need `ingressController.namespaceSelector`, the namespace of your ingress controller or
+Gateway, and no default could name it for every cluster. A default of `true` would fail every
+default render. Enable them together with that selector:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingressController:
+    namespaceSelector:
+      kubernetes.io/metadata.name: ingress-nginx
+frontend:
+  networkPolicy:
+    enabled: true
+    ingressController:
+      namespaceSelector:
+        kubernetes.io/metadata.name: ingress-nginx
+```
+
+Render time guards, each with a message naming the value:
+
+- `ingressController.namespaceSelector` is required when the part's policy is enabled. The
+  optional `podSelector` narrows it to the controller's pods; left empty, every pod of that
+  namespace is admitted.
+- `networkPolicy.smtp.cidr` is required when `networkPolicy.enabled` and `config.smtpHost` are
+  set: a mail server has no selector, and this chart cannot resolve a host name.
+- `frontend.networkPolicy.umami` needs a `cidr`, a `namespaceSelector` or a `podSelector` when
+  `frontend.networkPolicy.enabled` and `config.umamiUrl` are set.
+  `frontend.networkPolicy.umami.port` is the port `config.umamiUrl` names (default `443`).
+
+The frontend's Umami egress deviates from "the frontend needs nothing beyond DNS": page view
+counting moved into the frontend, which reports every counted page to Umami from the server, so
+without that one rule the counts would be dropped.
+
+`metrics` is optional. Left empty, no rule admits the admin port, and only the node's own
+kubelet probes reach it. The admin ports are never routed from outside either way.
 
 This is a correctness warning, not a hedge: a `NetworkPolicy` object does nothing at all on a
 cluster whose CNI does not enforce `NetworkPolicy`. Such a cluster accepts and stores the object
 without complaint, with no error and no warning either. Confirm your CNI actually enforces
 `NetworkPolicy` before relying on this for anything.
 
-The one ingress rule admits traffic only from the website's own pods (matched by
-`ostendorf-tech.selectorLabels`, in the same namespace), on `feed.service.port`. It admits no
+`networkPolicy.dns` and `frontend.networkPolicy.dns` have the same defaults and the same
+caveats as the feed's DNS rule below (kube-dns in `kube-system`).
+
+### The feed's NetworkPolicy
+
+`feed.networkPolicy.enabled` defaults to `true`, but only takes effect once `feed.enabled` is
+also `true`: this organisation's clusters enforce `NetworkPolicy`, and the goal is enforcement by
+the chart itself rather than by convention alone.
+
+The one ingress rule admits traffic only from the API's own pods (matched by
+`ostendorf-tech.api.selectorLabels`, in the same namespace), never the frontend's, on
+`feed.service.port`. It admits no
 rule for kubelet probe traffic, and needs none: per the
 [Kubernetes documentation](https://kubernetes.io/docs/concepts/services-networking/network-policies/),
 the exception under `ipBlock` states "traffic to and from the node where a Pod is running is
@@ -418,11 +517,30 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 
 | Key | Description | Default |
 | --- | --- | --- |
-| `image.repository` | Container image | `ghcr.io/ostendorf-cloud/ostendorf.tech` |
-| `image.tag` | Image tag | `.Chart.AppVersion` |
-| `replicaCount` | Pod replicas: 0 (stopped) or 1, never above (see "Replicas" above) | `1` |
-| `service.port` | Public Service and container port, the only one the `Ingress` ever routes to | `8080` |
-| `service.adminPort` | govue's admin listener: health, readiness and metrics, in-cluster only | `8081` |
+| `image.repository` | The API's container image (breaking: was the single website image) | `ghcr.io/ostendorf-cloud/ostendorf-tech-api` |
+| `image.tag` | The API's image tag | `.Chart.AppVersion` |
+| `replicaCount` | The API's pod replicas: 0 (stopped) or 1, never above (see "Replicas" above) | `1` |
+| `service.port` | The API's Service and container port, routed for `/api` | `8080` |
+| `service.adminPort` | The API's admin listener: health, readiness and metrics, in-cluster only | `8081` |
+| `networkPolicy.enabled` | Create the API's `NetworkPolicy`; see "NetworkPolicy" above | `false` |
+| `networkPolicy.ingressController.namespaceSelector` / `.podSelector` | Who may reach the API's http port. Namespace required when enabled | `{}` |
+| `networkPolicy.metrics.namespaceSelector` / `.podSelector` | Optional: who may reach the API's admin port | `{}` |
+| `networkPolicy.dns.namespaceSelector` / `.podSelector` | Destination scope for the DNS egress rule | `kube-system` / `k8s-app: kube-dns` |
+| `networkPolicy.smtp.cidr` | CIDR of the SMTP server. Required when enabled and `config.smtpHost` is set | `""` |
+| `frontend.replicaCount` | The frontend's pod replicas, stateless, more than 1 allowed | `1` |
+| `frontend.image.repository` | The frontend's container image | `ghcr.io/ostendorf-cloud/ostendorf-tech-frontend` |
+| `frontend.image.tag` | The frontend's image tag | `.Chart.AppVersion` |
+| `frontend.service.port` | The frontend's Service and container port, routed for `/` | `8080` |
+| `frontend.service.adminPort` | The frontend's admin listener, in-cluster only | `8081` |
+| `frontend.resources` | The frontend's resource requests and limits | see `values.yaml` |
+| `frontend.goMemLimit` | `GOMEMLIMIT` of the frontend, below `frontend.resources.limits.memory`; empty renders none | `86MiB` |
+| `frontend.networkPolicy.enabled` | Create the frontend's `NetworkPolicy`; see "NetworkPolicy" above | `false` |
+| `frontend.networkPolicy.ingressController.namespaceSelector` / `.podSelector` | Who may reach the frontend's http port. Namespace required when enabled | `{}` |
+| `frontend.networkPolicy.metrics.namespaceSelector` / `.podSelector` | Optional: who may reach the frontend's admin port | `{}` |
+| `frontend.networkPolicy.dns.namespaceSelector` / `.podSelector` | Destination scope for the DNS egress rule | `kube-system` / `k8s-app: kube-dns` |
+| `frontend.networkPolicy.umami.cidr` / `.namespaceSelector` / `.podSelector` | Egress to Umami. One is required when enabled and `config.umamiUrl` is set | `""` / `{}` / `{}` |
+| `frontend.networkPolicy.umami.port` | Port of Umami egress | `443` |
+| `ingress.hosts` | Hosts of the `Ingress`, each with the fixed `/api` and `/` routes (breaking: `paths` is gone) | `[{host: ostendorf.tech}]` |
 | `ingress.enabled` | Create an `Ingress`. Requires `config.trustedProxies` to be set; see that row. Mutually exclusive with `httpRoute.enabled`; see "External routing" above. | `false` |
 | `ingress.annotations` | Annotations for the `Ingress` | `{}` |
 | `ingress.tls` | TLS configuration for the `Ingress` | `[]` |
@@ -433,7 +551,7 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `httpRoute.parentRefs.namespace` | Namespace the `Gateway` lives in. Required when `httpRoute.enabled` is true; see "External routing" above for why this has no same-namespace fallback | `""` |
 | `httpRoute.parentRefs.sectionName` | Specific listener on the `Gateway` to attach to, when it exposes more than one | `""` |
 | `resources` | Pod resource requests/limits | see `values.yaml` |
-| `goMemLimit` | `GOMEMLIMIT` of the website, below `resources.limits.memory`; empty renders none, see "Posts and memory" | `172MiB` |
+| `goMemLimit` | `GOMEMLIMIT` of the API, below `resources.limits.memory`; empty renders none, see "Posts and memory" | `172MiB` |
 | `config.siteUrl` | The site's own canonical origin | `https://ostendorf.tech` |
 | `config.listenAddr` | Address the public listener binds (`LISTEN_ADDR`); must match `service.port` | `:8080` |
 | `config.logLevel` | `debug`, `info`, `warn` or `error` (`LOG_LEVEL`) | `info` |
@@ -449,11 +567,12 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 | `config.adminListenAddr` | govue's admin listener address (`ADMIN_ADDR`); must match `service.adminPort` | `:8081` |
 | `config.trustedProxies` | Trusted proxy CIDRs for client IP resolution, required when `ingress.enabled` is true (see the note under "Installing" above) | `""` |
 | `config.feedRefreshInterval` | How often the website asks the feed service for the current post list | `5m` |
-| `config.umamiUrl` | `UMAMI_URL`: base URL of the Umami that page views are reported to, empty counts nothing. Not a secret. Plain `http` only for localhost or a name inside the cluster. Needs `config.trustedProxies` behind an Ingress or Gateway, or nothing is counted | `""` |
+| `config.umamiUrl` | `UMAMI_URL` of the frontend: base URL of the Umami that page views are reported to, empty counts nothing. Not a secret. Plain `http` only for localhost or a name inside the cluster. Needs `config.trustedProxies` behind an Ingress or Gateway, or nothing is counted | `""` |
 | `config.umamiWebsiteId` | `UMAMI_WEBSITE_ID`: UUID of the website in Umami, set together with `config.umamiUrl`, one alone stops the start. Not a secret | `""` |
+| `config.umamiTimeout` / `config.umamiQueueSize` | Optional `UMAMI_TIMEOUT` (a Go duration) and `UMAMI_QUEUE_SIZE`, frontend only. Empty or `0` leaves govue's default | `""` / `0` |
 | `existingSecret.name` | Name of the existing `Secret` | `""` (required) |
 | `feed.enabled` | Create the feed service's `Deployment`, `Service`, `ServiceAccount` and `NetworkPolicy`; see "Feed service" above | `false` |
-| `feed.image.repository` | Feed service container image, published by the `feed-image` job; see "Feed service" above | `ghcr.io/ostendorf-cloud/ostendorf.tech-feed` |
+| `feed.image.repository` | Feed service container image, published by the `image-build` matrix; see "Feed service" above | `ghcr.io/ostendorf-cloud/ostendorf-tech-feed` |
 | `feed.service.port` | Feed service's one container and Service port | `8081` |
 | `feed.config.openBaoAddr` | OpenBao address the feed service authenticates against. Required when `feed.enabled` is true; see "Feed service" above | `""` (required) |
 | `feed.config.openBaoAuthMethod` | How the feed service logs in to OpenBao: `kubernetes` for a cluster, `token` for tests; see "Feed service" above | `kubernetes` |
@@ -486,8 +605,9 @@ See `values.yaml` for the full, commented list. The ones most deployments touch:
 helm uninstall ostendorf-tech
 ```
 
-Removes the website's `Deployment`, `Service`, `ServiceAccount`, and the `Ingress` or
-`HTTPRoute`, whichever was enabled; the feed service's own `Deployment`, `Service`,
+Removes the frontend's and the API's `Deployment`, `Service` and `ServiceAccount`, their
+`NetworkPolicy` objects if enabled, and the `Ingress` or `HTTPRoute`, whichever was enabled;
+the feed service's own `Deployment`, `Service`,
 `ServiceAccount` and `NetworkPolicy`, if `feed.enabled` was set, are removed the same way.
 Neither OpenBao nor anything stored in it is touched: this chart never created it, so it is never
 removed by it either, the same reasoning as the existing `Secret` `existingSecret.name` points
@@ -502,9 +622,11 @@ This chart is verified with:
   it logs either at INFO and still exits zero, so it covers a values mistake schema validation
   would catch, not one of this chart's own render-time guards.
 - `helm template`, for the same combinations as `helm lint` above, and for a must-fail set: one
-  combination per render-time guard in `templates/deployment.yaml`, `templates/deployment-feed.yaml`
-  and `templates/httproute.yaml`, each asserted to fail with that guard's own message rather than
-  merely to render. `helm lint` cannot stand in for this: see the bullet above.
+  combination per render-time guard in `templates/deployment.yaml` (the API's),
+  `templates/deployment-frontend.yaml`, `templates/deployment-feed.yaml`,
+  `templates/httproute.yaml` and the NetworkPolicy templates, each asserted to fail with that
+  guard's own message rather than merely to render. `helm lint` cannot stand in for this: see
+  the bullet above.
 - `kubeconform`, against the rendered manifests of the must-succeed combinations. The default
   schema set carries no Gateway API schemas, so an httpRoute-enabled render's `HTTPRoute` is
   validated with a second `-schema-location` added after the default one, pointing at the

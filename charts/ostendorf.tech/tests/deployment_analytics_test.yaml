@@ -50,22 +50,35 @@ tests:
             name: FEED_REFRESH_INTERVAL
             value: "1m"
 
-  - it: reports page views to the Umami it is pointed at
+  # Page view counting moved into the frontend, see deployment_frontend_test.yaml.
+  - it: counts no page views in the API, even with Umami configured
     set:
       config:
         umamiUrl: http://umami.umami.svc.cluster.local
         umamiWebsiteId: 0f1e2d3c-4b5a-4968-8776-655443322110
+        umamiTimeout: 2s
+        umamiQueueSize: 100
     asserts:
-      - contains:
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: UMAMI_URL
-            value: "http://umami.umami.svc.cluster.local"
-      - contains:
+          any: true
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: UMAMI_WEBSITE_ID
-            value: "0f1e2d3c-4b5a-4968-8776-655443322110"
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UMAMI_TIMEOUT
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UMAMI_QUEUE_SIZE
+          any: true
 
   - it: rejects a Umami URL that carries credentials
     set:

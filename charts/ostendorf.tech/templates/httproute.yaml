@@ -14,7 +14,7 @@ kind: HTTPRoute
 metadata:
   name: {{ include "ostendorf-tech.fullname" . }}
   labels:
-    {{- include "ostendorf-tech.labels" . | nindent 4 }}
+    {{- include "ostendorf-tech.frontend.labels" . | nindent 4 }}
   {{- with .Values.httpRoute.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -30,11 +30,25 @@ spec:
   hostnames:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  # The routing is fixed, not values-driven: /api is the API's, every other
+  # path is the frontend's. The Gateway API picks the longest matching prefix,
+  # so /api wins over / whatever the order. Only the http ports are ever
+  # routed, never an admin port: an HTTPRoute that reached an admin listener
+  # would undo the split that moved /metrics and the probes off the public
+  # port; see values.yaml's own comment.
   rules:
-    - backendRefs:
-        - name: {{ include "ostendorf-tech.fullname" . }}
-          # The public Service port, never service.adminPort: an HTTPRoute that
-          # reached the admin listener would undo the split that moved /metrics
-          # and the probes off the public port; see values.yaml's own comment.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: {{ include "ostendorf-tech.api.fullname" . }}
           port: {{ .Values.service.port }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "ostendorf-tech.frontend.fullname" . }}
+          port: {{ .Values.frontend.service.port }}
 {{- end -}}

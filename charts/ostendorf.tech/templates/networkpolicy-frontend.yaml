@@ -1,0 +1,74 @@
+{{- if .Values.frontend.networkPolicy.enabled -}}
+{{- $np := .Values.frontend.networkPolicy -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "ostendorf-tech.frontend.fullname" . }}
+  labels:
+    {{- include "ostendorf-tech.frontend.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ostendorf-tech.frontend.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The http port from the ingress controller (or Gateway) only, named by
+    # frontend.networkPolicy.ingressController, which is required: no default
+    # could fit every cluster. The Ingress routes / here.
+    #
+    # No rule admits kubelet probe traffic, and none is needed: per the
+    # Kubernetes documentation
+    # (https://kubernetes.io/docs/concepts/services-networking/network-policies/),
+    # the exception under ipBlock states "traffic to and from the node where a
+    # Pod is running is always allowed, regardless of the IP address of the Pod
+    # or the node". There is no conformance suite enforcing this for a
+    # podSelector-based default-deny policy such as this one, but it holds in
+    # practice on the common CNIs this organisation runs, so a kubelet
+    # liveness/readiness probe, which originates from the node, needs no
+    # ingress rule of its own here.
+    - from:
+        - {{- include "ostendorf-tech.networkPolicy.ingressControllerPeer" (list $np "frontend.") | nindent 10 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.service.port }}
+    {{- if or ($np.metrics).namespaceSelector ($np.metrics).podSelector }}
+    # The admin port (health, readiness, metrics) from the metrics scraper
+    # only, named by frontend.networkPolicy.metrics. Left empty, no rule
+    # exists and nothing but the node's own probes reaches the admin port.
+    - from:
+        - {{- include "ostendorf-tech.networkPolicy.peer" (dict "namespaceSelector" $np.metrics.namespaceSelector "podSelector" $np.metrics.podSelector) | nindent 10 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.service.adminPort }}
+    {{- end }}
+  egress:
+    # DNS, scoped like the feed's own DNS rule; see
+    # frontend.networkPolicy.dns in values.yaml.
+    {{- include "ostendorf-tech.networkPolicy.dnsRule" $np | nindent 4 }}
+    {{- if .Values.config.umamiUrl }}
+    # Deviation from "the frontend needs nothing beyond DNS": page view
+    # counting moved into the frontend, which reports every counted page to
+    # Umami from the server (config.umamiUrl), so this one egress rule exists,
+    # only while config.umamiUrl is set. Its destination is
+    # frontend.networkPolicy.umami, required then: a Umami outside the
+    # cluster is an address, one inside it is a selector, and this chart
+    # cannot derive either from the URL.
+    {{- $umami := $np.umami | default dict }}
+    {{- if not (or $umami.cidr $umami.namespaceSelector $umami.podSelector) }}
+    {{ fail "frontend.networkPolicy.umami needs a cidr, a namespaceSelector or a podSelector when frontend.networkPolicy.enabled and config.umamiUrl are set: the frontend's page views would be dropped without an egress rule for Umami." }}
+    {{- end }}
+    - ports:
+        - protocol: TCP
+          port: {{ $umami.port }}
+      to:
+        {{- if $umami.cidr }}
+        - ipBlock:
+            cidr: {{ $umami.cidr | quote }}
+        {{- end }}
+        {{- if or $umami.namespaceSelector $umami.podSelector }}
+        - {{- include "ostendorf-tech.networkPolicy.peer" (dict "namespaceSelector" $umami.namespaceSelector "podSelector" $umami.podSelector) | nindent 10 }}
+        {{- end }}
+    {{- end }}
+{{- end -}}

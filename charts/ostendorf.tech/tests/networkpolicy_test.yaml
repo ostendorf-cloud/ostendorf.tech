@@ -39,27 +39,39 @@ tests:
             - Ingress
             - Egress
 
-  - it: allows exactly one ingress rule, from the website's own pods only, on feed.service.port
+  - it: allows exactly one ingress rule, from the API's own pods only, on feed.service.port
     asserts:
       - lengthEqual:
           path: spec.ingress
           count: 1
+      - lengthEqual:
+          path: spec.ingress[0].from
+          count: 1
       - equal:
           path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
-          value: ostendorf-tech
+          value: ostendorf-tech-api
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
       - equal:
           path: spec.ingress[0].ports[0].port
           value: 8081
 
   # A hardcoded label would still match the default name, so the override is
   # what proves the selector comes from the shared selectorLabels helper.
-  - it: follows a non-default nameOverride for the ingress rule's website selector
+  - it: follows a non-default nameOverride for the ingress rule's API selector
     set:
       nameOverride: custom-site
     asserts:
       - equal:
           path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
-          value: custom-site
+          value: custom-site-api
+
+  - it: never admits the frontend's pods
+    asserts:
+      - notEqual:
+          path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
+          value: ostendorf-tech-frontend
 
   - it: follows a non-default feed.service.port for the ingress rule, proving it is not hardcoded
     set:

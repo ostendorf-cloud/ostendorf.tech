@@ -31,36 +31,151 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
-Common labels.
+The site is three workloads deployed together, one release and one version tag:
+the frontend (static pages), the API (contact form, feed proxy) and the feed
+service. Each has its own fullname, selector labels, common labels and
+ServiceAccount name. Every selector uses a different app.kubernetes.io/name:
+sharing one would make each Service and each NetworkPolicy select the pods of
+all of them instead of just their own.
 */}}
-{{- define "ostendorf-tech.labels" -}}
+
+{{/*
+API fullname: the release's own fullname with "-api" appended. This is the
+workload the chart's top level values (replicaCount, image, resources, probes)
+configure, the former single website Deployment.
+*/}}
+{{- define "ostendorf-tech.api.fullname" -}}
+{{- printf "%s-api" (include "ostendorf-tech.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+API selector labels. Deliberately excludes app.kubernetes.io/version: a selector
+must stay stable across an image upgrade, matchLabels is immutable once a
+Deployment exists.
+*/}}
+{{- define "ostendorf-tech.api.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "ostendorf-tech.name" . }}-api
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{/*
+API common labels.
+*/}}
+{{- define "ostendorf-tech.api.labels" -}}
 helm.sh/chart: {{ include "ostendorf-tech.chart" . }}
-{{ include "ostendorf-tech.selectorLabels" . }}
+{{ include "ostendorf-tech.api.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-app.kubernetes.io/component: server
+app.kubernetes.io/component: api
 app.kubernetes.io/part-of: {{ include "ostendorf-tech.name" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{/*
-Selector labels. Deliberately excludes app.kubernetes.io/version: a selector
-must stay stable across an image upgrade, matchLabels is immutable once a
-Deployment exists.
+API ServiceAccount name.
 */}}
-{{- define "ostendorf-tech.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "ostendorf-tech.name" . }}
+{{- define "ostendorf-tech.api.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- default (include "ostendorf-tech.api.fullname" .) .Values.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Frontend fullname: the release's own fullname with "-frontend" appended.
+*/}}
+{{- define "ostendorf-tech.frontend.fullname" -}}
+{{- printf "%s-frontend" (include "ostendorf-tech.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Frontend selector labels; see the API's for why they exclude the version.
+*/}}
+{{- define "ostendorf-tech.frontend.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "ostendorf-tech.name" . }}-frontend
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
-Create the name of the service account to use.
+Frontend common labels.
 */}}
-{{- define "ostendorf-tech.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create -}}
-{{- default (include "ostendorf-tech.fullname" .) .Values.serviceAccount.name -}}
-{{- else -}}
-{{- default "default" .Values.serviceAccount.name -}}
+{{- define "ostendorf-tech.frontend.labels" -}}
+helm.sh/chart: {{ include "ostendorf-tech.chart" . }}
+{{ include "ostendorf-tech.frontend.selectorLabels" . }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/component: frontend
+app.kubernetes.io/part-of: {{ include "ostendorf-tech.name" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
+
+{{/*
+Frontend ServiceAccount name.
+*/}}
+{{- define "ostendorf-tech.frontend.serviceAccountName" -}}
+{{- if .Values.frontend.serviceAccount.create -}}
+{{- default (include "ostendorf-tech.frontend.fullname" .) .Values.frontend.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.frontend.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+One NetworkPolicy peer from a dict with the optional keys namespaceSelector,
+podSelector (each a map of labels, rendered as matchLabels) and cidr. An empty
+dict renders "{}", which callers must not use: they test for a non empty
+selector first. namespaceSelector and podSelector in one peer mean "pods with
+these labels in namespaces with these labels" (both must match). A cidr
+renders an ipBlock peer instead.
+*/}}
+{{- define "ostendorf-tech.networkPolicy.peer" -}}
+{{- $peer := dict -}}
+{{- with .cidr -}}
+{{- $_ := set $peer "ipBlock" (dict "cidr" .) -}}
+{{- end -}}
+{{- with .namespaceSelector -}}
+{{- $_ := set $peer "namespaceSelector" (dict "matchLabels" .) -}}
+{{- end -}}
+{{- with .podSelector -}}
+{{- $_ := set $peer "podSelector" (dict "matchLabels" .) -}}
+{{- end -}}
+{{- toYaml $peer -}}
+{{- end -}}
+
+{{/*
+The ingress controller peer of an http port rule. Called with the part's
+networkPolicy values and the part's name for the error message. There is no
+default: no chart can know which namespace and labels the ingress controller or
+Gateway of a cluster runs with, and a guess would silently drop every visitor.
+The namespaceSelector is required; the podSelector narrows it further and may
+stay empty, which admits every pod of that namespace.
+*/}}
+{{- define "ostendorf-tech.networkPolicy.ingressControllerPeer" -}}
+{{- $np := index . 0 -}}
+{{- $part := index . 1 -}}
+{{- $ic := $np.ingressController | default dict -}}
+{{- if not $ic.namespaceSelector -}}
+{{- fail (printf "%snetworkPolicy.ingressController.namespaceSelector is required when %snetworkPolicy.enabled is true: it names the namespace of the ingress controller or Gateway that may reach the http port. There is no default, since none could fit every cluster." $part $part) -}}
+{{- end -}}
+{{- include "ostendorf-tech.networkPolicy.peer" (dict "namespaceSelector" $ic.namespaceSelector "podSelector" $ic.podSelector) -}}
+{{- end -}}
+
+{{/*
+The DNS egress rule of the API and the frontend: UDP and TCP 53, scoped to the
+destination in networkPolicy.dns (default kube-dns in kube-system, the same
+default and the same caveats as feed.networkPolicy.dns, see values.yaml). Null
+both selectors for a port only rule. Called with the part's networkPolicy values.
+*/}}
+{{- define "ostendorf-tech.networkPolicy.dnsRule" -}}
+- ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  {{- $dns := .dns | default dict }}
+  {{- if or $dns.namespaceSelector $dns.podSelector }}
+  to:
+    - {{- include "ostendorf-tech.networkPolicy.peer" (dict "namespaceSelector" $dns.namespaceSelector "podSelector" $dns.podSelector) | nindent 6 }}
+  {{- end }}
 {{- end -}}
 
 {{/*

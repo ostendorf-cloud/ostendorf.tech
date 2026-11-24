@@ -1,0 +1,240 @@
+suite: frontend NetworkPolicy
+templates:
+  - templates/networkpolicy-frontend.yaml
+set:
+  existingSecret:
+    name: ostendorf-tech-secrets
+  frontend:
+    networkPolicy:
+      enabled: true
+      ingressController:
+        namespaceSelector:
+          kubernetes.io/metadata.name: ingress-nginx
+        podSelector:
+          app.kubernetes.io/name: ingress-nginx
+tests:
+  - it: renders nothing by default, since frontend.networkPolicy.enabled defaults to false
+    set:
+      frontend:
+        networkPolicy:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders once enabled, named after the frontend and selecting only the frontend's pods
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: NetworkPolicy
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ostendorf-tech-frontend
+      - equal:
+          path: spec.podSelector.matchLabels
+          value:
+            app.kubernetes.io/name: ostendorf-tech-frontend
+            app.kubernetes.io/instance: RELEASE-NAME
+
+  - it: governs both ingress and egress
+    asserts:
+      - equal:
+          path: spec.policyTypes
+          value:
+            - Ingress
+            - Egress
+
+  - it: fails the render without the ingress controller's namespaceSelector
+    set:
+      frontend:
+        networkPolicy:
+          ingressController:
+            namespaceSelector: null
+    asserts:
+      - failedTemplate:
+          errorPattern: "frontend.networkPolicy.ingressController.namespaceSelector is required when frontend.networkPolicy.enabled is true"
+
+  - it: admits the http port from the ingress controller only, namespace and pod labels together
+    asserts:
+      - lengthEqual:
+          path: spec.ingress
+          count: 1
+      - equal:
+          path: spec.ingress[0]
+          value:
+            from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: ingress-nginx
+                podSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: ingress-nginx
+            ports:
+              - protocol: TCP
+                port: 8080
+
+  - it: follows a non-default frontend.service.port for the http rule
+    set:
+      frontend:
+        service:
+          port: 9100
+    asserts:
+      - equal:
+          path: spec.ingress[0].ports[0].port
+          value: 9100
+
+  - it: admits no rule for the admin port without a metrics selector
+    asserts:
+      - lengthEqual:
+          path: spec.ingress
+          count: 1
+
+  - it: admits the admin port from the metrics selector when one is set
+    set:
+      frontend:
+        networkPolicy:
+          metrics:
+            namespaceSelector:
+              kubernetes.io/metadata.name: monitoring
+    asserts:
+      - lengthEqual:
+          path: spec.ingress
+          count: 2
+      - equal:
+          path: spec.ingress[1]
+          value:
+            from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: monitoring
+            ports:
+              - protocol: TCP
+                port: 8081
+
+  - it: allows only DNS egress without Umami, UDP and TCP 53 to kube-dns by default
+    asserts:
+      - lengthEqual:
+          path: spec.egress
+          count: 1
+      - equal:
+          path: spec.egress[0]
+          value:
+            ports:
+              - protocol: UDP
+                port: 53
+              - protocol: TCP
+                port: 53
+            to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+                podSelector:
+                  matchLabels:
+                    k8s-app: kube-dns
+
+  - it: follows a non-default DNS selector
+    set:
+      frontend:
+        networkPolicy:
+          dns:
+            namespaceSelector:
+              kubernetes.io/metadata.name: custom-dns
+            podSelector:
+              k8s-app: null
+              app: custom-coredns
+    asserts:
+      - equal:
+          path: spec.egress[0].to[0]
+          value:
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: custom-dns
+            podSelector:
+              matchLabels:
+                app: custom-coredns
+
+  - it: allows no egress to the API, the feed, SMTP or Meta
+    set:
+      config:
+        smtpHost: mail.example.test
+      feed:
+        enabled: true
+        config:
+          openBaoAddr: https://openbao.openbao.svc.cluster.local:8200
+          openBaoRole: ostendorf-tech-feed
+    asserts:
+      - lengthEqual:
+          path: spec.egress
+          count: 1
+
+  - it: fails the render when config.umamiUrl is set and no Umami target is given
+    set:
+      config:
+        umamiUrl: http://umami.umami.svc.cluster.local
+        umamiWebsiteId: 0f1e2d3c-4b5a-4968-8776-655443322110
+    asserts:
+      - failedTemplate:
+          errorPattern: "frontend.networkPolicy.umami needs a cidr, a namespaceSelector or a podSelector"
+
+  - it: allows egress to an in-cluster Umami by selector on its port when config.umamiUrl is set
+    set:
+      config:
+        umamiUrl: http://umami.umami.svc.cluster.local:3000
+        umamiWebsiteId: 0f1e2d3c-4b5a-4968-8776-655443322110
+      frontend:
+        networkPolicy:
+          umami:
+            namespaceSelector:
+              kubernetes.io/metadata.name: umami
+            podSelector:
+              app.kubernetes.io/name: umami
+            port: 3000
+    asserts:
+      - lengthEqual:
+          path: spec.egress
+          count: 2
+      - equal:
+          path: spec.egress[1]
+          value:
+            ports:
+              - protocol: TCP
+                port: 3000
+            to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: umami
+                podSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: umami
+
+  - it: allows egress to an external Umami by CIDR, on 443 by default
+    set:
+      config:
+        umamiUrl: https://umami.example.test
+        umamiWebsiteId: 0f1e2d3c-4b5a-4968-8776-655443322110
+      frontend:
+        networkPolicy:
+          umami:
+            cidr: 198.51.100.0/24
+    asserts:
+      - equal:
+          path: spec.egress[1]
+          value:
+            ports:
+              - protocol: TCP
+                port: 443
+            to:
+              - ipBlock:
+                  cidr: 198.51.100.0/24
+
+  - it: needs no Umami target and renders no Umami rule while config.umamiUrl is empty
+    set:
+      frontend:
+        networkPolicy:
+          umami:
+            cidr: 198.51.100.0/24
+    asserts:
+      - lengthEqual:
+          path: spec.egress
+          count: 1
