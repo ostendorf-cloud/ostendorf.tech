@@ -196,18 +196,24 @@ The global baseline already applies here and is not repeated below.
   lets two pods coexist either. Lifts only once all of them move to a shared store:
   `pow.Config.Seen` is an interface that can take one, but `contact.Config`'s limiters
   are `*ratelimit.Limiter`, a concrete in-memory type, so govue offers no shared limiter
-  in v0.6.0.
+  in v0.8.0.
 - `web/` is the Vue SPA, consuming govue's Vue package as a pnpm git dependency. `web/src`
   holds the app. The contact section in `web/src/views/HomeView.vue` renders govue's
   `GovueContactForm` with a cookie free client (`createClient({ credentials: 'omit' })`),
   the site's own consent text (`home.contact.consent`), the form heading and the privacy
   link of the page's language; its fields, errors and success text come from govue's
-  catalogue, except that `web/src/i18n/govue.ts` merges formal German ("Sie") texts over
-  govue's "du" through `createSiteGovueI18n`, which `main.ts` and the prerender script
-  both install; `web/src/i18n/govueI18n.test.ts` fails on a new or renamed govue contact
-  key. Its proof of work Worker is govue's, emitted by Vite as a same-origin
-  file under `/assets/` that `worker-src 'self'` allows. `web/src/views/contactSection.test.ts`
-  proves the section in both languages. `web/scripts/prerender.ts` is the static site
+  catalogue. The site says "Sie": `main.ts` and the prerender script both install
+  `createGovueI18n` with `formality: 'formal'`, govue's formal German catalogue, and
+  `web/src/i18n/formality.test.ts` fails when either stops doing so. Its proof of work
+  Worker is govue's, emitted by Vite as a same-origin file under `/assets/` that govue's
+  default `worker-src 'self'` allows. `web/src/views/contactSection.test.ts` proves the
+  section in both languages. The header (`web/src/components/AppHeader.vue`) is govue's
+  `GovueHeader` with the navigation at the end, the contact link as the `cta` nav item,
+  `GovueLanguageSwitch` in link mode (`linkFor`, `navigate` to the router) and the
+  compact `GovueThemeSwitch` in the `#theme` slot; its translucent ground is govue's
+  `--color-header-bg` and `--header-backdrop` tokens in `web/src/theme/vtech.css`. It
+  does not use govue's `overlay` mode: the light mode hero is a pale ground, and the
+  transparent header paints the dark mode roles. `web/scripts/prerender.ts` is the static site
   generation step `task prerender` runs. `web/src/lib/routeTable.ts` is the one place the frontend reads
   `internal/routes/routes.json` from; `web/scripts/prerender.ts`, `web/src/router/index.ts`
   (the Vue Router table) and `web/src/lib/seo.ts` (the `PageRoute` list and its slugs) all
