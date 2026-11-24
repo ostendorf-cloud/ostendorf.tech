@@ -270,6 +270,18 @@ pnpm/pnpm#12344, not backported to the pnpm 10 release line as far as this repos
 could establish). `check:govue-version` therefore also reads `web/pnpm-lock.yaml`
 directly and fails when that dependency's resolution carries no `path: /web`.
 
+Renovate raises both halves in one pull request, group `govue` in `renovate.json`.
+Its own npm manager skips the `&path:/web` specifier (`unversioned-reference`), so a
+regex custom manager reads the tag from `web/package.json`. Renovate regenerates no lock
+file for a custom manager, so the shared preset `govue-lockfile` (extended in
+`renovate.json`) runs one fixed post upgrade command, `pnpm --dir web install
+--lockfile-only --ignore-scripts --ignore-pnpmfile`, and commits `web/pnpm-lock.yaml`.
+The `constraints.pnpm` value of the govue rule equals the pin in `mise.toml`: move both
+together. Check on every govue pull request that the lock file entry still carries
+`path: /web`: `task check:govue-version` fails when it does not. The command and its limits
+are described in the workflows repository, `docs/concepts/renovate-post-upgrade.md`.
+`internal/depsync/renovate_test.go` fails when the group or the manager goes missing.
+
 ## Verify before committing
 
 ```sh
