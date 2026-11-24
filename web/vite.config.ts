@@ -15,7 +15,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../cmd/website/dist',
+    outDir: '../cmd/frontend/dist',
     emptyOutDir: true,
     // The prerender script reads this to find the content hashed entry
     // script and its CSS, so it can write them into the HTML it generates

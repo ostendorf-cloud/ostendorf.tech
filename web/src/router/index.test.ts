@@ -5,7 +5,7 @@ import { routeTable } from '../lib/routeTable'
 import { createAppRouter, NOT_FOUND_ROUTE_NAME, views } from './index'
 
 // This is the router side of the same check
-// cmd/website/routes_test.go's TestPrerenderedOutputMatchesRouteTable
+// cmd/frontend/build_test.go's TestPrerenderedOutputMatchesRouteTable
 // runs for the Go side: routeTable is the single source of truth for
 // which pages exist, and nothing today checks the router against it by
 // hand. The failure mode this catches is a page added to routes.json
