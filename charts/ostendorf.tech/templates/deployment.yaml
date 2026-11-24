@@ -168,20 +168,23 @@ spec:
                   name: {{ include "ostendorf-tech.existingSecretName" . }}
                   key: {{ .Values.existingSecret.challengeKeyPreviousKey }}
             {{- end }}
+            {{- /* The SMTP credentials are files from a Secret volume, read
+                   through govue's _FILE twins, so neither value is in the
+                   container's environment. */}}
             {{- if .Values.existingSecret.smtpUsernameKey }}
-            - name: SMTP_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.smtpUsernameKey }}
+            - name: SMTP_USERNAME_FILE
+              value: /run/secrets/smtp/username
             {{- end }}
             {{- if .Values.existingSecret.smtpPasswordKey }}
-            - name: SMTP_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ostendorf-tech.existingSecretName" . }}
-                  key: {{ .Values.existingSecret.smtpPasswordKey }}
+            - name: SMTP_PASSWORD_FILE
+              value: /run/secrets/smtp/password
             {{- end }}
+          {{- if or .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
+          volumeMounts:
+            - name: smtp-credentials
+              mountPath: /run/secrets/smtp
+              readOnly: true
+          {{- end }}
           {{- if .Values.startupProbe.enabled }}
           startupProbe:
             httpGet:
@@ -207,6 +210,23 @@ spec:
             failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      {{- if or .Values.existingSecret.smtpUsernameKey .Values.existingSecret.smtpPasswordKey }}
+      volumes:
+        - name: smtp-credentials
+          secret:
+            secretName: {{ include "ostendorf-tech.existingSecretName" . }}
+            # Readable by the pod's fsGroup only, the group the process runs in.
+            defaultMode: 0440
+            items:
+              {{- with .Values.existingSecret.smtpUsernameKey }}
+              - key: {{ . }}
+                path: username
+              {{- end }}
+              {{- with .Values.existingSecret.smtpPasswordKey }}
+              - key: {{ . }}
+                path: password
+              {{- end }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

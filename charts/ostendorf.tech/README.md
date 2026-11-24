@@ -64,15 +64,18 @@ by name.
 | --- | --- | --- | --- |
 | `CHALLENGE_KEY` | `existingSecret.challengeKeyKey` | unset (omitted) | No |
 | `CHALLENGE_KEY_PREVIOUS` | `existingSecret.challengeKeyPreviousKey` | unset (omitted) | No |
-| `SMTP_USERNAME` | `existingSecret.smtpUsernameKey` | unset (omitted) | No |
-| `SMTP_PASSWORD` | `existingSecret.smtpPasswordKey` | unset (omitted) | No |
+| `SMTP_USERNAME_FILE` | `existingSecret.smtpUsernameKey` | unset (omitted) | No |
+| `SMTP_PASSWORD_FILE` | `existingSecret.smtpPasswordKey` | unset (omitted) | No |
 
 Every key left unset omits the corresponding environment variable entirely, rather than
 referencing a key that may not exist in your `Secret`. `config.smtpHost` is empty by
 default, so a default install answers 503 `not_configured` on both contact routes, and every
 other page keeps working. The contact form needs `CHALLENGE_KEY`, `config.smtpHost` and, for a
-server with SMTP AUTH, both credentials. `SMTP_USERNAME` and `SMTP_PASSWORD` go together: one
-without the other stops the website at startup. With `config.smtpHost` set and neither
+server with SMTP AUTH, both credentials. The two SMTP keys are mounted read only from the
+`Secret` as files under `/run/secrets/smtp`, mode `0440` for the pod's `fsGroup`, and the
+website reads them through govue's `SMTP_USERNAME_FILE` and `SMTP_PASSWORD_FILE`, so neither
+value is in the container's environment. They go together: one without the other stops the
+website at startup. With `config.smtpHost` set and neither
 credential, govue sends without SMTP AUTH, which a submission server that requires it
 refuses. The website holds no CSRF key and no session any more: the contact form is govue's
 stateless one.

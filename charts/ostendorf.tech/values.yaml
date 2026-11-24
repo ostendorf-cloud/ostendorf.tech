@@ -252,9 +252,10 @@ existingSecret:
   # omitted entirely rather than wired to a key that may not exist. The
   # contact form answers 503 not_configured without challengeKeyKey; every
   # other page still works. smtpUsernameKey and smtpPasswordKey are set
-  # together or not at all, the website refuses to start otherwise.
-  # govue v0.6.0 reads SMTP_USERNAME as a plain variable, which a
-  # secretKeyRef fills just as well.
+  # together or not at all, the website refuses to start otherwise. Both
+  # are mounted as files under /run/secrets/smtp and read through
+  # SMTP_USERNAME_FILE and SMTP_PASSWORD_FILE, so neither value is in the
+  # container's environment.
   challengeKeyKey: ""
   # Set only while rotating challengeKeyKey: the previous CHALLENGE_KEY,
   # kept around so a proof of work challenge issued just before the

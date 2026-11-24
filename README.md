@@ -64,7 +64,7 @@ listener (`ADMIN_ADDR`), never on this public one; see the Configuration table b
 | `CHALLENGE_KEY_PREVIOUS` (+ `_FILE`) | Hex encoded, at least 32 bytes. The key `CHALLENGE_KEY` was just rotated out of; see "Rotating the challenge key" below | none | no |
 | `SMTP_HOST` | SMTP submission server the contact form sends through, a bare host name | none | no\* |
 | `SMTP_PORT` | Its port: `587` requires STARTTLS, `465` means TLS from the first byte | `587` | no |
-| `SMTP_USERNAME` | SMTP username, set together with `SMTP_PASSWORD`. No `_FILE` twin in govue v0.6.0 | none | no |
+| `SMTP_USERNAME` (+ `_FILE`) | SMTP username, set together with `SMTP_PASSWORD` | none | no |
 | `SMTP_PASSWORD` (+ `_FILE`) | SMTP password | none | no |
 | `CONTACT_TO` | Recipient address of every contact mail | `simon@ostendorf.tech` | no |
 | `CONTACT_FROM` | Envelope sender address of every contact mail | `ostendorf.tech <no-reply@ostendorf.cloud>` | no |

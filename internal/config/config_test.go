@@ -176,6 +176,31 @@ func TestLoadSMTPDefaultsToSubmissionWithStartTLS(t *testing.T) {
 	}
 }
 
+// TestLoadSMTPCredentialsFromFiles proves both SMTP credentials are read
+// through their _FILE twins, the form the Helm chart mounts.
+func TestLoadSMTPCredentialsFromFiles(t *testing.T) {
+	dir := t.TempDir()
+	username := filepath.Join(dir, "username")
+	password := filepath.Join(dir, "password")
+	if err := os.WriteFile(username, []byte("no-reply@example.test\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(password, []byte("s3cret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(env(map[string]string{
+		"SMTP_HOST":          "mail.example.test",
+		"SMTP_USERNAME_FILE": username,
+		"SMTP_PASSWORD_FILE": password,
+	}))
+	if err != nil {
+		t.Fatalf("Load() returned an unexpected error: %v", err)
+	}
+	if cfg.SMTP == nil || cfg.SMTP.Username != "no-reply@example.test" || cfg.SMTP.Password.Reveal() != "s3cret" {
+		t.Fatalf("SMTP credentials not read from the files: %+v", cfg.SMTP)
+	}
+}
+
 func TestLoadSecretFromFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "smtp-password")

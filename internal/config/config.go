@@ -114,8 +114,9 @@ type Config struct {
 	AllowPlainHTTP bool
 
 	// SMTP is the mail submission server the contact form sends through,
-	// read by govue's mail.LoadConfig (SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
-	// SMTP_PASSWORD or SMTP_PASSWORD_FILE). Nil when SMTP_HOST is unset: the
+	// read by govue's mail.LoadConfig (SMTP_HOST, SMTP_PORT, SMTP_USERNAME or
+	// SMTP_USERNAME_FILE, SMTP_PASSWORD or SMTP_PASSWORD_FILE). Nil when
+	// SMTP_HOST is unset: the
 	// site still serves every page, and the contact form answers 503
 	// not_configured instead of the service refusing to start.
 	SMTP *govuemail.Config

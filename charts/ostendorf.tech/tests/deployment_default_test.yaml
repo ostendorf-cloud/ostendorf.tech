@@ -133,11 +133,17 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: SMTP_USERNAME
+            name: SMTP_USERNAME_FILE
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: SMTP_PASSWORD
+            name: SMTP_PASSWORD_FILE
+          any: true
+      - notExists:
+          path: spec.template.spec.volumes
+      - notExists:
+          path: spec.template.spec.containers[0].volumeMounts
 
   - it: counts no page views until Umami is configured
     template: templates/deployment.yaml

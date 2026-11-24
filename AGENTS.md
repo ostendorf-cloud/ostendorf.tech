@@ -40,8 +40,9 @@ The global baseline already applies here and is not repeated below.
   (`CHALLENGE_RATE_LIMIT_*`, `CONTACT_RATE_LIMIT_*`, `MAIL_RATE_LIMIT_*`) and the trusted
   origin of `SITE_URL`, and mounts `GET /api/v1/contact/challenge` and
   `POST /api/v1/contact` behind the general rate limit. `internal/config` reads SMTP
-  through govue's `mail.LoadConfig` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
-  `SMTP_PASSWORD` or `SMTP_PASSWORD_FILE`) and only when `SMTP_HOST` is set. Without a key
+  through govue's `mail.LoadConfig` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME` or
+  `SMTP_USERNAME_FILE`, `SMTP_PASSWORD` or `SMTP_PASSWORD_FILE`; the chart mounts both
+  credentials as files) and only when `SMTP_HOST` is set. Without a key
   or without `SMTP_HOST` both routes answer 503 `not_configured`. The handler runs with
   `RequireConsent`: the form sends the consent box (`requireConsent` in `HomeView.vue`),
   and a submission without a ticked box is a field error before the proof of work. The
