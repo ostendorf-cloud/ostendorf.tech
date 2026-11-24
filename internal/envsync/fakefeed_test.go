@@ -147,18 +147,18 @@ func closure(stages []stage, target string) []stage {
 
 // TestFakeFeedNotInProductionImages proves neither production target evaluates a
 // stage that mentions the fake, that the fake has a target of its own, and that
-// "website" stays the last stage a bare build resolves to.
+// "frontend" stays the last stage a bare build resolves to.
 func TestFakeFeedNotInProductionImages(t *testing.T) {
 	t.Parallel()
 
 	stages := parseStages(t)
-	if len(stages) == 0 || stages[len(stages)-1].name != "website" {
-		t.Fatal("the last Dockerfile stage must be website, what a build without --target resolves to")
+	if len(stages) == 0 || stages[len(stages)-1].name != "frontend" {
+		t.Fatal("the last Dockerfile stage must be frontend, what a build without --target resolves to")
 	}
 	if !slices.ContainsFunc(stages, func(s stage) bool { return s.name == "fakefeed" }) {
 		t.Fatal("the Dockerfile has no fakefeed target")
 	}
-	for _, target := range []string{"website", "feed"} {
+	for _, target := range []string{"frontend", "api", "feed"} {
 		got := closure(stages, target)
 		if len(got) < 2 {
 			t.Fatalf("target %s resolved to %d stages: the parser no longer understands the Dockerfile", target, len(got))

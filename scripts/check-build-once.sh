@@ -3,7 +3,7 @@
 # Asserts that one task run starts web:build and prerender exactly once, for every
 # target that needs the frontend. The frontend is reachable by several paths (a target
 # lists web:build and prerender, and prerender lists web:build again), and Task starts a
-# task once per path unless it carries run: once. Two vite builds on cmd/website/dist at
+# task once per path unless it carries run: once. Two vite builds on cmd/frontend/dist at
 # the same time fail with ENOTEMPTY in vite:prepare-out-dir (issue #137).
 #
 # Reads the output of task --dry, which prints one line per command Task would start and

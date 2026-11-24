@@ -214,6 +214,26 @@ jobs:
             ${{ runner.os }}-routes-
       - run: task build:feed
 
+  # cmd/api embeds nothing, so this job needs no frontend build. It shares
+  # build-feed's cache key, both compile without the Vue build.
+  build-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a  # v5.2.10
+      - name: Cache Go modules and build output
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-build-feed-${{ hashFiles('go.sum', 'mise.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-feed-
+            ${{ runner.os }}-build-
+      - run: task build:api
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -279,7 +299,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a  # v5.2.10
       - name: Cache Go modules and build output
-        # test:routes runs go test against cmd/website, which needs the
+        # test:routes runs go test against cmd/frontend, which needs the
         # same module and build cache as the other Go jobs.
         #
         # Own key, since vet, build, build-feed, test and govue-version
@@ -325,9 +345,11 @@ jobs:
       - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a  # v5.2.10
       - run: task check:build-once
 
+  # The frontend and the API image, on each platform's native runner.
   docker-build:
     strategy:
       matrix:
+        image: [frontend, api]
         platform: [linux/amd64, linux/arm64]
         include:
           - platform: linux/amd64
@@ -342,12 +364,14 @@ jobs:
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
-          target: website
+          target: ${{ matrix.image }}
           platforms: ${{ matrix.platform }}
           push: false
           load: true
-          tags: ostendorf-tech:smoke
-      - run: scripts/smoke-test-image.sh ostendorf-tech:smoke
+          tags: ostendorf-tech-${{ matrix.image }}:smoke
+      - run: scripts/smoke-test-image.sh "ostendorf-tech-${IMAGE}:smoke" "${IMAGE}"
+        env:
+          IMAGE: ${{ matrix.image }}
 
   docker-build-feed:
     strategy:
