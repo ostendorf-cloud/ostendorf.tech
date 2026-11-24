@@ -81,9 +81,6 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.FeedRefreshInterval != DefaultFeedRefreshInterval {
 		t.Errorf("FeedRefreshInterval = %v, want %v", cfg.FeedRefreshInterval, DefaultFeedRefreshInterval)
 	}
-	if cfg.Umami.Enabled() || cfg.Umami.URL != "" || cfg.Umami.WebsiteID != "" {
-		t.Errorf("umami = %q/%q, want both empty by default", cfg.Umami.URL, cfg.Umami.WebsiteID)
-	}
 }
 
 // TestLoadKeepsTheProtectionOfTheFormerSiteDefaults pins the contact limits
@@ -446,16 +443,18 @@ func TestLoadRejectsEachInvalidField(t *testing.T) {
 	}
 }
 
-// validUmamiWebsiteID is the lowercase UUID shape Umami names a website
-// by, the only shape Load accepts.
-const validUmamiWebsiteID = "0f1e2d3c-4b5a-4968-8776-655443322110"
+// TestLoadReadsNoUmami proves the API reads no UMAMI_ variable: page views
+// are counted by the frontend image, so half a pair here is no error.
+func TestLoadReadsNoUmami(t *testing.T) {
+	if _, err := Load(env(map[string]string{"UMAMI_URL": "http://umami"})); err != nil {
+		t.Errorf("Load() with UMAMI_URL alone = %v, want nil: the API counts no page views", err)
+	}
+}
 
-func TestLoadFeedAndUmamiOverrides(t *testing.T) {
+func TestLoadFeedOverrides(t *testing.T) {
 	cfg, err := Load(env(map[string]string{
 		"FEED_SERVICE_URL":      "http://feed.ostendorf-tech.svc.cluster.local/",
 		"FEED_REFRESH_INTERVAL": "30m",
-		"UMAMI_URL":             "http://umami.umami.svc.cluster.local/",
-		"UMAMI_WEBSITE_ID":      validUmamiWebsiteID,
 	}))
 	if err != nil {
 		t.Fatalf("Load() returned an unexpected error: %v", err)
@@ -467,57 +466,6 @@ func TestLoadFeedAndUmamiOverrides(t *testing.T) {
 	}
 	if cfg.FeedRefreshInterval != 30*time.Minute {
 		t.Errorf("FeedRefreshInterval = %v, want 30m", cfg.FeedRefreshInterval)
-	}
-	if cfg.Umami.URL != "http://umami.umami.svc.cluster.local" {
-		t.Errorf("Umami.URL = %q, want the trailing slash trimmed", cfg.Umami.URL)
-	}
-	if cfg.Umami.WebsiteID != validUmamiWebsiteID {
-		t.Errorf("Umami.WebsiteID = %q, want %q", cfg.Umami.WebsiteID, validUmamiWebsiteID)
-	}
-	if !cfg.Umami.Enabled() {
-		t.Error("Umami.Enabled() = false, want true with both values set")
-	}
-}
-
-func TestLoadRejectsInvalidUmamiPairs(t *testing.T) {
-	tests := map[string]map[string]string{
-		"URL alone":        {"UMAMI_URL": "http://umami"},
-		"ID alone":         {"UMAMI_WEBSITE_ID": validUmamiWebsiteID},
-		"relative URL":     {"UMAMI_URL": "umami:3000", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
-		"URL with query":   {"UMAMI_URL": "http://umami/?x=1", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
-		"URL with user":    {"UMAMI_URL": "http://a:b@umami", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
-		"ftp URL":          {"UMAMI_URL": "ftp://umami", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
-		"ID that is no ID": {"UMAMI_URL": "http://umami", "UMAMI_WEBSITE_ID": "ostendorf.tech"},
-		"plain http host":  {"UMAMI_URL": "http://umami.example.test", "UMAMI_WEBSITE_ID": validUmamiWebsiteID},
-	}
-
-	for name, values := range tests {
-		t.Run(name, func(t *testing.T) {
-			_, err := Load(env(values))
-			if err == nil {
-				t.Fatal("Load() = nil error, want one naming UMAMI_URL or UMAMI_WEBSITE_ID")
-			}
-			if !strings.Contains(err.Error(), "UMAMI_") {
-				t.Errorf("Load() error = %q, want it to mention the UMAMI_ variable at fault", err.Error())
-			}
-		})
-	}
-
-	// govue accepts an upper case id and lowers it: a UUID is case
-	// insensitive. The site's own check used to refuse it.
-	cfg, err := Load(env(map[string]string{
-		"UMAMI_URL": "http://umami", "UMAMI_WEBSITE_ID": strings.ToUpper(validUmamiWebsiteID),
-	}))
-	if err != nil {
-		t.Fatalf("Load() with an upper case id = %v, want nil", err)
-	}
-	if cfg.Umami.WebsiteID != validUmamiWebsiteID {
-		t.Errorf("Umami.WebsiteID = %q, want it lowered to %q", cfg.Umami.WebsiteID, validUmamiWebsiteID)
-	}
-
-	// Both unset is the feature switched off, not a problem.
-	if _, err := Load(env(nil)); err != nil {
-		t.Errorf("Load() with no Umami configuration = %v, want nil", err)
 	}
 }
 

@@ -64,8 +64,7 @@ func contactApp(t *testing.T, env map[string]string) (*App, *fakeSender, *testCl
 	}
 	sender := &fakeSender{}
 	clock := &testClock{now: time.Now()}
-	dist, prerendered := testFS()
-	app, err := New(testConfig(t, merged), discardLogger(), dist, prerendered,
+	app, err := New(testConfig(t, merged), discardLogger(),
 		WithMailSender(sender), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -342,8 +341,7 @@ func TestContactNotConfiguredWithoutKeyOrSMTP(t *testing.T) {
 // form send: without SMTP_HOST and without a sender, the submission answers
 // 503 not_configured.
 func TestContactNotConfiguredWithoutSMTP(t *testing.T) {
-	dist, prerendered := testFS()
-	app, err := New(testConfig(t, map[string]string{"CHALLENGE_KEY": validHexKey}), discardLogger(), dist, prerendered)
+	app, err := New(testConfig(t, map[string]string{"CHALLENGE_KEY": validHexKey}), discardLogger())
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -359,13 +357,12 @@ func TestContactNotConfiguredWithoutSMTP(t *testing.T) {
 // TestContactSMTPHostConfiguresTheForm proves SMTP_HOST plus the key is
 // what makes the form configured with the real SMTP sender.
 func TestContactSMTPHostConfiguresTheForm(t *testing.T) {
-	dist, prerendered := testFS()
 	app, err := New(testConfig(t, map[string]string{
 		"CHALLENGE_KEY": validHexKey,
 		"SMTP_HOST":     "mail.example.test",
 		"SMTP_USERNAME": "no-reply@example.test",
 		"SMTP_PASSWORD": "s3cret",
-	}), discardLogger(), dist, prerendered)
+	}), discardLogger())
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -485,11 +482,10 @@ func TestContactAcceptsASolutionSignedWithThePreviousKey(t *testing.T) {
 	sol, _ := fetchChallenge(t, old, addr)
 
 	sender := &fakeSender{}
-	dist, prerendered := testFS()
 	rotated, err := New(testConfig(t, map[string]string{
 		"CHALLENGE_KEY":          validHexKey,
 		"CHALLENGE_KEY_PREVIOUS": previous,
-	}), discardLogger(), dist, prerendered, WithMailSender(sender), WithClock(clock.Now))
+	}), discardLogger(), WithMailSender(sender), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -504,7 +500,7 @@ func TestContactAcceptsASolutionSignedWithThePreviousKey(t *testing.T) {
 	// Without the previous key the same kind of solution is refused.
 	sol2, _ := fetchChallenge(t, old, "198.51.100.22:1234")
 	dropped, err := New(testConfig(t, map[string]string{"CHALLENGE_KEY": validHexKey}),
-		discardLogger(), dist, prerendered, WithMailSender(&fakeSender{}), WithClock(clock.Now))
+		discardLogger(), WithMailSender(&fakeSender{}), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -523,9 +519,8 @@ func TestContactChallengeAudienceIsTheSiteHost(t *testing.T) {
 	sol, _ := fetchChallenge(t, other, "198.51.100.23:1234")
 
 	sender := &fakeSender{}
-	dist, prerendered := testFS()
 	app, err := New(testConfig(t, map[string]string{"CHALLENGE_KEY": validHexKey}),
-		discardLogger(), dist, prerendered, WithMailSender(sender), WithClock(clock.Now))
+		discardLogger(), WithMailSender(sender), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

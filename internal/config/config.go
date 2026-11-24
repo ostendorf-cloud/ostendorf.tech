@@ -1,5 +1,6 @@
-// Package config loads and validates the website's configuration from the
-// environment, once, in main. Every problem is collected and returned
+// Package config loads and validates the API's configuration from the
+// environment, once, in cmd/api's main. The frontend image has its own,
+// internal/frontendconfig. Every problem is collected and returned
 // together, so a misconfigured deployment reports all of its mistakes on
 // the first start instead of one per restart.
 package config
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ostendorf-cloud/govue/analytics"
 	"github.com/ostendorf-cloud/govue/clientip"
 	"github.com/ostendorf-cloud/govue/contact"
 	"github.com/ostendorf-cloud/govue/envconf"
@@ -164,15 +164,6 @@ type Config struct {
 	// for the current post list; see DefaultFeedRefreshInterval.
 	FeedRefreshInterval time.Duration
 
-	// Umami is the connection to the self-hosted Umami every page view is
-	// reported to, server to server, read by govue's analytics.LoadConfig
-	// (UMAMI_URL, UMAMI_WEBSITE_ID, UMAMI_TIMEOUT, UMAMI_QUEUE_SIZE). The
-	// zero value counts nothing, and setting exactly one of the two required
-	// values is a configuration mistake rather than a half-enabled feature.
-	// No script, cookie or beacon ever reaches the visitor's browser either
-	// way.
-	Umami analytics.Config
-
 	// MailRateLimitBurst/Per bound every contact mail this service sends
 	// in total, across every client address; see
 	// DefaultMailRateLimitBurst.
@@ -263,11 +254,6 @@ func Load(getenv func(string) string) (Config, error) {
 	// this section switched off, not a mistake.
 	cfg.FeedServiceURL = strings.TrimRight(loader.String("FEED_SERVICE_URL", ""), "/")
 	fail(wrap("FEED_SERVICE_URL", validateOptionalURL(cfg.FeedServiceURL)))
-
-	// govue's own messages name the variable at fault, so no wrap here.
-	umami, err := analytics.LoadConfig(getenv)
-	fail(err)
-	cfg.Umami = umami
 
 	if err := errors.Join(append(problems, loader.Err())...); err != nil {
 		return Config{}, err
