@@ -627,10 +627,12 @@ const germanHref = computed(
         >.
       </p>
       <p>
-        Wenn Sie uns über WhatsApp schreiben, verarbeiten wir Ihre Telefonnummer und Ihre Nachricht
-        wie im Abschnitt „Anfrage per E-Mail, Telefon oder Telefax“ beschrieben. Die Nachricht wird
-        dabei über die Server von WhatsApp übermittelt; hierfür gelten die Datenschutzbestimmungen
-        von WhatsApp.
+        Die WhatsApp-Nummer auf dieser Website ist ein WhatsApp-Business-Konto. Wenn Sie uns über
+        WhatsApp schreiben, verarbeiten wir Ihre Telefonnummer und Ihre Nachricht wie im Abschnitt
+        „Anfrage per E-Mail, Telefon oder Telefax“ beschrieben. Die Nachricht wird dabei über die
+        Server von WhatsApp übermittelt; ab dem Klick auf den Link gelten die Nutzungsbedingungen
+        und die Datenschutzbestimmungen von WhatsApp. Alternativ können Sie uns per E-Mail oder
+        Telefon kontaktieren, siehe den Abschnitt „Anfrage per E-Mail, Telefon oder Telefax“.
       </p>
     </div>
 
@@ -1212,9 +1214,11 @@ const germanHref = computed(
         >.
       </p>
       <p>
-        If you write to us via WhatsApp, we process your phone number and your message as described
-        in the section "Enquiry by email, phone or fax". The message is transmitted via WhatsApp's
-        servers; WhatsApp's privacy policy applies to this.
+        The WhatsApp number on this website is a WhatsApp Business account. If you write to us via
+        WhatsApp, we process your phone number and your message as described in the section "Enquiry
+        by email, phone or fax". The message is transmitted via WhatsApp's servers; from the click
+        on the link, WhatsApp's terms of use and privacy policy apply. Alternatively, you can
+        contact us by email or phone, see the section "Enquiry by email, phone or fax".
       </p>
     </div>
   </GovueLegalPage>

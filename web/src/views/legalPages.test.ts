@@ -99,6 +99,25 @@ describe('legal pages', () => {
       )
     })
 
+    it('names the WhatsApp contact as a WhatsApp Business account', async () => {
+      const { container } = await renderPage(locale, 'privacy')
+      const text = (container.textContent ?? '').replace(/\s+/g, ' ')
+
+      expect(text).toContain(
+        locale === 'de' ? 'ist ein WhatsApp-Business-Konto' : 'is a WhatsApp Business account',
+      )
+      expect(text).toContain(
+        locale === 'de'
+          ? 'ab dem Klick auf den Link gelten die Nutzungsbedingungen und die Datenschutzbestimmungen von WhatsApp'
+          : "from the click on the link, WhatsApp's terms of use and privacy policy apply",
+      )
+      expect(text).toContain(
+        locale === 'de'
+          ? 'Alternativ können Sie uns per E-Mail oder Telefon kontaktieren'
+          : 'Alternatively, you can contact us by email or phone',
+      )
+    })
+
     it('describes the stateless contact form and no cookie', async () => {
       const { container } = await renderPage(locale, 'privacy')
       const text = (container.textContent ?? '').replace(/\s+/g, ' ')
