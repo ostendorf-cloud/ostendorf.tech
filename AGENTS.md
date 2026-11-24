@@ -222,11 +222,11 @@ The global baseline already applies here and is not repeated below.
   section in both languages. The header (`web/src/components/AppHeader.vue`) is govue's
   `GovueHeader` with the navigation at the end, the contact link as the `cta` nav item,
   `GovueLanguageSwitch` in link mode (`linkFor`, `navigate` to the router) and
-  `GovueThemeSwitch` in the `#theme` slot, in govue's narrow setup: below 1024 px the
-  `cycle` button and the `othersOnly` link to the other language, from 1024 px the
-  `compact` switch and both languages. Both variants are in the markup, in
-  `contents lg:hidden` and `hidden lg:contents` wrappers, so the hidden one leaves the
-  accessibility tree. Below 480 px govue's header has two rows, the brand row and the
+  `GovueThemeSwitch` in the `#theme` slot, the same at every width: the `cycle` button
+  and the `othersOnly` link to the other language, with `hreflang`, `lang` and
+  `navigate`. There is no width variant and no wrapper. govue puts both after the
+  navigation and the contact link, at the right edge of the bar, the theme button first
+  and the language link last. Below 480 px govue's header has two rows, the brand row and the
   navigation row, which the owner accepted. `web/src/styles.css` holds the prerender
   fallback of `--header-height` per breakpoint, 57 px from 480 px and 109 px below,
   read from govue's header classes. `AppHeader.test.ts` derives both from those classes

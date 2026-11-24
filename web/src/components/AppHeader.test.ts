@@ -65,20 +65,10 @@ describe('AppHeader on govue header', () => {
     expect(container.innerHTML).not.toMatch(/ThemeToggle/)
   })
 
-  it('offers each language as a link to the same page from 1024px, with hreflang', async () => {
-    const { container } = await renderHeader('/de/imprint')
-    const group = within(wide(container, 'group')).getByRole('group', { name: /Sprache/ })
-    const links = Array.from(group.querySelectorAll('a'))
-    expect(links.map((a) => [a.getAttribute('hreflang'), a.getAttribute('href')])).toEqual([
-      ['de', '/de/imprint'],
-      ['en', '/en/imprint'],
-    ])
-    expect(links[0].getAttribute('aria-current')).toBe('true')
-  })
-
   it('hands a language click to the router instead of reloading', async () => {
-    const { container, router } = await renderHeader('/de/imprint')
-    const english = within(narrow(container, 'group')).getByRole('link', { name: 'English' })
+    const { router } = await renderHeader('/de/imprint')
+    const group = screen.getByRole('group', { name: /Sprache/ })
+    const english = within(group).getByRole('link', { name: 'English' })
     const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
     english.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)
@@ -88,92 +78,60 @@ describe('AppHeader on govue header', () => {
     })
   })
 
-  it('shows the compact theme switch with three named modes from 1024px', async () => {
+  it('puts the theme button and the language link last, after the navigation', async () => {
     const { container } = await renderHeader()
-    const group = within(wide(container, 'radiogroup')).getByRole('radiogroup')
-    const options = Array.from(group.querySelectorAll('[role="radio"], button'))
-    expect(options).toHaveLength(3)
-    expect(group.querySelectorAll('svg').length).toBeGreaterThanOrEqual(3)
+    const actions = container.querySelector('header .ml-auto') as HTMLElement
+    const nav = screen.getByRole('navigation', { name: 'Hauptmenü' })
+    expect(actions.contains(nav)).toBe(false)
+    const children = Array.from(actions.children)
+    expect(children).toHaveLength(2)
+    expect(children[0].matches('button[data-mode]')).toBe(true)
+    expect(children[1].matches('[role="group"]')).toBe(true)
+    expect(nav.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
-
-/** The wrapper of one width: govue's narrow setup puts each part twice in
- *  the markup and the stylesheet hides one. jsdom loads no Tailwind, so the
- *  wrapper's classes are what decides which part a width shows. */
-type Part = 'group' | 'radiogroup' | 'button'
-
-const HOLDS: Record<Part, string> = {
-  group: '[role="group"]',
-  radiogroup: '[role="radiogroup"]',
-  button: 'button[data-mode]:not([role])',
-}
-
-function wrapper(container: Element, classes: string, part: Part): HTMLElement {
-  const found = Array.from(container.querySelectorAll<HTMLElement>('header span')).filter(
-    (span) => span.className.trim() === classes && span.querySelector(HOLDS[part]) !== null,
-  )
-  expect(found, `${classes} around ${part}`).toHaveLength(1)
-  return found[0]
-}
-
-const narrow = (container: Element, part: Part) => wrapper(container, 'contents lg:hidden', part)
-const wide = (container: Element, part: Part) => wrapper(container, 'hidden lg:contents', part)
 
 describe.each([
   {
     locale: 'de',
     path: '/de/imprint',
     other: ['en', 'English', '/en/imprint'],
-    current: ['de', 'Deutsch', '/de/imprint'],
+    current: 'Deutsch',
     cycle: /^Darstellung: (Dem System folgen|Heller Modus|Dunkler Modus)\. Als Nächstes: /,
   },
   {
     locale: 'en',
     path: '/en/imprint',
     other: ['de', 'Deutsch', '/de/imprint'],
-    current: ['en', 'English', '/en/imprint'],
+    current: 'English',
     cycle: /^Theme: (Follow the system|Light mode|Dark mode)\. Next: /,
   },
-])('AppHeader narrow setup, $locale', ({ path, other, current, cycle }) => {
-  it('below 1024px shows only the link to the other language', async () => {
+])('AppHeader controls at every width, $locale', ({ path, other, current, cycle }) => {
+  it('shows only the link to the other language, with hreflang and lang', async () => {
     const { container } = await renderHeader(path)
-    const links = Array.from(narrow(container, 'group').querySelectorAll('a'))
+    const links = Array.from(container.querySelectorAll('[role="group"] a'))
     expect(
       links.map((a) => [a.getAttribute('hreflang'), a.textContent?.trim(), a.getAttribute('href')]),
     ).toEqual([other])
     expect(links[0].getAttribute('lang')).toBe(other[0])
     expect(links[0].getAttribute('aria-current')).toBeNull()
+    expect(screen.queryByText(current)).toBeNull()
   })
 
-  it('below 1024px shows the one cycle theme button and no radio group', async () => {
+  it('shows the one cycle theme button and none of the compact radios', async () => {
     const { container } = await renderHeader(path)
-    const part = narrow(container, 'button')
-    expect(part.querySelector('[role="radiogroup"]')).toBeNull()
-    const buttons = Array.from(part.querySelectorAll('button'))
+    expect(container.querySelectorAll('[role="radiogroup"]')).toHaveLength(0)
+    expect(container.querySelectorAll('[role="radio"]')).toHaveLength(0)
+    const buttons = Array.from(container.querySelectorAll('button[data-mode]'))
     expect(buttons).toHaveLength(1)
     expect(buttons[0].getAttribute('type')).toBe('button')
     expect(buttons[0].getAttribute('aria-label')).toMatch(cycle)
   })
 
-  it('from 1024px shows both languages and the compact switch', async () => {
+  it('has no width variant wrapper around either control', async () => {
     const { container } = await renderHeader(path)
-    const links = Array.from(wide(container, 'group').querySelectorAll('a'))
-    const pairs = links.map((a) => [
-      a.getAttribute('hreflang'),
-      a.textContent?.trim(),
-      a.getAttribute('href'),
-    ])
-    expect(pairs).toHaveLength(2)
-    expect(pairs).toContainEqual(other)
-    expect(pairs).toContainEqual(current)
-    expect(wide(container, 'radiogroup').querySelectorAll('[role="radio"]')).toHaveLength(3)
-  })
-
-  it('has exactly one theme control and one language control per width', async () => {
-    const { container } = await renderHeader(path)
-    expect(container.querySelectorAll('[role="radiogroup"]')).toHaveLength(1)
-    expect(container.querySelectorAll('button[data-mode]:not([role])')).toHaveLength(1)
-    expect(container.querySelectorAll('[role="group"]')).toHaveLength(2)
+    expect(container.querySelectorAll('[role="group"]')).toHaveLength(1)
+    expect(container.innerHTML).not.toMatch(/lg:hidden|lg:contents/)
   })
 })
 
