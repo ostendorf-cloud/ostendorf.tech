@@ -69,7 +69,7 @@ RUN pnpm run build && pnpm run prerender
 # Hub's API. Re-resolve with
 # "docker buildx imagetools inspect golang:1.27.4-bookworm" if this patch
 # version ever moves; that command reports the index digest below.
-FROM golang:1.27.4-bookworm@sha256:b754301872c53d3dff666ec39e3fae971dc6f5ecd5a9b01fdefabbebb0f59901 AS go-deps
+FROM golang:1.27.4-bookworm@sha256:ce59b41415e2524ae99926fe1f37ce48ba8c194dcbd2a56a65436cdcefa2bd34 AS go-deps
 
 WORKDIR /src
 
