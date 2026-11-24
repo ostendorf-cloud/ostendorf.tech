@@ -39,15 +39,19 @@ func contactSubject(r contact.Request) string {
 }
 
 // contactBody is the plain text body of every contact mail: a German intro
-// line, govue's DefaultBody with the name, the address and the message, and
-// one line on the consent box. DefaultBody picks its labels from
-// Request.Language, the page language GovueContactForm sends: German on a
-// German page, English on an English one or without a language. The
-// visitor's address is also in Reply-To, set by govue.
+// line, govue's body with the name, the address and the message, and one
+// line on the consent box. Every mail goes to the German owner, so the labels
+// are govue's German ones (E-Mail, Nachricht) whatever language the page
+// was in: Labels.Body, the documented way for a site's own Body, not
+// DefaultBody, which follows Request.Language. The visitor's address is also
+// in Reply-To, set by govue.
 func contactBody(r contact.Request) string {
 	return "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n" +
-		contact.DefaultBody(r) + "\n" + consentLine(r) + "\n"
+		contactLabels.Body(r) + "\n" + consentLine(r) + "\n"
 }
+
+// contactLabels are govue's built in German labels of the mail body.
+var contactLabels = contact.LabelsFor("de")
 
 // consentLine states the consent box as the browser sent it and the time the
 // server received the request. It records a claim of the client, not a

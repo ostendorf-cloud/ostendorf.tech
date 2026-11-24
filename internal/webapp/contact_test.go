@@ -151,7 +151,8 @@ func postContact(t *testing.T, app *App, remoteAddr, body string, mod func(*http
 // site's, the visitor is only in Reply-To, and the body is the site's intro,
 // govue's DefaultBody and one line on the consent box with the server's
 // receive time. The submission carries language "de", as GovueContactForm
-// sends it on a German page, so the mail is German throughout.
+// sends it on a German page. The mail is German throughout in every language,
+// see TestContactBodyIsGermanInEveryLanguage.
 func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	app, sender, clock := contactApp(t, nil)
 	const addr = "198.51.100.10:1234"
@@ -196,28 +197,19 @@ func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	}
 }
 
-// TestContactBodyLabelsFollowTheLanguage proves the labels come from govue's
-// DefaultBody through Request.Language: German for "de", English for a
-// request without a language. The site's intro and consent line stay German.
-func TestContactBodyLabelsFollowTheLanguage(t *testing.T) {
+// TestContactBodyIsGermanInEveryLanguage proves the labels are German
+// whatever page language the form sends: the mail goes to the German owner.
+// The site's intro and consent line are German as well.
+func TestContactBodyIsGermanInEveryLanguage(t *testing.T) {
+	want := []string{"\nE-Mail: erika@example.test\n", "\nNachricht:\nHallo,"}
+	absent := []string{"Email:", "Message:"}
 	cases := []struct {
 		name     string
 		language any
-		want     []string
-		absent   []string
 	}{
-		{
-			name:     "de",
-			language: "de",
-			want:     []string{"\nE-Mail: erika@example.test\n", "\nNachricht:\nHallo,"},
-			absent:   []string{"Email:", "Message:"},
-		},
-		{
-			name:     "none",
-			language: nil,
-			want:     []string{"\nEmail: erika@example.test\n", "\nMessage:\nHallo,"},
-			absent:   []string{"E-Mail:", "Nachricht:"},
-		},
+		{name: "en", language: "en"},
+		{name: "de", language: "de"},
+		{name: "none", language: nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -242,12 +234,12 @@ func TestContactBodyLabelsFollowTheLanguage(t *testing.T) {
 			if !strings.Contains(got, "\nEinwilligung: ") {
 				t.Errorf("Body = %q, want the German consent line", got)
 			}
-			for _, w := range tc.want {
+			for _, w := range want {
 				if !strings.Contains(got, w) {
 					t.Errorf("Body = %q, want %q", got, w)
 				}
 			}
-			for _, a := range tc.absent {
+			for _, a := range absent {
 				if strings.Contains(got, a) {
 					t.Errorf("Body = %q, want no %q", got, a)
 				}
