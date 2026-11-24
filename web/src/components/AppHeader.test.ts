@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { createAppI18n } from '../i18n'
-import { createSiteGovueI18n } from '../i18n/govue'
+import { createGovueI18n } from '@ostendorf-cloud/govue'
 import { HEADER_HEIGHT_PROPERTY } from '../lib/headerHeight'
 import AppHeader from './AppHeader.vue'
 import WordMark from './WordMark.vue'
@@ -27,7 +27,7 @@ async function renderHeader(path = '/de') {
   const locale = path.startsWith('/en') ? 'en' : 'de'
   const i18n = createAppI18n(locale)
   const view = render(AppHeader, {
-    global: { plugins: [i18n, router, createSiteGovueI18n({ i18n, locale })] },
+    global: { plugins: [i18n, router, createGovueI18n({ i18n, locale, formality: 'formal' })] },
   })
   return { ...view, router }
 }

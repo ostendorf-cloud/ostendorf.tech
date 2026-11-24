@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { createAppI18n } from '../i18n'
 import type { Locale } from '../i18n'
-import { createSiteGovueI18n } from '../i18n/govue'
+import { createGovueI18n } from '@ostendorf-cloud/govue'
 import { IMPRESSIONS_HIDDEN_QUERY, impressionsOnPage } from '../lib/pageSections'
 import AppHeader from './AppHeader.vue'
 import InstagramFeed from './InstagramFeed.vue'
@@ -26,7 +26,7 @@ async function renderPage(locale: Locale, answer: () => Promise<unknown>) {
   })
   const i18n = createAppI18n(locale)
   return render(page, {
-    global: { plugins: [i18n, router, createSiteGovueI18n({ i18n, locale })] },
+    global: { plugins: [i18n, router, createGovueI18n({ i18n, locale, formality: 'formal' })] },
   })
 }
 

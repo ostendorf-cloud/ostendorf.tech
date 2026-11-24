@@ -10,7 +10,7 @@ import { createMemoryHistory } from 'vue-router'
 
 import App from '../App.vue'
 import { createAppI18n, type Locale } from '../i18n'
-import { createSiteGovueI18n } from '../i18n/govue'
+import { createGovueI18n } from '@ostendorf-cloud/govue'
 import de from '../i18n/locales/de.json'
 import en from '../i18n/locales/en.json'
 import { attachLocaleSync, createAppRouter } from '../router'
@@ -27,7 +27,7 @@ async function renderHome(locale: Locale) {
   await router.push({ name: 'home', params: { locale } })
   await router.isReady()
   return render(App, {
-    global: { plugins: [router, i18n, createSiteGovueI18n({ i18n, locale })] },
+    global: { plugins: [router, i18n, createGovueI18n({ i18n, locale, formality: 'formal' })] },
   })
 }
 
@@ -79,7 +79,7 @@ describe.each(['de', 'en'] as const)('the contact section in %s', (locale) => {
       locale === 'de' ? 'Nachricht senden' : 'Send a message',
     )
 
-    // The site's formal German text, merged over govue's "du".
+    // govue's formal German ("Ihren"), not its default "du".
     expect(form?.textContent).toContain(
       locale === 'de' ? 'So gehen wir mit Ihren Angaben um:' : 'How your details are handled:',
     )
