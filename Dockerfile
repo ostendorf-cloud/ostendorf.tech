@@ -44,7 +44,7 @@ WORKDIR /src/web
 # in the same pull request as the mise.toml pin (group "pnpm");
 # internal/envsync fails when the two differ.
 # renovate: datasource=npm depName=pnpm
-ARG PNPM_VERSION=12.21.0
+ARG PNPM_VERSION=12.23.0
 RUN npm install -g corepack@0.36.0 && corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
