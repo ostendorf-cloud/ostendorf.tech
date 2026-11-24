@@ -211,10 +211,16 @@ The global baseline already applies here and is not repeated below.
   `GovueHeader` with the navigation at the end, the contact link as the `cta` nav item,
   `GovueLanguageSwitch` in link mode (`linkFor`, `navigate` to the router) and the
   compact `GovueThemeSwitch` in the `#theme` slot; its translucent ground is govue's
-  `--color-header-bg` and `--header-backdrop` tokens in `web/src/theme/vtech.css`. It
-  does not use govue's `overlay` mode: the light mode hero is a pale ground, and the
-  transparent header paints the dark mode roles. `web/scripts/prerender.ts` is the static site
-  generation step `task prerender` runs. `web/src/lib/routeTable.ts` is the one place the frontend reads
+  `--color-header-bg` and `--header-backdrop` tokens in `web/src/theme/vtech.css`. On the
+  home page it is govue's `overlay` header, transparent over the hero until the page
+  scrolls. That is an exception to govue's documented hero bound: the brightest hero
+  ground is about 0.0638 in dark mode, above govue's 0.05 and above the bound with
+  `text-muted`, which no header part paints. `web/src/theme/contrast.test.ts` guards the
+  site's own bound over the roles the header paints. In light mode the hero is pale, so
+  `web/src/styles.css` gives the transparent header the light roles and the navy focus
+  ring. The hero itself is unchanged apart from filling the window under the header.
+  `web/scripts/prerender.ts` is the static site generation step `task prerender` runs.
+  `web/src/lib/routeTable.ts` is the one place the frontend reads
   `internal/routes/routes.json` from; `web/scripts/prerender.ts`, `web/src/router/index.ts`
   (the Vue Router table) and `web/src/lib/seo.ts` (the `PageRoute` list and its slugs) all
   import it instead of restating the page list themselves.

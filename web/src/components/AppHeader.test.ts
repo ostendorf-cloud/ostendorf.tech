@@ -34,10 +34,22 @@ async function renderHeader(path = '/de') {
 
 describe('AppHeader on govue header', () => {
   it('puts the navigation at the end, next to the actions', async () => {
-    const { container } = await renderHeader()
+    await renderHeader()
     const nav = screen.getByRole('navigation', { name: 'Hauptmenü' })
     expect(nav.closest('[class*="justify-end"]')).not.toBeNull()
-    expect(container.querySelector('header')?.dataset.overlay).toBeUndefined()
+  })
+
+  it('lies over the hero on the home page only, transparent before a scroll', async () => {
+    const home = await renderHeader('/de')
+    const header = home.container.querySelector('header')
+    expect(header?.dataset.overlay).toBe('true')
+    expect(header?.dataset.state).toBe('transparent')
+    home.unmount()
+
+    const imprint = await renderHeader('/de/imprint')
+    const solid = imprint.container.querySelector('header')
+    expect(solid?.dataset.overlay).toBeUndefined()
+    expect(solid?.dataset.state).toBe('solid')
   })
 
   it('makes the contact link the one call to action', async () => {

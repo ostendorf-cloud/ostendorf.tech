@@ -347,10 +347,14 @@ const aboutFacts = computed<Fact[]>(() => [
   isolation: isolate;
   display: grid;
   place-items: center;
-  min-height: calc(100svh - var(--spacing-header));
+  /* The header is govue's overlay header on this page: fixed, out of the
+     flow, so the hero starts at the top of the window behind it. The hero
+     fills the window and pads its top by the header's measured height, so
+     its content sits where it sat under the former sticky header. */
+  min-height: 100svh;
   margin-top: calc(-1 * var(--spacing) * 8);
   margin-inline: calc(50% - 50vw);
-  padding-block: clamp(3rem, 9vh, 6rem) clamp(5rem, 13vh, 8rem);
+  padding-block: calc(var(--header-height) + clamp(3rem, 9vh, 6rem)) clamp(5rem, 13vh, 8rem);
   padding-inline: 1rem;
   overflow: hidden;
   text-align: center;

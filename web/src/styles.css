@@ -170,6 +170,28 @@ body {
 }
 
 /*
+ * govue's overlay header paints the dark mode roles while it is transparent,
+ * which needs a dark hero. In light mode this site's hero is a pale ground
+ * (the light scrim and navy text, see "in light mode" in
+ * src/theme/contrast.test.ts), so the transparent header takes the light
+ * roles there, and the focus ring the navy text colour: the light focus
+ * violet is below 3:1 over the hero's darker areas. Only the header's own
+ * hooks, data-overlay and data-state, are used; the hero is unchanged.
+ * src/theme/contrast.test.ts measures both modes.
+ */
+:root[data-mode='light'] header[data-overlay='true'][data-state='transparent'] {
+  color-scheme: light;
+  --color-focus: var(--color-text);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-mode]) header[data-overlay='true'][data-state='transparent'] {
+    color-scheme: light;
+    --color-focus: var(--color-text);
+  }
+}
+
+/*
  * The clip above would cut a long unbreakable string, a URL in the legal
  * text for instance, at 360 px instead of letting it wrap. The legal pages
  * and the 404 page are the pages in govue's reading width, the one

@@ -76,6 +76,14 @@ function linkFor(code: string): string {
   return route.name === NOT_FOUND_ROUTE_NAME && !href.endsWith('/') ? `${href}/` : href
 }
 
+/** overlay is govue's overlay header, on the home page only: transparent
+ *  over the hero until the page scrolls, solid after. Every other page has
+ *  no hero behind the header, so it keeps the solid sticky header. The
+ *  site's own contrast bound for the hero is in src/theme/contrast.test.ts,
+ *  and src/styles.css gives the transparent header the light roles in
+ *  light mode, where the hero is a pale ground. */
+const overlay = computed(() => route.name === 'home')
+
 /** navigate hands a plain click to the router, so the page does not reload. */
 function navigate(href: string): boolean {
   void router.push(href)
@@ -84,7 +92,7 @@ function navigate(href: string): boolean {
 </script>
 
 <template>
-  <GovueHeader ref="header" nav-placement="end">
+  <GovueHeader ref="header" nav-placement="end" :overlay="overlay">
     <template #brand>
       <router-link
         :to="{ name: 'home', params: { locale: route.params.locale } }"
