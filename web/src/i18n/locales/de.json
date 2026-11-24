@@ -3,20 +3,11 @@
     "siteName": "Simon Ostendorf Veranstaltungstechnik",
     "socialImageAlt": "Simon Ostendorf Veranstaltungstechnik: das Fader-Zeichen und der Schriftzug auf dunklem Hintergrund",
     "skipToContent": "Zum Inhalt springen",
-    "switchLocale": "English",
     "carousel": {
       "slide": "{n} von {total}",
       "region": "{label}, seitlich scrollbar",
       "pause": "Automatisches Scrollen pausieren",
       "play": "Automatisches Scrollen starten"
-    },
-    "theme": {
-      "switch": "Farbmodus: {current}. Wechseln zu: {next}.",
-      "modes": {
-        "light": "Hell",
-        "dark": "Dunkel",
-        "system": "Systemeinstellung"
-      }
     }
   },
   "nav": {

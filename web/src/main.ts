@@ -15,8 +15,8 @@ import './styles.css'
 // prerendered <head>'s own blocking boot script's job (see
 // web/scripts/prerender.ts), not this call's: that script runs before
 // first paint, this call only once the deferred bundle has loaded. This
-// call brings govue's reactive theme state, which the toggle and
-// cycleMode operate on, in line with what the boot script already wrote
+// call brings govue's reactive theme state, which the header's theme
+// switch operates on, in line with what the boot script already wrote
 // into the DOM, using the same storage key so both read the same choice.
 useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE, storageKey: STORAGE_KEY })
 

@@ -9,21 +9,6 @@
 @source '../node_modules/@ostendorf-cloud/govue/src';
 
 /*
- * The theme toggle drives its own circular reveal through the View
- * Transitions API (ThemeToggle.vue), clipping ::view-transition-new(root)
- * by hand with the Web Animations API. The browser's own default
- * cross-fade on the root pseudo-elements would otherwise run at the same
- * time and compete with that clip-path animation, so both are switched
- * off here; every other same-document view transition this app might
- * grow stays unaffected because neither selector matches a named group.
- */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-
-/*
  * The home page's hero breaks out of the page measure to span the window,
  * which it does in viewport units. Those count the classic scrollbar a
  * desktop browser may reserve, so the hero can end up a scrollbar wider
@@ -139,26 +124,6 @@
 
   .btn-ghost {
     box-shadow: none;
-  }
-}
-
-/*
- * The header as on the old site: translucent with a blur. This overrides
- * the bg-surface that GovueHeader sets on its root, because govue has no
- * header background token to set instead: a token for the header's ground
- * is the missing govue feature, and this one rule goes when it exists.
- * --header-bg is the theme's token for it. A browser without backdrop-filter
- * keeps govue's opaque ground, since a see-through bar over text is
- * unreadable. The old site also made the bar transparent over the hero
- * until the page scrolled; this one is a sticky row the hero starts below,
- * whose measured height (--header-height) drives the anchors and the hero's
- * own height, so it stays a bar.
- */
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .app-header {
-    background-color: var(--header-bg);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
-    backdrop-filter: blur(14px) saturate(1.2);
   }
 }
 

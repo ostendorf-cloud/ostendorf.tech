@@ -64,12 +64,12 @@ describe('the gradient button', () => {
     expect(styles).not.toMatch(/a\[href/)
   })
 
-  it('makes the header translucent from one token and one selector, with the govue gap named', () => {
-    expect(styles).toMatch(
-      /@supports \(backdrop-filter: blur\(1px\)\)[^{]*\{\s*\.app-header\s*\{[^}]*background-color: var\(--header-bg\)[^}]*backdrop-filter: blur\(14px\)/,
-    )
-    expect(styles.match(/\.app-header\b/g)).toHaveLength(1)
-    expect(styles).toMatch(/govue has no\s+\*?\s*header background token/)
+  it('makes the header translucent through govue header tokens, with no selector of its own', () => {
+    const theme = source('src/theme/vtech.css')
+    expect(theme).toMatch(/--color-header-bg:\s*color-mix\(in srgb, var\(--color-bg\) 86%/)
+    expect(theme).toMatch(/--header-backdrop:\s*blur\(14px\) saturate\(1\.2\);/)
+    expect(styles).not.toMatch(/\.app-header\b/)
+    expect(styles).not.toMatch(/backdrop-filter/)
   })
 
   it('is what the primary buttons of the home page use', () => {

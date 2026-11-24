@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { createAppI18n } from '../i18n'
 import type { Locale } from '../i18n'
+import { createSiteGovueI18n } from '../i18n/govue'
 import { IMPRESSIONS_HIDDEN_QUERY, impressionsOnPage } from '../lib/pageSections'
 import AppHeader from './AppHeader.vue'
 import InstagramFeed from './InstagramFeed.vue'
@@ -23,7 +24,10 @@ async function renderPage(locale: Locale, answer: () => Promise<unknown>) {
   const page = defineComponent({
     render: () => [h(AppHeader), h(InstagramFeed, { client })],
   })
-  return render(page, { global: { plugins: [createAppI18n(locale), router] } })
+  const i18n = createAppI18n(locale)
+  return render(page, {
+    global: { plugins: [i18n, router, createSiteGovueI18n({ i18n, locale })] },
+  })
 }
 
 function navLabels(): string[] {

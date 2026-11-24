@@ -53,9 +53,9 @@ const outDir = join(here, '../../cmd/website/prerendered')
 
 // The same call main.ts makes, for the same two values, before anything
 // is rendered. useTheme holds one shared state per process and the header
-// reads it to draw the theme toggle, so without this the toggle would be
-// prerendered as the sun with "switch to light mode" on it and then flip
-// to the moon the moment the bundle hydrated. There is no document here,
+// reads it to draw the theme switch, so without this the switch would be
+// prerendered on "system" and then jump to "dark" the moment the bundle
+// hydrated. There is no document here,
 // so the attribute writing half of useTheme does nothing;
 // renderDocument below writes those attributes itself.
 useTheme({ theme: THEME_NAME, mode: DEFAULT_MODE, storageKey: STORAGE_KEY })

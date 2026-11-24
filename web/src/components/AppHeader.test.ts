@@ -1,10 +1,11 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { render } from '@testing-library/vue'
+import { render, screen } from '@testing-library/vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { createAppI18n } from '../i18n'
+import { createSiteGovueI18n } from '../i18n/govue'
 import { HEADER_HEIGHT_PROPERTY } from '../lib/headerHeight'
 import AppHeader from './AppHeader.vue'
 import WordMark from './WordMark.vue'
@@ -13,15 +14,76 @@ function source(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf-8')
 }
 
-async function renderHeader() {
+async function renderHeader(path = '/de') {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/:locale', name: 'home', component: { template: '<div />' } }],
+    routes: [
+      { path: '/:locale', name: 'home', component: { template: '<div />' } },
+      { path: '/:locale/imprint', name: 'imprint', component: { template: '<div />' } },
+    ],
   })
-  await router.push('/de')
+  await router.push(path)
   await router.isReady()
-  return render(AppHeader, { global: { plugins: [createAppI18n('de'), router] } })
+  const locale = path.startsWith('/en') ? 'en' : 'de'
+  const i18n = createAppI18n(locale)
+  const view = render(AppHeader, {
+    global: { plugins: [i18n, router, createSiteGovueI18n({ i18n, locale })] },
+  })
+  return { ...view, router }
 }
+
+describe('AppHeader on govue header', () => {
+  it('puts the navigation at the end, next to the actions', async () => {
+    const { container } = await renderHeader()
+    const nav = screen.getByRole('navigation', { name: 'Hauptmenü' })
+    expect(nav.closest('[class*="justify-end"]')).not.toBeNull()
+    expect(container.querySelector('header')?.dataset.overlay).toBeUndefined()
+  })
+
+  it('makes the contact link the one call to action', async () => {
+    const { container } = await renderHeader()
+    const links = Array.from(
+      screen.getByRole('navigation', { name: 'Hauptmenü' }).querySelectorAll('li a'),
+    )
+    const contact = links.find((a) => a.getAttribute('href') === '/de#contact')
+    expect(contact).toBeDefined()
+    expect(contact?.className).toMatch(/bg-accent-strong/)
+    const ctas = links.filter((a) => /bg-accent-strong/.test(a.className))
+    expect(ctas).toHaveLength(1)
+    expect(container.innerHTML).not.toMatch(/ThemeToggle/)
+  })
+
+  it('offers each language as a link to the same page, with hreflang', async () => {
+    await renderHeader('/de/imprint')
+    const group = screen.getByRole('group', { name: /Sprache/ })
+    const links = Array.from(group.querySelectorAll('a'))
+    expect(links.map((a) => [a.getAttribute('hreflang'), a.getAttribute('href')])).toEqual([
+      ['de', '/de/imprint'],
+      ['en', '/en/imprint'],
+    ])
+    expect(links[0].getAttribute('aria-current')).toBe('true')
+  })
+
+  it('hands a language click to the router instead of reloading', async () => {
+    const { router } = await renderHeader('/de/imprint')
+    const english = screen.getByRole('link', { name: 'English' })
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+    english.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    await router.isReady()
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.fullPath).toBe('/en/imprint')
+    })
+  })
+
+  it('shows the compact theme switch with three named modes', async () => {
+    await renderHeader()
+    const group = screen.getByRole('radiogroup')
+    const options = Array.from(group.querySelectorAll('[role="radio"], button'))
+    expect(options).toHaveLength(3)
+    expect(group.querySelectorAll('svg').length).toBeGreaterThanOrEqual(3)
+  })
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()

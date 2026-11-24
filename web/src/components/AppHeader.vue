@@ -2,14 +2,19 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { GovueHeader, GovueNav, type NavItem } from '@ostendorf-cloud/govue'
+import {
+  GovueHeader,
+  GovueLanguageSwitch,
+  GovueNav,
+  GovueThemeSwitch,
+  type NavItem,
+} from '@ostendorf-cloud/govue'
 
 import { trackHeaderHeight } from '../lib/headerHeight'
 import { useMediaQuery } from '../lib/mediaQuery'
 import { IMPRESSIONS_HIDDEN_QUERY, IMPRESSIONS_ID, impressionsOnPage } from '../lib/pageSections'
-import LocaleSwitch from './LocaleSwitch.vue'
+import { NOT_FOUND_ROUTE_NAME } from '../router'
 import LogoMark from './LogoMark.vue'
-import ThemeToggle from './ThemeToggle.vue'
 import WordMark from './WordMark.vue'
 
 // The header's height is not a constant: below 480px govue's header puts
@@ -29,13 +34,13 @@ onBeforeUnmount(() => {
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-
 const impressionsHiddenInRow = useMediaQuery(IMPRESSIONS_HIDDEN_QUERY)
 
 /** Every nav item is an in-page anchor on the home page: this milestone
  *  has only one page with sections, so there is nowhere else to link a
  *  section heading to. GovueNav renders a plain anchor, not a router-link,
- *  so each href is resolved to a real path up front. */
+ *  so each href is resolved to a real path up front. The contact link is
+ *  the call to action, govue's `cta` item. */
 const items = computed<NavItem[]>(() => {
   const locale = route.params.locale
   const home = (hash: string) => router.resolve({ name: 'home', params: { locale }, hash }).href
@@ -51,13 +56,35 @@ const items = computed<NavItem[]>(() => {
       : []),
     { href: home('#bands'), label: t('nav.bands') },
     { href: home('#about'), label: t('nav.about') },
-    { href: home('#contact'), label: t('nav.contact') },
+    { href: home('#contact'), label: t('nav.contact'), variant: 'cta' },
   ]
 })
+
+/** linkFor is the current page in another language: same route name,
+ *  params and hash, only :locale swapped, so switching never drops a
+ *  visitor back to the home page. A repeatable param resolved with no
+ *  entries, the not-found route's own pathMatch for instance, drops the
+ *  trailing slash the route pattern carries; it is restored for that route
+ *  only, so the link is canonical. The legal pages never end in a slash:
+ *  govue's /<code>/<page> is the one canonical path. */
+function linkFor(code: string): string {
+  const href = router.resolve({
+    name: route.name ?? undefined,
+    params: { ...route.params, locale: code },
+    hash: route.hash,
+  }).href
+  return route.name === NOT_FOUND_ROUTE_NAME && !href.endsWith('/') ? `${href}/` : href
+}
+
+/** navigate hands a plain click to the router, so the page does not reload. */
+function navigate(href: string): boolean {
+  void router.push(href)
+  return true
+}
 </script>
 
 <template>
-  <GovueHeader ref="header" class="app-header">
+  <GovueHeader ref="header" nav-placement="end">
     <template #brand>
       <router-link
         :to="{ name: 'home', params: { locale: route.params.locale } }"
@@ -68,10 +95,15 @@ const items = computed<NavItem[]>(() => {
         <WordMark />
       </router-link>
     </template>
+
     <GovueNav :items="items" :aria-label="t('nav.main')" />
+
+    <template #theme>
+      <GovueThemeSwitch compact />
+    </template>
+
     <template #actions>
-      <LocaleSwitch />
-      <ThemeToggle />
+      <GovueLanguageSwitch :link-for="linkFor" :navigate="navigate" />
     </template>
   </GovueHeader>
 </template>
