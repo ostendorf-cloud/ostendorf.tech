@@ -40,8 +40,10 @@ func contactSubject(r contact.Request) string {
 
 // contactBody is the plain text body of every contact mail: a German intro
 // line, govue's DefaultBody with the name, the address and the message, and
-// one line on the consent box. The visitor's address is also in Reply-To,
-// set by govue.
+// one line on the consent box. DefaultBody picks its labels from
+// Request.Language, the page language GovueContactForm sends: German on a
+// German page, English on an English one or without a language. The
+// visitor's address is also in Reply-To, set by govue.
 func contactBody(r contact.Request) string {
 	return "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n" +
 		contact.DefaultBody(r) + "\n" + consentLine(r) + "\n"

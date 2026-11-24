@@ -150,7 +150,8 @@ func postContact(t *testing.T, app *App, remoteAddr, body string, mod func(*http
 // challenge and submission sends exactly one mail, From and To are the
 // site's, the visitor is only in Reply-To, and the body is the site's intro,
 // govue's DefaultBody and one line on the consent box with the server's
-// receive time.
+// receive time. The submission carries language "de", as GovueContactForm
+// sends it on a German page, so the mail is German throughout.
 func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	app, sender, clock := contactApp(t, nil)
 	const addr = "198.51.100.10:1234"
@@ -158,7 +159,8 @@ func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	sol, _ := fetchChallenge(t, app, addr)
 	clock.Advance(5 * time.Second)
 	received := clock.Now().UTC().Format(time.RFC3339)
-	rec := postContact(t, app, addr, submission(t, &sol), nil)
+	body := submissionWith(t, &sol, map[string]any{"consent": true, "language": "de"})
+	rec := postContact(t, app, addr, body, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("submit status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
 	}
@@ -182,8 +184,8 @@ func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	}
 	wantBody := "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n" +
 		"Name: Erika Mustermann\n" +
-		"Email: erika@example.test\n\n" +
-		"Hallo,\nich brauche Technik.\n" +
+		"E-Mail: erika@example.test\n\n" +
+		"Nachricht:\nHallo,\nich brauche Technik.\n" +
 		"\nEinwilligung: Kontrollkästchen laut Browser angehakt, Eingang beim Server " +
 		received + " (Angabe des Browsers, kein Nachweis)\n"
 	if m.Body != wantBody {
@@ -191,6 +193,66 @@ func TestContactSendsTheSiteMailThroughTheRealChain(t *testing.T) {
 	}
 	if n := strings.Count(m.Body, "Einwilligung"); n != 1 {
 		t.Errorf("Body names the consent %d times, want one line", n)
+	}
+}
+
+// TestContactBodyLabelsFollowTheLanguage proves the labels come from govue's
+// DefaultBody through Request.Language: German for "de", English for a
+// request without a language. The site's intro and consent line stay German.
+func TestContactBodyLabelsFollowTheLanguage(t *testing.T) {
+	cases := []struct {
+		name     string
+		language any
+		want     []string
+		absent   []string
+	}{
+		{
+			name:     "de",
+			language: "de",
+			want:     []string{"\nE-Mail: erika@example.test\n", "\nNachricht:\nHallo,"},
+			absent:   []string{"Email:", "Message:"},
+		},
+		{
+			name:     "none",
+			language: nil,
+			want:     []string{"\nEmail: erika@example.test\n", "\nMessage:\nHallo,"},
+			absent:   []string{"E-Mail:", "Nachricht:"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app, sender, clock := contactApp(t, nil)
+			const addr = "198.51.100.12:1234"
+			sol, _ := fetchChallenge(t, app, addr)
+			clock.Advance(5 * time.Second)
+
+			body := submissionWith(t, &sol, map[string]any{"consent": true, "language": tc.language})
+			rec := postContact(t, app, addr, body, nil)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("submit status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body)
+			}
+			sent := sender.messages()
+			if len(sent) != 1 {
+				t.Fatalf("sent %d mails, want 1", len(sent))
+			}
+			got := sent[0].Body
+			if !strings.HasPrefix(got, "Neue Kontaktanfrage über das Formular auf ostendorf.tech\n\n") {
+				t.Errorf("Body = %q, want the German intro first", got)
+			}
+			if !strings.Contains(got, "\nEinwilligung: ") {
+				t.Errorf("Body = %q, want the German consent line", got)
+			}
+			for _, w := range tc.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("Body = %q, want %q", got, w)
+				}
+			}
+			for _, a := range tc.absent {
+				if strings.Contains(got, a) {
+					t.Errorf("Body = %q, want no %q", got, a)
+				}
+			}
+		})
 	}
 }
 
