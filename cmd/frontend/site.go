@@ -42,16 +42,14 @@ const maxRateLimitKeys = 100_000
 // languages are the site's two, German first as the default.
 var languages = []string{"de", "en"}
 
-// themeBootOptions is the seam for the site's dark default. govue's boot
-// script resolves "nothing stored" to the system setting and removes the
-// prerendered data-mode="dark"; govue v0.8.0 has no option to change that.
-// govue v0.9.0 adds themeboot.WithDefaultMode (govue#254). Once go.mod and
-// web/package.json name v0.9.0, this returns
-// []themeboot.Option{themeboot.WithDefaultMode("dark")} and
-// TestThemeBootKeepsTheDarkDefault drops its t.Skip. The storage key is
-// govue's default, themeboot.StorageKey, the same as web/src/lib/theme.ts.
+// themeBootOptions are the options of govue's theme boot script. The site
+// opens dark: with nothing stored the script keeps the prerendered
+// data-mode="dark" and pins the theme-color tags to the dark colour, the
+// same mode web/src/lib/theme.ts hands useTheme and the prerender writes.
+// A stored choice, system included, still wins. The storage key is govue's
+// default, themeboot.StorageKey, the same as web/src/lib/theme.ts.
 func themeBootOptions() []themeboot.Option {
-	return nil
+	return []themeboot.Option{themeboot.WithDefaultMode(themeboot.ModeDark)}
 }
 
 // redirects keep the former AGB paths: /<code>/agb and /<code>/agb/ answer

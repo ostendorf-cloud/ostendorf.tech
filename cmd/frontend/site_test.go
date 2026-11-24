@@ -395,13 +395,37 @@ func TestThemeColorsMatchTheTheme(t *testing.T) {
 	}
 }
 
-// TestThemeBootKeepsTheDarkDefault is the seam for the site's dark default.
-// It is skipped until govue v0.9.0: then themeBootOptions returns
-// themeboot.WithDefaultMode("dark") and this test drops its t.Skip.
+// TestThemeBootKeepsTheDarkDefault proves every served page, the 404 page
+// included, carries govue's boot script for the dark default, the script
+// govue pins in its themeboot testdata as boot-dark.js, and that the
+// policy allows exactly that script. A page with the system default would
+// turn a first visit on a light system light.
 func TestThemeBootKeepsTheDarkDefault(t *testing.T) {
-	t.Skip("waits for govue v0.9.0 themeboot.WithDefaultMode (govue#254): " +
-		"without it govue's boot script turns a first visit into the system mode")
-	if len(themeBootOptions()) == 0 {
-		t.Fatal("themeBootOptions passes no default mode, the dark default is lost on a first visit")
+	dark := []themeboot.Option{themeboot.WithDefaultMode(themeboot.ModeDark)}
+	want := themeboot.Script(dark...)
+	if want == themeboot.Script() {
+		t.Fatal("the dark script equals the system one: the option changes nothing")
+	}
+	h := server(t, nil, options{}).Handler()
+	for _, path := range []string{"/de/", "/en/imprint", "/nope"} {
+		rec := visit(t, h, path, nil)
+		if !strings.Contains(rec.Body.String(), want) {
+			t.Errorf("%s does not carry the dark default boot script", path)
+		}
+		if strings.Contains(rec.Body.String(), themeboot.Script()) {
+			t.Errorf("%s carries the system default boot script", path)
+		}
+		if csp := rec.Header().Get("Content-Security-Policy"); !strings.Contains(csp, themeboot.Hash(dark...)) {
+			t.Errorf("%s policy lacks the dark script's hash", path)
+		}
+	}
+	// The browser side starts useTheme and pins the prerendered data-mode
+	// with the same mode, see TestPrerenderedPagesPinTheColourMode.
+	theme, err := os.ReadFile("../../web/src/lib/theme.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`DEFAULT_MODE[^=]*= 'dark'`).Match(theme) {
+		t.Error("web/src/lib/theme.ts no longer defaults to dark")
 	}
 }
