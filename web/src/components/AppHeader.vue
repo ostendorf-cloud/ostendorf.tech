@@ -93,7 +93,7 @@ function navigate(href: string): boolean {
 </script>
 
 <template>
-  <GovueHeader ref="header" nav-placement="end" :overlay="overlay">
+  <GovueHeader ref="header" nav-placement="center" :overlay="overlay">
     <template #brand>
       <router-link
         :to="{ name: 'home', params: { locale: route.params.locale } }"
@@ -110,7 +110,7 @@ function navigate(href: string): boolean {
     <!-- The same two controls at every width: the one cycle button and only
          the link to the other language. GovueHeader puts both after the
          navigation, at the right edge of the bar, theme button first and the
-         language link last. -->
+         language link last. The navigation itself sits in the middle. -->
     <template #theme>
       <GovueThemeSwitch cycle />
     </template>
