@@ -107,23 +107,16 @@ function navigate(href: string): boolean {
 
     <GovueNav :items="items" :aria-label="t('nav.main')" />
 
-    <!-- govue's narrow setup: below 1024px the one cycle button and only the
-         link to the other language, so brand and actions stay one row. From
-         1024px the compact switch and both languages. hidden is display:
-         none, so the variant of the other width leaves the accessibility
-         tree, and contents keeps the visible one a flex item of the row. -->
+    <!-- The same two controls at every width: the one cycle button and only
+         the link to the other language. GovueHeader puts both after the
+         navigation, at the right edge of the bar, theme button first and the
+         language link last. -->
     <template #theme>
-      <span class="contents lg:hidden"><GovueThemeSwitch cycle /></span>
-      <span class="hidden lg:contents"><GovueThemeSwitch compact /></span>
+      <GovueThemeSwitch cycle />
     </template>
 
     <template #actions>
-      <span class="contents lg:hidden">
-        <GovueLanguageSwitch :link-for="linkFor" :navigate="navigate" others-only />
-      </span>
-      <span class="hidden lg:contents">
-        <GovueLanguageSwitch :link-for="linkFor" :navigate="navigate" />
-      </span>
+      <GovueLanguageSwitch :link-for="linkFor" :navigate="navigate" others-only />
     </template>
   </GovueHeader>
 </template>
