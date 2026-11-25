@@ -33,10 +33,13 @@ async function renderHeader(path = '/de') {
 }
 
 describe('AppHeader on govue header', () => {
-  it('puts the navigation at the end, next to the actions', async () => {
+  it('centres the navigation in the middle of the bar', async () => {
     await renderHeader()
     const nav = screen.getByRole('navigation', { name: 'Hauptmenü' })
-    expect(nav.closest('[class*="justify-end"]')).not.toBeNull()
+    const part = nav.parentElement as HTMLElement
+    expect(part.className).toContain('min-[480px]:justify-center')
+    expect(part.className).not.toContain('justify-end')
+    expect(part.className).not.toContain('justify-start')
   })
 
   it('lies over the hero on the home page only, transparent before a scroll', async () => {

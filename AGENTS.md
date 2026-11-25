@@ -220,8 +220,8 @@ The global baseline already applies here and is not repeated below.
   Worker is govue's, emitted by Vite as a same-origin file under `/assets/` that govue's
   default `worker-src 'self'` allows. `web/src/views/contactSection.test.ts` proves the
   section in both languages. The header (`web/src/components/AppHeader.vue`) is govue's
-  `GovueHeader` with the navigation at the end, the contact link as the `cta` nav item,
-  `GovueLanguageSwitch` in link mode (`linkFor`, `navigate` to the router) and
+  `GovueHeader` with the navigation centred (`navPlacement="center"`), the contact link
+  as the `cta` nav item, `GovueLanguageSwitch` in link mode (`linkFor`, `navigate` to the router) and
   `GovueThemeSwitch` in the `#theme` slot, the same at every width: the `cycle` button
   and the `othersOnly` link to the other language, with `hreflang`, `lang` and
   `navigate`. There is no width variant and no wrapper. govue puts both after the
