@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task lint:fmt
+      - run: task --trusted-hosts github.com lint:fmt
 
   golangci-config:
     runs-on: ubuntu-latest
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task lint:golangci-config
+      - run: task --trusted-hosts github.com lint:golangci-config
 
   vet:
     runs-on: ubuntu-latest
@@ -52,7 +52,7 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-govue-version-
             ${{ runner.os }}-routes-
-      - run: task lint:vet
+      - run: task --trusted-hosts github.com lint:vet
 
   golangci:
     runs-on: ubuntu-latest
@@ -88,7 +88,7 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-govue-version-
             ${{ runner.os }}-routes-
-      - run: task lint:golangci
+      - run: task --trusted-hosts github.com lint:golangci
 
   markdownlint:
     runs-on: ubuntu-latest
@@ -96,7 +96,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task lint:markdown
+      - run: task --trusted-hosts github.com lint:markdown
+
+  agents-md:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
+      - run: task --trusted-hosts github.com lint:agents-md
 
   yamllint:
     runs-on: ubuntu-latest
@@ -104,7 +112,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task lint:yaml
+      - run: task --trusted-hosts github.com lint:yaml
 
   actionlint:
     runs-on: ubuntu-latest
@@ -112,7 +120,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task lint:actions
+      - run: task --trusted-hosts github.com lint:actions
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -122,7 +130,7 @@ jobs:
         with:
           fetch-depth: 0
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task lint:secrets
+      - run: task --trusted-hosts github.com lint:secrets
 
   web-lint:
     runs-on: ubuntu-latest
@@ -130,7 +138,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task web:lint
+      - run: task --trusted-hosts github.com web:lint
 
   web-format:
     runs-on: ubuntu-latest
@@ -138,7 +146,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task web:format
+      - run: task --trusted-hosts github.com web:format
 
   web-types:
     runs-on: ubuntu-latest
@@ -146,7 +154,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task web:types
+      - run: task --trusted-hosts github.com web:types
 
   web-test:
     runs-on: ubuntu-latest
@@ -154,7 +162,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task web:test
+      - run: task --trusted-hosts github.com web:test
 
   build:
     runs-on: ubuntu-latest
@@ -183,7 +191,7 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-govue-version-
             ${{ runner.os }}-routes-
-      - run: task build
+      - run: task --trusted-hosts github.com build
 
   build-feed:
     runs-on: ubuntu-latest
@@ -212,7 +220,7 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-govue-version-
             ${{ runner.os }}-routes-
-      - run: task build:feed
+      - run: task --trusted-hosts github.com build:feed
 
   # cmd/api embeds nothing, so this job needs no frontend build. It shares
   # build-feed's cache key, both compile without the Vue build.
@@ -232,7 +240,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-feed-
             ${{ runner.os }}-build-
-      - run: task build:api
+      - run: task --trusted-hosts github.com build:api
 
   test:
     runs-on: ubuntu-latest
@@ -261,7 +269,7 @@ jobs:
             ${{ runner.os }}-build-feed-
             ${{ runner.os }}-govue-version-
             ${{ runner.os }}-routes-
-      - run: task test:go
+      - run: task --trusted-hosts github.com test:go
 
   govue-version:
     runs-on: ubuntu-latest
@@ -290,7 +298,7 @@ jobs:
             ${{ runner.os }}-build-feed-
             ${{ runner.os }}-test-
             ${{ runner.os }}-routes-
-      - run: task check:govue-version
+      - run: task --trusted-hosts github.com check:govue-version
 
   routes:
     runs-on: ubuntu-latest
@@ -319,7 +327,7 @@ jobs:
             ${{ runner.os }}-build-feed-
             ${{ runner.os }}-test-
             ${{ runner.os }}-govue-version-
-      - run: task test:routes
+      - run: task --trusted-hosts github.com test:routes
 
   hadolint:
     runs-on: ubuntu-latest
@@ -327,7 +335,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task lint:docker
+      - run: task --trusted-hosts github.com lint:docker
 
   shell:
     runs-on: ubuntu-latest
@@ -335,7 +343,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task lint:shell
+      - run: task --trusted-hosts github.com lint:shell
 
   build-once:
     runs-on: ubuntu-latest
@@ -343,7 +351,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task check:build-once
+      - run: task --trusted-hosts github.com check:build-once
 
   # The frontend and the API image, on each platform's native runner.
   docker-build:
@@ -403,7 +411,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task lint:helm
+      - run: task --trusted-hosts github.com lint:helm
 
   kubeconform:
     runs-on: ubuntu-latest
@@ -411,7 +419,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task validate:kubeconform
+      - run: task --trusted-hosts github.com validate:kubeconform
 
   helm-unittest:
     runs-on: ubuntu-latest
@@ -419,7 +427,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78  # v5.3.0
-      - run: task test:helm
+      - run: task --trusted-hosts github.com test:helm
 
   renovate-config:
     uses: ostendorf-cloud/workflows/.github/workflows/reusable-renovate-config.yaml@v0

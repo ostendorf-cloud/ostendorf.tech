@@ -18,7 +18,7 @@ targets=(lint:vet lint:golangci build test:go test:routes check)
 fail=0
 
 for target in "${targets[@]}"; do
-  out="$(task --taskfile "$taskfile" --dry "$target" 2>&1)"
+  out="$(task --trusted-hosts github.com --taskfile "$taskfile" --dry "$target" 2>&1)"
   for step in web:build prerender; do
     count="$(grep -c -F "task: [${step}] " <<<"$out" || true)"
     if [[ "$count" -ne 1 ]]; then
