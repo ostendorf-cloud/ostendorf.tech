@@ -5,8 +5,8 @@ description: >-
   single page application, prerendered HTML and the contact form.
 type: application
 # version and appVersion are stamped by release-me on every release; see release-me.yaml.
-version: 0.1.0
-appVersion: 0.1.0
+version: 0.1.1
+appVersion: 0.1.1
 home: https://github.com/ostendorf-cloud/ostendorf.tech
 sources:
   - https://github.com/ostendorf-cloud/ostendorf.tech
