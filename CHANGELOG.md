@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.1.1](https://github.com/ostendorf-cloud/ostendorf.tech/compare/v0.1.0...v0.1.1) (2026-11-28)
+
+### Bug Fixes
+
+- **ci:** use the client id for the release app token ([#182](https://github.com/ostendorf-cloud/ostendorf.tech/pull/182))
+- **deps:** update govue to v0.12.0 ([#173](https://github.com/ostendorf-cloud/ostendorf.tech/pull/173))
+- **deps:** update govue to v0.11.0 ([#168](https://github.com/ostendorf-cloud/ostendorf.tech/pull/168))
+
 ## v0.1.0 (2026-11-25)
 
 ### Features
